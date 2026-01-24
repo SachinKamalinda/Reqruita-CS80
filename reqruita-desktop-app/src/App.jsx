@@ -1,35 +1,26 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.jsx
+import React, { useMemo, useState, useEffect } from "react";
 
-function App() {
-  const [count, setCount] = useState(0)
+import RoleSelect from "./pages/RoleSelect.jsx";
+import Login from "./pages/Login.jsx";
+import DeviceCheck from "./pages/DeviceCheck.jsx";
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+import MeetingInterviewer from "./pages/MeetingInterviewer.jsx";
+import MeetingInterviewee from "./pages/MeetingInterviewee.jsx";
 
-export default App
+//TEMP hardcoded credentials 
+
+const USERS = [
+  {
+    role: "join", // Interviewee (Candidate) joins interview
+    email: "candi@com.com",
+    meetingId: "wuo12333",
+    password: "8d3#223",
+  },
+  {
+    role: "conduct", // Interviewer conducts interview
+    email: "work@crn.com",
+    meetingId: "wuo12333",
+    password: "8d3#223",
+  },
+];
