@@ -45,3 +45,40 @@ function setupDisplayMediaHandler() {
         { useSystemPicker: false }
     );
 }
+
+//Interview mode (full screen + kiosk-ish lock) via IPC
+// This locks the app window, not the entire OS 
+
+function setupInterviewModeIPC() {
+    ipcMain.handle("rq:enter-interview-mode", () => {
+        if (!win) return;
+
+        // Most "locked" Electron can do:
+        win.setKiosk(true);
+        win.setFullScreen(true);
+
+        // Keep it focused on top (optional but helpful)
+        win.setAlwaysOnTop(true, "screen-saver");
+
+        // Reduce escape routes inside the app
+        win.setResizable(false);
+        win.setMinimizable(false);
+
+        // If you want to prevent closing the window via X (optional):
+        // win.setClosable(false);
+    });
+
+    ipcMain.handle("rq:exit-interview-mode", () => {
+        if (!win) return;
+
+        win.setAlwaysOnTop(false);
+        win.setKiosk(false);
+        win.setFullScreen(false);
+
+        win.setResizable(true);
+        win.setMinimizable(true);
+
+        // If you used setClosable(false) above:
+        // win.setClosable(true);
+    });
+}
