@@ -102,11 +102,11 @@ Structure first. Enforcement later.
 
 
 <p align="center">
-  <img src="screan shots/1.png" width="60%" alt="Reqruita Preview 1"/>
+  <img src="screan shots/3.png" width="30%" alt="Reqruita Preview 1"/>
 </p>
 
 <p align="center">
-  <img src="screan shots/2.png" width="60%" alt="Reqruita Preview 2"/>
+  <img src="screan shots/5.png" width="30%" alt="Reqruita Preview 2"/>
 </p>
 
 <details>
@@ -114,15 +114,15 @@ Structure first. Enforcement later.
 
   <br/>
   <p align="center">
-    <img src="screan shots/3.png" width="60%" alt="Interviewer UI"/>
+    <img src="screan shots/1.png" width="60%" alt="Interviewer UI"/>
+  </p>
+
+  <p align="center">
+    <img src="screan shots/2.png" width="60%" alt="Interviewee UI"/>
   </p>
 
   <p align="center">
     <img src="screan shots/4.png" width="60%" alt="Interviewee UI"/>
-  </p>
-
-  <p align="center">
-    <img src="screan shots/5.png" width="60%" alt="Interviewee UI"/>
   </p>
 </details>
 
