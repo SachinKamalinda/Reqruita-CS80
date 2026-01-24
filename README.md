@@ -102,11 +102,11 @@ Structure first. Enforcement later.
 
 
 <p align="center">
-  <img src="./assets/screan shots/1.png" width="90%" alt="Reqruita Preview 1"/>
+  <img src="./reqruita-desktop-app/src/assets/screenshots/1.png" width="90%" alt="Reqruita Preview 1"/>
 </p>
 
 <p align="center">
-  <img src="./assets/screan shots/2.png" width="90%" alt="Reqruita Preview 2"/>
+  <img src="./reqruita-desktop-app/src/assets/screenshots/2.png" width="90%" alt="Reqruita Preview 2"/>
 </p>
 
 <details>
@@ -114,15 +114,15 @@ Structure first. Enforcement later.
 
   <br/>
   <p align="center">
-    <img src="./assets/screan shots/3.png" width="90%" alt="Interviewer UI"/>
+    <img src="./reqruita-desktop-app/src/assets/screenshots/3.png" width="90%" alt="Interviewer UI"/>
   </p>
 
   <p align="center">
-    <img src="././assets/screan shots/4.png" width="90%" alt="Interviewee UI"/>
+    <img src="./reqruita-desktop-app/src/assets/screenshots/4.png" width="90%" alt="Interviewee UI"/>
   </p>
 
   <p align="center">
-    <img src="././assets/screan shots/5.png" width="90%" alt="Interviewee UI"/>
+    <img src="reqruita-desktop-app/src/assets/screenshots/5.png" width="90%" alt="Interviewee UI"/>
   </p>
 </details>
 
