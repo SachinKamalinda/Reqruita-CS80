@@ -122,7 +122,7 @@ Structure first. Enforcement later.
   </p>
 
   <p align="center">
-    <img src="reqruita-desktop-app/src/assets/screenshots/5.png" width="90%" alt="Interviewee UI"/>
+    <img src="screenshots/5.png" width="90%" alt="Interviewee UI"/>
   </p>
 </details>
 
