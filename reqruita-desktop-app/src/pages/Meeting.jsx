@@ -74,3 +74,36 @@ export default function Meeting({ role, onEnd }) {
         </div>
     );
 }
+function Box({ title, children }) {
+    return (
+        <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>{title}</div>
+            <div style={{ background: "#0b1220", borderRadius: 10, padding: 8 }}>
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function stopStream(stream) {
+    if (!stream) return;
+    for (const track of stream.getTracks()) track.stop();
+}
+
+const videoStyle = {
+    width: "100%",
+    height: 260,
+    borderRadius: 10,
+    background: "black",
+    objectFit: "cover",
+};
+
+const endBtn = {
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.2)",
+    background: "#7f1d1d",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: 800,
+};
