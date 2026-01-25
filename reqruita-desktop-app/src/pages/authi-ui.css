@@ -247,3 +247,224 @@ body.rq-noscr{
   color: #dc2626;
   margin: 6px 0 10px;
 }
+
+
+/* ================= Device Check (matches Login UI) ================= */
+
+.dc-wrap{
+  height: 100%;
+  width: 100%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  padding: var(--rq-safe);
+  overflow: hidden;
+}
+
+.dc-card{
+  width: 100%;
+  max-width: 920px;
+  border-radius: 14px;
+  border: 1px solid var(--rq-border);
+  background: #fff;
+  padding: 18px;
+  overflow: hidden;
+}
+
+/* header */
+.dc-top{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.dc-title{
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0;
+  color: var(--rq-text);
+}
+
+.dc-sub{
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--rq-muted);
+  line-height: 1.35;
+  max-width: 560px;
+}
+
+.dc-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--rq-border);
+  color: var(--rq-muted);
+  background: #fafafa;
+}
+
+/* control pills */
+.dc-controls{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 920px){
+  .dc-controls{ grid-template-columns: 1fr; }
+}
+
+.dc-pill{
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--rq-border);
+  background: #fff;
+  color: var(--rq-text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: 140ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.dc-pill:hover{ transform: translateY(-1px); background: #fafafa; }
+.dc-pill:active{ transform: translateY(0px); }
+
+.dc-pill-on{
+  border-color: rgba(75,47,182,0.35);
+  background: rgba(75,47,182,0.08);
+  color: #2b1a73;
+}
+
+.dc-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+.dc-dot-on{ background: #22c55e; } /* green */
+
+/* error */
+.dc-err{
+  margin-top: 12px;
+  font-size: 13px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+/* previews */
+.dc-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (max-width: 900px){
+  .dc-grid{ grid-template-columns: 1fr; }
+}
+
+/* Make previews height flexible to avoid overflow */
+.dc-preview{
+  border: 1px solid var(--rq-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dc-preview-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rq-border);
+}
+
+.dc-preview-title{
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--rq-text);
+}
+
+.dc-status{
+  font-size: 11px;
+  color: var(--rq-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dc-body{
+  background: #0b1220;         /* keeps the preview dark like camera feed */
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  min-height: 160px;
+  height: clamp(160px, 34vh, 260px);
+}
+
+.dc-video{
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  background: black;
+  object-fit: cover;
+}
+
+/* footer buttons */
+.dc-footer{
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: center;
+}
+
+.dc-back{
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--rq-border);
+  background: #fff;
+  color: var(--rq-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dc-next{
+  flex: 1;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  background: var(--rq-primary);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(75,47,182,0.22);
+  transition: 140ms ease;
+}
+
+.dc-next:hover{ background: var(--rq-primary-hover); }
+
+.dc-next-disabled{
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dc-tip{
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--rq-muted);
+}
