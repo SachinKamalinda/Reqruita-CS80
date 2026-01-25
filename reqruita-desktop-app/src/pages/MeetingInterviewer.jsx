@@ -457,3 +457,29 @@ export default function MeetingInterviewer({ session, onEnd }) {
         </div>
     );
 }
+
+/* ---------- Small UI helper ---------- */
+function ParticipantRow({ name, actions }) {
+    const initial = (name || "?").trim().slice(0, 1).toUpperCase();
+    return (
+        <div className="mt-p-row">
+            <div className="mt-avatar">{initial}</div>
+            <div>
+                <div className="mt-p-name">{name}</div>
+                <div className="mt-p-sub"> </div>
+            </div>
+            {actions}
+        </div>
+    );
+}
+
+/* ---------- Media helpers ---------- */
+function stopStream(stream) {
+    if (!stream) return;
+    for (const track of stream.getTracks()) track.stop();
+}
+
+function setTracksEnabled(stream, kind, enabled) {
+    const tracks = kind === "audio" ? stream.getAudioTracks() : stream.getVideoTracks();
+    for (const t of tracks) t.enabled = enabled;
+}
