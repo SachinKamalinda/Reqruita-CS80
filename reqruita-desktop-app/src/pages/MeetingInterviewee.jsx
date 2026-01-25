@@ -129,3 +129,78 @@ export default function MeetingInterviewee({ session, onLeave }) {
         stopStream(shareStream);
         onLeave?.();
     }
+
+    return (
+        <div className="jm-wrap">
+            {error && (
+                <div className="mt-err" style={{ background: "rgba(220,38,38,0.92)" }}>
+                    {error}
+                </div>
+            )}
+
+            <div className="jm-row">
+                {/* Main shared screen */}
+                <div className="jm-main">
+                    <div className="jm-share">
+                        {shareStream ? (
+                            <video ref={shareRef} autoPlay playsInline muted />
+                        ) : (
+                            <div className="jm-share-placeholder">
+                                Screen share (not active)
+                                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8, fontWeight: 700 }}>
+                                    Meeting: {session?.meetingId || "—"}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Side videos */}
+                <div className="jm-side">
+                    {/* Interviewee video (real) */}
+                    <div className="jm-tile">
+                        <video ref={camRef} autoPlay playsInline muted />
+                        <div className="jm-label">You (Candidate)</div>
+                    </div>
+
+                    {/* Interviewer video (placeholder for now) */}
+                    <div className="jm-tile">
+                        <div
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                background:
+                                    "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))",
+                                display: "grid",
+                                placeItems: "center",
+                                color: "rgba(255,255,255,0.9)",
+                                fontWeight: 900,
+                                fontSize: 12,
+                            }}
+                        >
+                            Interviewer video (placeholder)
+                        </div>
+                        <div className="jm-label">Interviewer</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Footer */}
+            <div className="jm-footer">
+                <div className="jm-left">
+                    <button className={`mt-ctl ${micMuted ? "mt-ctl-off" : ""}`} onClick={toggleMic}>
+                        {micMuted ? "Mic Off" : "Mic"}
+                    </button>
+
+                    <button className={`mt-ctl ${camOff ? "mt-ctl-off" : ""}`} onClick={toggleVideo}>
+                        {camOff ? "Video Off" : "Video"}
+                    </button>
+                </div>
+
+                <button className="mt-end" onClick={leave}>
+                    Leave interview
+                </button>
+            </div>
+        </div>
+    );
+}
