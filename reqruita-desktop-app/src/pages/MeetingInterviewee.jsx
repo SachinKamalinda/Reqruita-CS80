@@ -204,3 +204,14 @@ export default function MeetingInterviewee({ session, onLeave }) {
         </div>
     );
 }
+
+/* helpers */
+function stopStream(stream) {
+    if (!stream) return;
+    for (const track of stream.getTracks()) track.stop();
+}
+
+function setTracksEnabled(stream, kind, enabled) {
+    const tracks = kind === "audio" ? stream.getAudioTracks() : stream.getVideoTracks();
+    for (const t of tracks) t.enabled = enabled;
+}
