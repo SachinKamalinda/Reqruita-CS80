@@ -52,9 +52,11 @@ export default function MeetingInterviewer({ session, onEnd }) {
     // Fetches the latest participant list from the backend
     const fetchParticipants = async () => {
         try {
+            console.log("Fetching from:", API_URL);
             const res = await fetch(API_URL);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
+            console.log("Participants received:", data);
             // Ensure data is an array before setting state
             setParticipants(Array.isArray(data) ? data : []);
         } catch (err) {
