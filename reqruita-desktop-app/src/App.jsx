@@ -13,15 +13,15 @@ import MeetingInterviewee from "./pages/MeetingInterviewee.jsx";
 const USERS = [
   {
     role: "join", // Interviewee (Candidate) joins interview
-    email: "candi@com.com",
-    meetingId: "wuo12333",
-    password: "8d3#223",
+    email: "123",
+    meetingId: "123",
+    password: "123",
   },
   {
     role: "conduct", // Interviewer conducts interview
-    email: "work@crn.com",
-    meetingId: "wuo12333",
-    password: "8d3#223",
+    email: "123",
+    meetingId: "123",
+    password: "123",
   },
 ];
 
