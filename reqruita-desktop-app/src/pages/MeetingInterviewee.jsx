@@ -1,41 +1,44 @@
 // src/pages/MeetingInterviewee.jsx
 import React, { useEffect, useRef, useState } from "react";
 import "./auth-ui.css";
+import { BACKEND_URL } from "../config";
 
 /**
- * Interviewee (Join) Meeting
- * - Enters "interview mode" (fullscreen + kiosk-ish) on mount via preload API
- * - Exits interview mode when leaving / unmounting
- * - Main area: REAL screen share (getDisplayMedia)
- * - Left tile: REAL interviewee camera (getUserMedia)
- * - Right tile: interviewer placeholder (image/box for now)
- * - Footer: Mic/Video toggles + Leave Interview
+ * MeetingInterviewee.jsx (WORKING)
+ * - Enters kiosk-ish interview mode on mount (Electron preload)
+ * - Starts camera+mic
+ * - Registers candidate on backend so interviewer can see them
+ * - Cleans up on leave/unmount
  *
- * Requires preload exposing:
- * window.reqruita.enterInterviewMode()
- * window.reqruita.exitInterviewMode()
+ * Backend required:
+ *  POST /api/participants/join  body: { meetingId, name }
+ *  POST /api/participants/leave body: { meetingId, name }   (optional)
  */
 
 export default function MeetingInterviewee({ session, onLeave }) {
     const camRef = useRef(null);
 
     const [camStream, setCamStream] = useState(null);
-
     const [micMuted, setMicMuted] = useState(false);
     const [camOff, setCamOff] = useState(false);
 
     const [error, setError] = useState("");
     const [googleOpen, setGoogleOpen] = useState(false);
 
-    // Enter full-screen "locked" mode when candidate joins
+    // You can replace this with a real name input later
+    const candidateName =
+        session?.candidateName ||
+        session?.name ||
+        "Candidate";
+
+    // 1) Enter/Exit interview mode (Electron)
     useEffect(() => {
         try {
             window.reqruita?.enterInterviewMode?.();
         } catch (e) {
-            // ignore (e.g., running in browser dev without Electron)
+            // ignore in browser dev
         }
 
-        // Safety: always unlock on unmount
         return () => {
             try {
                 window.reqruita?.exitInterviewMode?.();
@@ -45,13 +48,52 @@ export default function MeetingInterviewee({ session, onLeave }) {
         };
     }, []);
 
-    // Keep meeting non-scroll (panel can scroll internally elsewhere)
+    // 2) Prevent body scroll
     useEffect(() => {
         document.body.classList.add("rq-noscr");
         return () => document.body.classList.remove("rq-noscr");
     }, []);
 
-    // Start camera when entering meeting
+    // 3) Register candidate on backend (so interviewer can see them)
+    useEffect(() => {
+        if (!session?.meetingId) return;
+
+        const controller = new AbortController();
+
+        (async () => {
+            try {
+                await fetch(`${BACKEND_URL}/api/participants/join`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        meetingId: session.meetingId,
+                        name: candidateName,
+                    }),
+                });
+            } catch (e) {
+                // Don’t hard-crash the UI; just show a helpful message
+                console.log("Join backend failed:", e);
+                setError("Could not connect to interview server. Check backend + Wi-Fi/IP.");
+            }
+        })();
+
+        // Optional: tell backend we left when page closes/unmounts
+        return () => {
+            controller.abort();
+            // fire-and-forget; don’t block UI
+            fetch(`${BACKEND_URL}/api/participants/leave`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    meetingId: session.meetingId,
+                    name: candidateName,
+                }),
+            }).catch(() => { });
+        };
+    }, [session?.meetingId, candidateName]);
+
+    // 4) Start camera/mic
     useEffect(() => {
         let mounted = true;
 
@@ -59,9 +101,15 @@ export default function MeetingInterviewee({ session, onLeave }) {
             try {
                 setError("");
 
-                // Interviewee camera + mic (local)
-                const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                if (!mounted) return;
+                const cam = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true,
+                });
+
+                if (!mounted) {
+                    stopStream(cam);
+                    return;
+                }
 
                 setCamStream(cam);
                 if (camRef.current) camRef.current.srcObject = cam;
@@ -77,13 +125,13 @@ export default function MeetingInterviewee({ session, onLeave }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Apply mic toggle
+    // 5) Apply mic toggle
     useEffect(() => {
         if (!camStream) return;
         setTracksEnabled(camStream, "audio", !micMuted);
     }, [micMuted, camStream]);
 
-    // Apply camera toggle
+    // 6) Apply camera toggle
     useEffect(() => {
         if (!camStream) return;
         setTracksEnabled(camStream, "video", !camOff);
@@ -98,12 +146,9 @@ export default function MeetingInterviewee({ session, onLeave }) {
     }
 
     function leave() {
-        // Unlock app window first
         try {
             window.reqruita?.exitInterviewMode?.();
-        } catch (e) {
-            // ignore
-        }
+        } catch (e) { }
 
         stopStream(camStream);
         onLeave?.();
@@ -118,7 +163,7 @@ export default function MeetingInterviewee({ session, onLeave }) {
             )}
 
             <div className="jm-row">
-                {/* Main shared screen */}
+                {/* Main area */}
                 <div className="jm-main">
                     <div className="jm-google">
                         {!googleOpen && (
@@ -128,7 +173,9 @@ export default function MeetingInterviewee({ session, onLeave }) {
                                 <div className="jm-google-sub">
                                     Open Google for quick searches during the interview.
                                 </div>
-                                <div className="jm-google-meta">Meeting: {session?.meetingId || "—"}</div>
+                                <div className="jm-google-meta">
+                                    Meeting: {session?.meetingId || "—"}
+                                </div>
                                 <button className="jm-google-btn" onClick={() => setGoogleOpen(true)}>
                                     Open Google
                                 </button>
@@ -157,20 +204,19 @@ export default function MeetingInterviewee({ session, onLeave }) {
 
                 {/* Side videos */}
                 <div className="jm-side">
-                    {/* Interviewee video (real) */}
+                    {/* Candidate video */}
                     <div className="jm-tile">
                         <video ref={camRef} autoPlay playsInline muted />
                         <div className="jm-label">You (Candidate)</div>
                     </div>
 
-                    {/* Interviewer video (placeholder for now) */}
+                    {/* Interviewer placeholder */}
                     <div className="jm-tile">
                         <div
                             style={{
                                 width: "100%",
                                 height: "100%",
-                                background:
-                                    "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))",
+                                background: "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))",
                                 display: "grid",
                                 placeItems: "center",
                                 color: "rgba(255,255,255,0.9)",

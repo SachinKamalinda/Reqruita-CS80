@@ -1,7 +1,7 @@
 // src/pages/MeetingInterviewer.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./auth-ui.css";
-
+import { BACKEND_URL } from "../config";
 /**
  * MeetingInterviewer.jsx
  * - Right panel toggles: Participants / Chat / Notes
@@ -47,7 +47,9 @@ export default function MeetingInterviewer({ session, onEnd }) {
     const waiting = useMemo(() => participants.filter(p => p.status === "waiting"), [participants]);
     const completed = useMemo(() => participants.filter(p => p.status === "completed"), [participants]);
 
-    const API_URL = "http://127.0.0.1:3001/api/participants";
+    //const API_URL = "http://172.20.10.4:3001/api/participants";
+
+    const API_URL = `${BACKEND_URL}/api/participants`;
 
     // Fetches the latest participant list from the backend
     const fetchParticipants = async () => {
@@ -69,6 +71,8 @@ export default function MeetingInterviewer({ session, onEnd }) {
     // Load participants on component mount
     useEffect(() => {
         fetchParticipants();
+        const t = setInterval(fetchParticipants, 2000);
+        return () => clearInterval(t);
     }, []);
 
     const micLabel = useMemo(() => {
