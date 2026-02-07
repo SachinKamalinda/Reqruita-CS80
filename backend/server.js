@@ -23,7 +23,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
         console.error('Error opening database:', err.message);
     } else {
         console.log('Connected to the SQLite database (reqruita.db).');
-        
+
         // Ensure table exists and has seed data
         db.serialize(() => {
             // 1. Create table
@@ -97,7 +97,7 @@ app.post('/api/participants/allow', (req, res) => {
             }
 
             // 2. Move the selected participant from 'waiting' to 'interviewing'
-            db.run("UPDATE participants SET status = 'interviewing' WHERE id = ?", [id], function(err) {
+            db.run("UPDATE participants SET status = 'interviewing' WHERE id = ?", [id], function (err) {
                 if (err) {
                     db.run("ROLLBACK");
                     return res.status(500).json({ error: "Failed to update selected participant status" });
@@ -128,7 +128,7 @@ app.post('/api/participants/reject', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Participant ID is required' });
 
     const sql = "DELETE FROM participants WHERE id = ?";
-    db.run(sql, [id], function(err) {
+    db.run(sql, [id], function (err) {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
@@ -136,7 +136,7 @@ app.post('/api/participants/reject', (req, res) => {
         if (this.changes === 0) {
             return res.status(404).json({ error: "Participant not found" });
         }
-        
+
         // Fetch updated list to return
         db.all("SELECT * FROM participants", [], (err, rows) => {
             res.json({ message: 'Participant removed', participants: rows });
@@ -150,7 +150,7 @@ app.post('/api/participants/complete', (req, res) => {
     if (!id) return res.status(400).json({ error: 'Participant ID is required' });
 
     const sql = "UPDATE participants SET status = 'completed' WHERE id = ?";
-    db.run(sql, [id], function(err) {
+    db.run(sql, [id], function (err) {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
@@ -158,7 +158,7 @@ app.post('/api/participants/complete', (req, res) => {
         if (this.changes === 0) {
             return res.status(404).json({ error: "Participant not found" });
         }
-        
+
         // Fetch updated list to return
         db.all("SELECT * FROM participants", [], (err, rows) => {
             res.json({ message: 'Participant moved to completed', participants: rows });
@@ -166,6 +166,7 @@ app.post('/api/participants/complete', (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`SQL Mock Backend running at http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Backend running on http://0.0.0.0:${PORT}`);
 });
+
