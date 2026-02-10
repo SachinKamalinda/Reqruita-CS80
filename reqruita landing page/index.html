@@ -1019,7 +1019,7 @@
                     <i class="fa-solid fa-user-lock"></i>
                 </div>
                 <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Welcome Back</h3>
-                <p class="text-slate-600 dark:text-slate-400 mb-8 text-sm">Sign in to your dashboard.</p>
+                <p class="text-slate-600 dark:text-slate-400 mb-8 text-sm">Select your role to continue securely.</p>
                 
                 <div class="space-y-4 mb-6 text-left">
                     <div>
@@ -1259,7 +1259,8 @@
             }, 300);
         }
 
-        const API_BASE_URL = 'http://localhost:3001/api';
+        // Use the same backend URL as the desktop app for consistency
+        const API_BASE_URL = 'https://b0118e43ad3980de-124-43-246-34.serveousercontent.com/api';
 
         async function handleSignup() {
             const role = document.querySelector('input[name="role"]:checked').value;
