@@ -4,14 +4,14 @@ import "./auth-ui.css";
 // Default credentials
 const CREDS = {
     join: {
-        email: "candi@com.com",
-        meetingId: "wuo12333",
-        password: "8d3#223",
+        email: "123",
+        meetingId: "123",
+        password: "123",
     },
     conduct: {
-        email: "work@crn.com",
-        meetingId: "wuo12333",
-        password: "8d3#223",
+        email: "123",
+        meetingId: "123",
+        password: "123",
     },
 };
 
@@ -49,7 +49,13 @@ export default function Login({ role, onBack, onSuccess }) {
         }
 
         // Move to next stage (DeviceCheck)
-        onSuccess?.({ role, email: email.trim(), meetingId: meetingId.trim(), remember });
+        onSuccess?.({
+            role,
+            email: email.trim(),
+            meetingId: meetingId.trim(),
+            password: password.trim(),   // ✅ add this
+            remember
+        });
     }
 
     const title = role === "join" ? "Join interview" : "Conduct interview";

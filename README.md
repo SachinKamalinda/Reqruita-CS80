@@ -1,5 +1,5 @@
 <!-- ====== HERO ====== -->
-<h1 align="center">Reqruita Desktop 🧠💼</h1>
+<h1 align="center">Reqruita Desktop 🧠💼 </h1>
 
 <p align="center">
   <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=18&duration=2500&pause=700&center=true&vCenter=true&width=700&lines=Secure+Interview+Platform+%E2%80%A2+Anti-Cheat+Focused;Electron+%2B+React+Desktop+App;Fullscreen+Enforcement+%E2%80%A2+Mandatory+Screen+Share" />
@@ -102,11 +102,11 @@ Structure first. Enforcement later.
 
 
 <p align="center">
-  <img src="screan shots/3.png" width="50%" alt="Reqruita Preview 1"/>
+  <img src="screenshots/role-selection.png" width="50%" alt="Role Selection Screen"/>
 </p>
 
 <p align="center">
-  <img src="screan shots/5.png" width="50%" alt="Reqruita Preview 2"/>
+  <img src="screenshots/meeting-interface.png" width="50%" alt="Meeting Interface"/>
 </p>
 
 <details>
@@ -114,15 +114,15 @@ Structure first. Enforcement later.
 
   <br/>
   <p align="center">
-    <img src="screan shots/1.png" width="50%" alt="Interviewer UI"/>
+    <img src="screenshots/interviewer-view.png" width="50%" alt="Interviewer UI"/>
   </p>
 
   <p align="center">
-    <img src="screan shots/2.png" width="50%" alt="Interviewee UI"/>
+    <img src="screenshots/interviewee-view.png" width="50%" alt="Interviewee UI"/>
   </p>
 
   <p align="center">
-    <img src="screan shots/4.png" width="50%" alt="Interviewee UI"/>
+    <img src="screenshots/device-check.png" width="50%" alt="Device Check Screen"/>
   </p>
 </details>
 
