@@ -1,42 +1,61 @@
 // src/pages/MeetingInterviewee.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./auth-ui.css";
+import { BACKEND_URL } from "../config";
+import { useWebRTC } from "../webrtc/useWebRTC";
 
 /**
- * Interviewee (Join) Meeting
- * - Enters "interview mode" (fullscreen + kiosk-ish) on mount via preload API
- * - Exits interview mode when leaving / unmounting
- * - Main area: REAL screen share (getDisplayMedia)
- * - Left tile: REAL interviewee camera (getUserMedia)
- * - Right tile: interviewer placeholder (image/box for now)
- * - Footer: Mic/Video toggles + Leave Interview
+ * MeetingInterviewee.jsx (FINAL - WebRTC + Candidate Google Window + Screen Share)
  *
- * Requires preload exposing:
- * window.reqruita.enterInterviewMode()
- * window.reqruita.exitInterviewMode()
+ * ✅ Candidate sends cam+mic to interviewer (two-way)
+ * ✅ Candidate receives interviewer cam+audio
+ * ✅ Candidate can screen share ("Share Screen") which shows on interviewer main stage
+ * ✅ Still registers candidate in participants list (so interviewer sees them)
+ *
+ * IMPORTANT:
+ * - meetingId MUST be a real id (not "—") and must match both sides.
+ *   (Interviewer and interviewee must join same meetingId.)
+ * - BACKEND_URL must be reachable from BOTH laptops (use LAN IP, not localhost).
  */
 
 export default function MeetingInterviewee({ session, onLeave }) {
-    const shareRef = useRef(null);
-    const camRef = useRef(null);
+    const meetingId = useMemo(() => session?.meetingId || "", [session]);
 
-    const [shareStream, setShareStream] = useState(null);
-    const [camStream, setCamStream] = useState(null);
+    // Video refs
+    const localCamRef = useRef(null);
+    const remoteCamRef = useRef(null);
 
+    // UI toggles
     const [micMuted, setMicMuted] = useState(false);
     const [camOff, setCamOff] = useState(false);
+    const [sharing, setSharing] = useState(false);
 
+    // UI state
     const [error, setError] = useState("");
+    const [googleOpen, setGoogleOpen] = useState(false);
 
-    // Enter full-screen "locked" mode when candidate joins
+    // Candidate display name (later replace with real input)
+    const candidateName = session?.candidateName || session?.name || "Candidate";
+
+    // ✅ WebRTC hook
+    const {
+        localCamStream,
+        localScreenStream,
+        remoteCamStream,
+        startScreenShare,
+        stopScreenShare,
+        setMicEnabled,
+        setCamEnabled,
+    } = useWebRTC({ meetingId, role: "interviewee" });
+
+    // 1) Enter/Exit interview mode (Electron)
     useEffect(() => {
         try {
             window.reqruita?.enterInterviewMode?.();
         } catch (e) {
-            // ignore (e.g., running in browser dev without Electron)
+            // ignore in browser dev
         }
 
-        // Safety: always unlock on unmount
         return () => {
             try {
                 window.reqruita?.exitInterviewMode?.();
@@ -46,68 +65,62 @@ export default function MeetingInterviewee({ session, onLeave }) {
         };
     }, []);
 
-    // Keep meeting non-scroll (panel can scroll internally elsewhere)
+    // 2) Prevent body scroll
     useEffect(() => {
         document.body.classList.add("rq-noscr");
         return () => document.body.classList.remove("rq-noscr");
     }, []);
 
-    // Start camera + screen share when entering meeting
+    // 3) Register candidate on backend (waiting room)
     useEffect(() => {
-        let mounted = true;
+        const controller = new AbortController();
 
         (async () => {
             try {
                 setError("");
 
-                // Interviewee camera + mic (local)
-                const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                if (!mounted) return;
-
-                setCamStream(cam);
-                if (camRef.current) camRef.current.srcObject = cam;
-
-                // Screen share (candidate shares screen)
-                const scr = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-                if (!mounted) return;
-
-                setShareStream(scr);
-                if (shareRef.current) shareRef.current.srcObject = scr;
-
-                // Detect stop share from browser UI
-                const track = scr.getVideoTracks()[0];
-                if (track) {
-                    track.onended = () => {
-                        stopStream(scr);
-                        setShareStream(null);
-                        if (shareRef.current) shareRef.current.srcObject = null;
-                        setError("Screen sharing stopped.");
-                    };
-                }
+                await fetch(`${BACKEND_URL}/api/participants/join`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: controller.signal,
+                    body: JSON.stringify({ name: candidateName }),
+                });
             } catch (e) {
-                setError("Could not start camera/screen share. Please check permissions.");
+                console.log("Join backend failed:", e);
+                setError("Could not connect to interview server. Check backend + Wi-Fi/IP.");
             }
         })();
 
-        return () => {
-            mounted = false;
-            stopStream(camStream);
-            stopStream(shareStream);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        return () => controller.abort();
+    }, [candidateName]);
 
-    // Apply mic toggle
+    // 4) Attach local stream
     useEffect(() => {
-        if (!camStream) return;
-        setTracksEnabled(camStream, "audio", !micMuted);
-    }, [micMuted, camStream]);
+        if (localCamRef.current && localCamStream) {
+            localCamRef.current.srcObject = localCamStream;
+        }
+    }, [localCamStream]);
 
-    // Apply camera toggle
+    // 5) Attach remote interviewer stream
     useEffect(() => {
-        if (!camStream) return;
-        setTracksEnabled(camStream, "video", !camOff);
-    }, [camOff, camStream]);
+        if (remoteCamRef.current && remoteCamStream) {
+            remoteCamRef.current.srcObject = remoteCamStream;
+        }
+    }, [remoteCamStream]);
+
+    // 6) Apply toggles to WebRTC tracks
+    useEffect(() => {
+        setMicEnabled(!micMuted);
+    }, [micMuted, setMicEnabled]);
+
+    useEffect(() => {
+        setCamEnabled(!camOff);
+    }, [camOff, setCamEnabled]);
+
+    // 7) Track screen share state
+    useEffect(() => {
+        setSharing(!!localScreenStream);
+    }, [localScreenStream]);
 
     function toggleMic() {
         setMicMuted((v) => !v);
@@ -117,18 +130,33 @@ export default function MeetingInterviewee({ session, onLeave }) {
         setCamOff((v) => !v);
     }
 
+    async function toggleShare() {
+        try {
+            setError("");
+            if (sharing) {
+                await stopScreenShare();
+            } else {
+                await startScreenShare();
+            }
+        } catch (e) {
+            console.error("Screen share failed:", e);
+            setError("Screen share failed. Please check permissions / Electron settings.");
+        }
+    }
+
     function leave() {
-        // Unlock app window first
         try {
             window.reqruita?.exitInterviewMode?.();
-        } catch (e) {
-            // ignore
-        }
+        } catch (e) { }
 
-        stopStream(camStream);
-        stopStream(shareStream);
+        try {
+            stopScreenShare();
+        } catch (e) { }
+
         onLeave?.();
     }
+
+    const hasRemote = !!remoteCamStream;
 
     return (
         <div className="jm-wrap">
@@ -138,18 +166,48 @@ export default function MeetingInterviewee({ session, onLeave }) {
                 </div>
             )}
 
+            {/* If meetingId is missing, show a clear warning */}
+            {!meetingId && (
+                <div className="mt-err" style={{ background: "rgba(245,158,11,0.95)" }}>
+                    Missing meetingId. Both devices must join the SAME meetingId for video to work.
+                </div>
+            )}
+
             <div className="jm-row">
-                {/* Main shared screen */}
+                {/* Main area */}
                 <div className="jm-main">
-                    <div className="jm-share">
-                        {shareStream ? (
-                            <video ref={shareRef} autoPlay playsInline muted />
-                        ) : (
-                            <div className="jm-share-placeholder">
-                                Screen share (not active)
-                                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8, fontWeight: 700 }}>
-                                    Meeting: {session?.meetingId || "—"}
+                    <div className="jm-google">
+                        {!googleOpen && (
+                            <div className="jm-google-launch">
+                                <div className="jm-google-badge">G</div>
+                                <div className="jm-google-title">Google app</div>
+                                <div className="jm-google-sub">
+                                    Open Google for quick searches during the interview.
                                 </div>
+                                <div className="jm-google-meta">Meeting: {meetingId || "—"}</div>
+
+                                <button className="jm-google-btn" onClick={() => setGoogleOpen(true)}>
+                                    Open Google
+                                </button>
+                            </div>
+                        )}
+
+                        {googleOpen && (
+                            <div className="jm-google-shell">
+                                <div className="jm-google-bar">
+                                    <div className="jm-google-badge sm">G</div>
+                                    <div className="jm-google-title">Google</div>
+                                    <button className="jm-google-btn" onClick={() => setGoogleOpen(false)}>
+                                        Close
+                                    </button>
+                                </div>
+
+                                <iframe
+                                    className="jm-google-frame"
+                                    title="Google"
+                                    src="https://www.google.com/webhp?igu=1"
+                                    referrerPolicy="no-referrer"
+                                />
                             </div>
                         )}
                     </div>
@@ -157,29 +215,35 @@ export default function MeetingInterviewee({ session, onLeave }) {
 
                 {/* Side videos */}
                 <div className="jm-side">
-                    {/* Interviewee video (real) */}
+                    {/* Candidate video */}
                     <div className="jm-tile">
-                        <video ref={camRef} autoPlay playsInline muted />
+                        <video ref={localCamRef} autoPlay playsInline muted />
                         <div className="jm-label">You (Candidate)</div>
                     </div>
 
-                    {/* Interviewer video (placeholder for now) */}
+                    {/* Interviewer remote video */}
                     <div className="jm-tile">
-                        <div
-                            style={{
-                                width: "100%",
-                                height: "100%",
-                                background:
-                                    "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))",
-                                display: "grid",
-                                placeItems: "center",
-                                color: "rgba(255,255,255,0.9)",
-                                fontWeight: 900,
-                                fontSize: 12,
-                            }}
-                        >
-                            Interviewer video (placeholder)
-                        </div>
+                        {hasRemote ? (
+                            <video ref={remoteCamRef} autoPlay playsInline />
+                        ) : (
+                            <div
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    background:
+                                        "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))",
+                                    display: "grid",
+                                    placeItems: "center",
+                                    color: "rgba(255,255,255,0.9)",
+                                    fontWeight: 900,
+                                    fontSize: 12,
+                                    textAlign: "center",
+                                    padding: 10,
+                                }}
+                            >
+                                Interviewer video (waiting…)
+                            </div>
+                        )}
                         <div className="jm-label">Interviewer</div>
                     </div>
                 </div>
@@ -187,13 +251,17 @@ export default function MeetingInterviewee({ session, onLeave }) {
 
             {/* Footer */}
             <div className="jm-footer">
-                <div className="jm-left">
+                <div className="jm-left" style={{ display: "flex", gap: 10 }}>
                     <button className={`mt-ctl ${micMuted ? "mt-ctl-off" : ""}`} onClick={toggleMic}>
                         {micMuted ? "Mic Off" : "Mic"}
                     </button>
 
                     <button className={`mt-ctl ${camOff ? "mt-ctl-off" : ""}`} onClick={toggleVideo}>
                         {camOff ? "Video Off" : "Video"}
+                    </button>
+
+                    <button className={`mt-ctl ${sharing ? "" : ""}`} onClick={toggleShare} disabled={!meetingId}>
+                        {sharing ? "Stop Share" : "Share Screen"}
                     </button>
                 </div>
 
@@ -203,15 +271,4 @@ export default function MeetingInterviewee({ session, onLeave }) {
             </div>
         </div>
     );
-}
-
-/* helpers */
-function stopStream(stream) {
-    if (!stream) return;
-    for (const track of stream.getTracks()) track.stop();
-}
-
-function setTracksEnabled(stream, kind, enabled) {
-    const tracks = kind === "audio" ? stream.getAudioTracks() : stream.getVideoTracks();
-    for (const t of tracks) t.enabled = enabled;
 }

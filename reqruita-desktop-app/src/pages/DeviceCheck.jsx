@@ -15,7 +15,7 @@ export default function DeviceCheck({ role, onReady, onBack }) {
 
     const [error, setError] = useState("");
 
-    const mustPassAll = true;
+    const mustPassAll = role === "join";
 
     const canContinue = useMemo(() => {
         return mustPassAll ? micOn && camOn && screenOn : true;
@@ -112,7 +112,11 @@ export default function DeviceCheck({ role, onReady, onBack }) {
                     <div>
                         <h2 className="dc-title">Device Check</h2>
                         <div className="dc-sub">
-                            Turn on <b>Mic</b>, <b>Camera</b> and <b>Screen Share</b>. You can’t continue until all 3 are enabled.
+                            {role === "join" ? (
+                                <>Turn on <b>Mic</b>, <b>Camera</b> and <b>Screen Share</b>. You can’t continue until all 3 are enabled.</>
+                            ) : (
+                                <>Optional: You can turn on <b>Mic</b>, <b>Camera</b> and <b>Screen Share</b> now, or continue and enable them later.</>
+                            )}
                         </div>
                     </div>
 
