@@ -22,13 +22,31 @@ export function useWebRTC({ meetingId, role }) {
     const screenSenderRef = useRef(null);
 
     // helper: pick first stream as cam, second as screen
-    const assignRemoteStream = (stream) => {
-        setRemoteCamStream((curCam) => {
-            if (!curCam) return stream;
-            if (curCam.id === stream.id) return curCam;
-            setRemoteScreenStream((curScreen) => (curScreen?.id === stream.id ? curScreen : stream));
-            return curCam;
+    const clearRemoteStream = (streamId, type) => {
+        if (type === "cam") {
+            setRemoteCamStream((cur) => (cur?.id === streamId ? null : cur));
+        } else {
+            setRemoteScreenStream((cur) => (cur?.id === streamId ? null : cur));
+        }
+    };
+
+    const watchRemoteStream = (stream, type) => {
+        const handleEnd = () => clearRemoteStream(stream.id, type);
+        stream.getTracks().forEach((track) => {
+            track.onended = handleEnd;
+            track.oninactive = handleEnd;
         });
+    };
+
+    const assignRemoteStream = (stream) => {
+        const hasAudioTrack = stream.getAudioTracks().length > 0;
+        if (hasAudioTrack) {
+            setRemoteCamStream((curCam) => (curCam?.id === stream.id ? curCam : stream));
+            watchRemoteStream(stream, "cam");
+        } else {
+            setRemoteScreenStream((curScreen) => (curScreen?.id === stream.id ? curScreen : stream));
+            watchRemoteStream(stream, "screen");
+        }
     };
 
     useEffect(() => {
