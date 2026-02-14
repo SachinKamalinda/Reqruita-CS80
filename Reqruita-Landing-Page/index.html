@@ -1014,7 +1014,7 @@
     <div id="loginModal" class="fixed inset-0 z-[100] hidden">
         <div class="absolute inset-0 bg-slate-900/60 dark:bg-black/90 backdrop-blur-sm" onclick="closeLoginModal()"></div>
         <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-brand-900 border border-slate-200 dark:border-brand-700 rounded-2xl p-8 max-w-sm w-full shadow-2xl scale-95 opacity-0 transition-all duration-300" id="loginModalContent">
-            <div class="text-center">
+            <div class="text-center" id="login-role-selection">
                 <div class="w-12 h-12 bg-brand-100 dark:bg-brand-800 text-brand-600 dark:text-brand-400 rounded-xl flex items-center justify-center text-xl mx-auto mb-6 shadow-sm border border-brand-200 dark:border-brand-700">
                     <i class="fa-solid fa-user-lock"></i>
                 </div>
@@ -1022,11 +1022,11 @@
                 <p class="text-slate-600 dark:text-slate-400 mb-8 text-sm">Select your role to continue securely.</p>
                 
                 <div class="space-y-3">
-                    <button class="w-full py-3.5 px-4 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-3 shadow-lg shadow-brand-500/20 group">
+                    <button onclick="showLoginForm('interviewer')" class="w-full py-3.5 px-4 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-3 shadow-lg shadow-brand-500/20 group">
                         <i class="fa-solid fa-users group-hover:scale-110 transition-transform"></i>
                         Login as Interviewer
                     </button>
-                    <button class="w-full py-3.5 px-4 bg-transparent border-2 border-slate-200 dark:border-brand-700 hover:border-brand-600 dark:hover:border-brand-500 text-slate-700 dark:text-brand-200 hover:text-brand-600 dark:hover:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-3 group">
+                    <button onclick="showLoginForm('admin')" class="w-full py-3.5 px-4 bg-transparent border-2 border-slate-200 dark:border-brand-700 hover:border-brand-600 dark:hover:border-brand-500 text-slate-700 dark:text-brand-200 hover:text-brand-600 dark:hover:text-white rounded-xl font-bold transition-all flex items-center justify-center gap-3 group">
                         <i class="fa-solid fa-shield-halved group-hover:scale-110 transition-transform"></i>
                         Login as Administrator
                     </button>
@@ -1034,6 +1034,30 @@
 
                 <button onclick="closeLoginModal()" class="mt-6 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white font-medium">
                     Cancel
+                </button>
+            </div>
+
+            <!-- Actual Login Form (Hidden by default) -->
+            <div class="hidden" id="login-form-fields">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-2" id="login-form-title">Login</h3>
+                    <p class="text-slate-600 dark:text-slate-400 text-sm">Enter your credentials below.</p>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase">Work Email</label>
+                        <input type="email" id="login-email" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all" placeholder="john@company.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase">Password</label>
+                        <input type="password" id="login-password" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all" placeholder="••••••••">
+                    </div>
+                </div>
+                <button onclick="handleLogin()" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-brand-500/20">
+                    Login
+                </button>
+                <button onclick="resetLoginModal()" class="w-full mt-4 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white font-medium text-center">
+                    Back to Role Selection
                 </button>
             </div>
         </div>
@@ -1063,7 +1087,7 @@
                 </label>
                 <label class="cursor-pointer group">
                     <input type="radio" name="role" value="interviewer" class="peer sr-only">
-                    <div class="p-3 rounded-xl border-2 border-slate-200 dark:border-brand-700 peer-checked:border-brand-600 dark:peer-checked:border-brand-500 peer-checked:bg-brand-50 dark:peer-checked:bg-brand-900/50 text-center transition-all">
+                    <div class="p-3 rounded-xl border-2 border-slate-200 dark:border-brand-700 peer-checked:border-brand-600 dark:peer-checked:border-brand-50 peer-checked:bg-brand-50 dark:peer-checked:bg-brand-900/50 text-center transition-all">
                         <div class="w-8 h-8 mx-auto bg-brand-100 dark:bg-brand-800 rounded-lg flex items-center justify-center text-brand-600 dark:text-brand-400 mb-2 group-hover:scale-110 transition-transform">
                             <i class="fa-solid fa-users"></i>
                         </div>
@@ -1077,15 +1101,15 @@
             <div class="space-y-4 mb-6">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase">Full Name</label>
-                    <input type="text" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400" placeholder="John Doe">
+                    <input type="text" id="signup-name" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400" placeholder="John Doe">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase">Work Email</label>
-                    <input type="email" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400" placeholder="john@company.com">
+                    <input type="email" id="signup-email" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400" placeholder="john@company.com">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase">Password</label>
-                    <input type="password" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400" placeholder="••••••••">
+                    <input type="password" id="signup-password" class="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-brand-950 border border-slate-200 dark:border-brand-800 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400" placeholder="••••••••">
                 </div>
             </div>
 
@@ -1096,6 +1120,23 @@
             <button onclick="closeSignupModal()" class="w-full mt-4 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-white font-medium">
                 Cancel
             </button>
+        </div>
+    </div>
+
+    <!-- Signup Success Modal -->
+    <div id="signupSuccessModal" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/80 backdrop-blur-sm" onclick="closeSignupSuccessModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-brand-900 border border-slate-200 dark:border-brand-700 rounded-2xl p-8 max-w-md w-full shadow-2xl scale-95 opacity-0 transition-all duration-300" id="signupSuccessModalContent">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center text-2xl mx-auto mb-4 border border-green-200 dark:border-green-800">
+                    <i class="fa-solid fa-user-check"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Welcome to Reqruita!</h3>
+                <p class="text-slate-600 dark:text-slate-400 mb-6">Your account has been created successfully. You can now log in to access your dashboard.</p>
+                <button onclick="goToLoginFromSuccess()" class="w-full py-3 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-500 transition-colors shadow-lg shadow-brand-500/20">
+                    Go to Login
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1219,7 +1260,11 @@
         const loginModal = document.getElementById('loginModal');
         const loginModalContent = document.getElementById('loginModalContent');
 
+        let selectedLoginRole = 'interviewer';
+
         function showLoginModal() {
+            console.log("Opening Login Modal");
+            resetLoginModal();
             loginModal.classList.remove('hidden');
             setTimeout(() => {
                 loginModalContent.classList.remove('scale-95', 'opacity-0');
@@ -1233,6 +1278,39 @@
             setTimeout(() => {
                 loginModal.classList.add('hidden');
             }, 300);
+        }
+
+        function showLoginForm(role) {
+            console.log("Switching to login form for:", role);
+            selectedLoginRole = role;
+            
+            const roleSelection = document.getElementById('login-role-selection');
+            const formFields = document.getElementById('login-form-fields');
+            const formTitle = document.getElementById('login-form-title');
+
+            if (roleSelection && formFields) {
+                roleSelection.classList.add('hidden');
+                formFields.classList.remove('hidden');
+                if (formTitle) {
+                    formTitle.textContent = role === 'admin' ? 'Administrator Login' : 'Interviewer Login';
+                }
+            } else {
+                console.error("Could not find login form elements!");
+            }
+        }
+
+        function resetLoginModal() {
+            console.log("Resetting Login Modal");
+            const roleSelection = document.getElementById('login-role-selection');
+            const formFields = document.getElementById('login-form-fields');
+            
+            if (roleSelection) roleSelection.classList.remove('hidden');
+            if (formFields) formFields.classList.add('hidden');
+            
+            const emailInput = document.getElementById('login-email');
+            const passInput = document.getElementById('login-password');
+            if (emailInput) emailInput.value = '';
+            if (passInput) passInput.value = '';
         }
 
         // Sign Up Modal Logic & Redirect
@@ -1255,22 +1333,113 @@
             }, 300);
         }
 
-        function handleSignup() {
-            const role = document.querySelector('input[name="role"]:checked').value;
-            closeSignupModal();
+        // Signup Success Modal Logic
+        const signupSuccessModal = document.getElementById('signupSuccessModal');
+        const signupSuccessModalContent = document.getElementById('signupSuccessModalContent');
 
-            if (role === 'admin') {
-                // If Admin, smooth scroll to pricing
-                setTimeout(() => {
-                    document.getElementById('pricing').scrollIntoView({ 
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }, 400); 
-            } else {
-                setTimeout(() => {
-                    showModal();
-                }, 400);
+        function showSignupSuccessModal() {
+            signupSuccessModal.classList.remove('hidden');
+            setTimeout(() => {
+                signupSuccessModalContent.classList.remove('scale-95', 'opacity-0');
+                signupSuccessModalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeSignupSuccessModal() {
+            signupSuccessModalContent.classList.remove('scale-100', 'opacity-100');
+            signupSuccessModalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                signupSuccessModal.classList.add('hidden');
+            }, 300);
+        }
+
+        function goToLoginFromSuccess() {
+            closeSignupSuccessModal();
+            setTimeout(() => {
+                showLoginModal();
+            }, 350);
+        }
+
+        const AUTH_API_URL = "http://localhost:3003/api";
+
+        // SIGN UP HANDLER - Collects data and saves to MongoDB
+        async function handleSignup() {
+            const fullName = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const role = document.querySelector('input[name="role"]:checked').value;
+
+            // 1. Basic Validation
+            if (!fullName || !email || !password) {
+                alert("Please fill in all fields.");
+                return;
+            }
+
+            try {
+                // 2. Send Registration Request to Auth Server
+                const response = await fetch(`${AUTH_API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fullName, email, password, role })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // 3. On success, show beautiful success modal
+                    closeSignupModal();
+                    setTimeout(() => {
+                        showSignupSuccessModal();
+                    }, 400);
+                } else {
+                    alert(data.message || "Registration failed.");
+                }
+            } catch (error) {
+                console.error("Signup error:", error);
+                alert("Server connection failed. Is the auth server running?");
+            }
+        }
+
+        // LOGIN HANDLER - Verifies user and manages session
+        async function handleLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            // Basic Validation
+            if (!email || !password) {
+                alert("Please fill in all fields.");
+                return;
+            }
+
+            try {
+                // Send Login Request to Auth Server
+                const response = await fetch(`${AUTH_API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Save Session Details (JWT Token) to Local Storage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+
+                    alert(`Login successful! Welcome ${data.user.fullName}`);
+                    
+                    // Role-Based Redirection
+                    if (data.user.role === 'admin') {
+                        window.location.href = "admin-dashboard.html"; // You need to create this
+                    } else {
+                        window.location.href = "interviewer-dashboard.html"; // You need to create this
+                    }
+                } else {
+                    alert(data.message || "Login failed.");
+                }
+            } catch (error) {
+                console.error("Login error:", error);
+                alert("Server connection failed. Is the auth server running?");
             }
         }
     </script>
