@@ -24,6 +24,7 @@ export default function MeetingInterviewee({ session, onLeave }) {
     // Video refs
     const localCamRef = useRef(null);
     const remoteCamRef = useRef(null);
+    const autoShareAttemptedRef = useRef(false);
 
     // UI toggles
     const [micMuted, setMicMuted] = useState(false);
@@ -121,6 +122,24 @@ export default function MeetingInterviewee({ session, onLeave }) {
     useEffect(() => {
         setSharing(!!localScreenStream);
     }, [localScreenStream]);
+
+    // Automatically share the desktop on join inside the Electron shell so the interviewer sees the full screen immediately
+    useEffect(() => {
+        const runningInDesktop = typeof window !== "undefined" && !!window.reqruita;
+        if (!runningInDesktop) return;
+        if (autoShareAttemptedRef.current) return;
+        if (!meetingId || !localCamStream) return;
+
+        autoShareAttemptedRef.current = true;
+        (async () => {
+            try {
+                await startScreenShare();
+            } catch (err) {
+                console.error("Automatic screen share failed:", err);
+                setError((prev) => prev || "Automatic screen share failed. Use Share Screen or grant permissions.");
+            }
+        })();
+    }, [meetingId, localCamStream, startScreenShare]);
 
     function toggleMic() {
         setMicMuted((v) => !v);
