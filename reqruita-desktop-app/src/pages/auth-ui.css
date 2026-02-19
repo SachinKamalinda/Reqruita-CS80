@@ -1374,3 +1374,52 @@ body.rq-noscr{
   align-items: center;
   gap: 10px;
 }
+
+/* ================= Sharing-Active Mode ================= */
+/* When screen sharing is active, Google fills the viewport and
+   video tiles become small floating overlays so the interviewer
+   sees primarily the Google window content.                    */
+
+.jm-sharing-active .jm-row{
+  grid-template-columns: 1fr;
+}
+
+/* Google area fills the entire main area with no padding */
+.jm-sharing-active .jm-google{
+  padding: 0;
+}
+
+/* Side panel becomes floating overlays */
+.jm-sharing-active .jm-side{
+  position: fixed;
+  bottom: 86px;
+  right: 16px;
+  width: 160px;
+  z-index: 100;
+  grid-template-rows: auto auto;
+  background: transparent;
+  border: none;
+  gap: 8px;
+  padding: 0;
+}
+
+.jm-sharing-active .jm-tile{
+  width: 160px;
+  height: 100px;
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.45);
+  border: 2px solid rgba(255,255,255,0.18);
+}
+
+.jm-sharing-active .jm-label{
+  font-size: 10px;
+  padding: 3px 7px;
+  left: 4px;
+  bottom: 4px;
+}
+
+/* Footer becomes more transparent in sharing mode */
+.jm-sharing-active .jm-footer{
+  background: rgba(0,0,0,0.25);
+  border-color: rgba(255,255,255,0.08);
+}

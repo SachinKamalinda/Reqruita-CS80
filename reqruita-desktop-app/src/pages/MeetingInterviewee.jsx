@@ -118,9 +118,14 @@ export default function MeetingInterviewee({ session, onLeave }) {
         setCamEnabled(!camOff);
     }, [camOff, setCamEnabled]);
 
-    // 7) Track screen share state
+    // 7) Track screen share state + auto-open Google when sharing starts
     useEffect(() => {
-        setSharing(!!localScreenStream);
+        const isSharing = !!localScreenStream;
+        setSharing(isSharing);
+        if (isSharing) {
+            // Use functional updater so we don't need googleOpen in deps
+            setGoogleOpen((prev) => prev || true);
+        }
     }, [localScreenStream]);
 
     // Automatically share the desktop on join inside the Electron shell so the interviewer sees the full screen immediately
@@ -178,7 +183,7 @@ export default function MeetingInterviewee({ session, onLeave }) {
     const hasRemote = !!remoteCamStream;
 
     return (
-        <div className="jm-wrap">
+        <div className={`jm-wrap ${sharing ? "jm-sharing-active" : ""}`}>
             {error && (
                 <div className="mt-err" style={{ background: "rgba(220,38,38,0.92)" }}>
                     {error}
