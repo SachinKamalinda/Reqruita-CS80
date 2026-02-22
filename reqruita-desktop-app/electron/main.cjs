@@ -35,7 +35,13 @@ function setupDisplayMediaHandler() {
                     types: ["screen", "window"],
                 });
 
-                const source = sources[0]; // MVP: auto-pick first source
+                // Prefer capturing OUR Electron app window so the interviewer
+                // sees only the app content (Google iframe), not the full desktop.
+                const winTitle = win?.getTitle() || "";
+                const source =
+                    sources.find((src) => winTitle && src.name === winTitle) ||
+                    sources.find((src) => src.id?.toLowerCase().startsWith("window:")) ||
+                    sources[0];
                 if (!source) return callback({}); // deny cleanly
 
                 callback({ video: source, audio: false });
