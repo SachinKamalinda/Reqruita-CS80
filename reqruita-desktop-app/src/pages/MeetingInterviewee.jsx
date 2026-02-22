@@ -80,6 +80,32 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         };
     }, [meetingId]);
 
+    //Load chat history
+     useEffect(() => {
+        if (!meetingId) return;
+
+        fetch(`${BACKEND_URL}/api/chat/${meetingId}`)
+            .then((res) => res.json())
+            .then(setMessages)
+            .catch(() => {});
+    }, [meetingId]);
+
+    // Send chat message
+    function sendChatMessage() {
+        const text = chatInput.trim();
+        if (!text || !chatSocketRef.current) return;
+
+        chatSocketRef.current.emit("chat-message", {
+            interviewId: meetingId,
+            senderRole: "interviewee",
+            senderName: candidateName,
+            message: text,
+        });
+
+        setChatInput("");
+    }
+
+    
     // 1) Enter/Exit interview mode (Electron)
     useEffect(() => {
         try {
