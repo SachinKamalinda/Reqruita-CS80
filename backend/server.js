@@ -218,7 +218,22 @@ app.post("/api/participants/join", (req, res) => {
             getAllParticipants(res, "Joined");
         }
     );
+
+/* GET /api/chat/{interviewId} */
+const ChatMessage =require("./ChatMessage");
+app.get("/api/chat/:interviewId",async(req,res)=>{
+    try{
+        const messages=await ChatMessage.find({
+            interviewId:req.params.interviewId,
+        }).sort({createdAt:1});
+        res.json(messages);}
+    catch(err){
+        res.status(500).json({error:"Failed to load chat"});
+        }
+    });
+
 });
+
 
 // -------------------- SOCKET.IO (SIGNALING) --------------------
 // WebRTC needs signaling: offer/answer/ice messages.
