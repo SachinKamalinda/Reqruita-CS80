@@ -35,6 +35,12 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [error, setError] = useState("");
     const [googleOpen, setGoogleOpen] = useState(false);
 
+    //chat UI
+    const [chatOpen, setChatOpen] = useState(false);
+    const [chatMessages, setChatMessages] = useState([]);
+    const [chatText, setChatText] = useState("");
+
+
     // Candidate display name (later replace with real input)
     const candidateName = session?.candidateName || session?.name || "Candidate";
 
