@@ -43,7 +43,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
     //socket ref for chat
     const socketRef = useRef(null);
-    
+
     // Candidate display name (later replace with real input)
     const candidateName = session?.candidateName || session?.name || "Candidate";
 
@@ -57,6 +57,28 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         setMicEnabled,
         setCamEnabled,
     } = useWebRTC({ meetingId, role: "interviewee" });
+
+    //chat shocket connection
+     useEffect(() => {
+        if (!meetingId) return;
+
+        // Create socket connection ONLY for chat
+        const socket = io(BACKEND_URL);
+        chatSocketRef.current = socket;
+
+        // Join chat room (same interviewId as interviewer)
+        socket.emit("join-chat", { interviewId: meetingId });
+
+        // Listen for incoming messages
+        socket.on("chat-message", (msg) => {
+            setMessages((prev) => [...prev, msg]);
+        });
+
+        // Cleanup on unmount
+        return () => {
+            socket.disconnect();
+        };
+    }, [meetingId]);
 
     // 1) Enter/Exit interview mode (Electron)
     useEffect(() => {
