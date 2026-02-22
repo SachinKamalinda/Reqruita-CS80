@@ -258,17 +258,7 @@ export function useWebRTC({ meetingId, role }) {
         await requestScreenOffer();
     }
 
-<<<<<<< HEAD
-    // handle renegotiate request: removed separate effect to avoid race condition
-    // handled inside main webrtc-signal listener
-    /*
-    useEffect(() => {
-    ...
-    }, [meetingId, role]);
-    */
-
-=======
->>>>>>> upstream/main
+    
     function setMicEnabled(enabled) {
         if (!localCamStream) return;
         localCamStream.getAudioTracks().forEach((t) => (t.enabled = enabled));

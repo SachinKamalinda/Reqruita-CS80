@@ -11,7 +11,7 @@
   --rq-safe: 20px;
 }
 
-/* ================= Toast Notifications ================= */
+/*  Toast Notifications  */
 .rq-toast-wrap {
   position: fixed;
   top: 16px;
@@ -41,7 +41,7 @@
   min-width: 260px;
 }
 
-/* ================= Page Transitions ================= */
+/*  Page Transitions  */
 .rq-page {
   height: 100%;
   width: 100%;
@@ -80,7 +80,7 @@ body.rq-noscr {
   overflow: hidden;
 }
 
-/* ================= Role Select Premium V2 ================= */
+/*  Role Select Premium V2  */
 .rs-shell {
   height: 100%;
   width: 100%;
@@ -338,7 +338,7 @@ body.rq-noscr {
 
 
 
-/* ================= Login ================= */
+/* Login */
 .lg-wrap {
   height: 100%;
   width: 100%;
@@ -541,7 +541,7 @@ body.rq-noscr {
 }
 
 
-/* ================= Device Check (V2 — redesigned) ================= */
+/*  Device Check (V2 — redesigned)  */
 
 .dc-wrap {
   height: 100%;
