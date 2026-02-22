@@ -10,14 +10,31 @@ export default function CandidatesPage() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {[
           { stage: "Applied", count: 24, color: "bg-blue-100 text-blue-800" },
-          { stage: "Screening", count: 12, color: "bg-yellow-100 text-yellow-800" },
-          { stage: "Interview", count: 8, color: "bg-purple-100 text-purple-800" },
+          {
+            stage: "Screening",
+            count: 12,
+            color: "bg-yellow-100 text-yellow-800",
+          },
+          {
+            stage: "Interview",
+            count: 8,
+            color: "bg-purple-100 text-purple-800",
+          },
           { stage: "Offer", count: 3, color: "bg-green-100 text-green-800" },
-          { stage: "Hired", count: 2, color: "bg-emerald-100 text-emerald-800" },
+          {
+            stage: "Hired",
+            count: 2,
+            color: "bg-emerald-100 text-emerald-800",
+          },
         ].map((stage) => (
-          <div key={stage.stage} className="bg-white rounded-2xl border p-6 text-center hover:shadow-md transition">
+          <div
+            key={stage.stage}
+            className="bg-white rounded-2xl border p-6 text-center hover:shadow-md transition"
+          >
             <p className="text-gray-600 text-sm mb-2">{stage.stage}</p>
-            <p className={`text-3xl font-bold ${stage.color} inline-block px-4 py-2 rounded-lg`}>
+            <p
+              className={`text-3xl font-bold ${stage.color} inline-block px-4 py-2 rounded-lg`}
+            >
               {stage.count}
             </p>
           </div>
@@ -61,7 +78,9 @@ export default function CandidatesPage() {
                   <td className="py-4">candidate{i}@email.com</td>
                   <td className="py-4">Software Engineer</td>
                   <td className="py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${stageColors[stage]}`}>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${stageColors[stage]}`}
+                    >
                       {stage}
                     </span>
                   </td>
@@ -75,8 +94,12 @@ export default function CandidatesPage() {
                     </div>
                   </td>
                   <td className="py-4 flex gap-2">
-                    <button className="text-[#5D20B3] text-sm hover:underline">View</button>
-                    <button className="text-gray-600 text-sm hover:underline">Note</button>
+                    <button className="text-[#5D20B3] text-sm hover:underline">
+                      View
+                    </button>
+                    <button className="text-gray-600 text-sm hover:underline">
+                      Note
+                    </button>
                   </td>
                 </tr>
               );
@@ -90,14 +113,19 @@ export default function CandidatesPage() {
         <h2 className="text-xl font-bold mb-6">Top 3 Candidates</h2>
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+            <div
+              key={i}
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+            >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-[#5D20B3] text-white rounded-full flex items-center justify-center font-bold">
                   {i}
                 </div>
                 <div>
                   <h3 className="font-bold">Top Candidate {i}</h3>
-                  <p className="text-gray-600 text-sm">Software Engineer • 95% Match</p>
+                  <p className="text-gray-600 text-sm">
+                    Software Engineer • 95% Match
+                  </p>
                 </div>
               </div>
               <button className="bg-[#5D20B3] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#4a1a8a]">
