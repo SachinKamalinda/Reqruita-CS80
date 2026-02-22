@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 
 import RoleSelect from "./pages/RoleSelect.jsx";
 import Login from "./pages/Login.jsx";
@@ -7,6 +7,9 @@ import DeviceCheck from "./pages/DeviceCheck.jsx";
 
 import MeetingInterviewer from "./pages/MeetingInterviewer.jsx";
 import MeetingInterviewee from "./pages/MeetingInterviewee.jsx";
+
+import ToastContainer from "./components/Toast.jsx";
+import useToast from "./hooks/useToast.js";
 
 // TEMP hardcoded credentials
 const USERS = [
@@ -28,12 +31,24 @@ export default function App() {
   const [step, setStep] = useState("role"); // role | login | devices | meeting
   const [role, setRole] = useState(null); // "join" | "conduct"
   const [session, setSession] = useState(null);
+  const [transitioning, setTransitioning] = useState(false);
+
+  const { toasts, addToast, removeToast } = useToast();
 
   const users = useMemo(() => USERS, []);
 
   useEffect(() => {
     document.documentElement.style.background = "#fff";
     document.body.style.background = "#fff";
+  }, []);
+
+  /* ── Smooth page transition helper ── */
+  const goTo = useCallback((nextStep) => {
+    setTransitioning(true);
+    setTimeout(() => {
+      setStep(nextStep);
+      setTransitioning(false);
+    }, 180);
   }, []);
 
   function resetAll() {
@@ -44,7 +59,7 @@ export default function App() {
 
   function onPickRole(nextRole) {
     setRole(nextRole);
-    setStep("login");
+    goTo("login");
   }
 
   // Accept BOTH shapes:
@@ -65,7 +80,8 @@ export default function App() {
     const currentRole = roleFromLogin || role;
 
     if (!em || !mId || !pwd || !currentRole) {
-      return { ok: false, error: "Please enter Email, Meeting ID, and Password." };
+      addToast("Please enter Email, Meeting ID, and Password.", "error");
+      return { ok: false };
     }
 
     const found = users.find(
@@ -77,7 +93,8 @@ export default function App() {
     );
 
     if (!found) {
-      return { ok: false, error: "Invalid Email, Meeting ID, or Password." };
+      addToast("Invalid Email, Meeting ID, or Password.", "error");
+      return { ok: false };
     }
 
     setSession({
@@ -86,48 +103,56 @@ export default function App() {
       meetingId: found.meetingId,
     });
 
-    setStep("devices");
+    addToast("Login successful! Setting up devices…", "success");
+    goTo("devices");
     return { ok: true };
   }
 
   function onDevicesReady() {
-    setStep("meeting");
+    addToast("Devices configured. Joining meeting…", "success");
+    goTo("meeting");
   }
 
   function onEnd() {
+    addToast("You left the meeting.", "info");
     resetAll();
   }
 
   return (
     <>
-      {step === "role" && <RoleSelect onPickRole={onPickRole} />}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      {step === "login" && (
-        <Login
-          role={role}
-          onSuccess={(payload) => {
-            // alert(JSON.stringify(payload, null, 2)); 
-            const res = onLogin(payload);
-            if (!res.ok) alert(res.error);
-          }}
-        />
-      )}
+      <div className={`rq-page ${transitioning ? "rq-page-exit" : "rq-page-enter"}`}>
+        {step === "role" && <RoleSelect onPickRole={onPickRole} />}
 
-      {step === "devices" && (
-        <DeviceCheck
-          role={role}
-          session={session}
-          onReady={onDevicesReady}
-          onBack={() => setStep("login")}
-        />
-      )}
+        {step === "login" && (
+          <Login
+            role={role}
+            onBack={() => goTo("role")}
+            onSuccess={(payload) => {
+              onLogin(payload);
+            }}
+            addToast={addToast}
+          />
+        )}
 
-      {step === "meeting" &&
-        (role === "conduct" ? (
-          <MeetingInterviewer session={session} onEnd={onEnd} />
-        ) : (
-          <MeetingInterviewee session={session} onLeave={onEnd} />
-        ))}
+        {step === "devices" && (
+          <DeviceCheck
+            role={role}
+            session={session}
+            onReady={onDevicesReady}
+            onBack={() => goTo("login")}
+            addToast={addToast}
+          />
+        )}
+
+        {step === "meeting" &&
+          (role === "conduct" ? (
+            <MeetingInterviewer session={session} onEnd={onEnd} addToast={addToast} />
+          ) : (
+            <MeetingInterviewee session={session} onLeave={onEnd} addToast={addToast} />
+          ))}
+      </div>
     </>
   );
 }
