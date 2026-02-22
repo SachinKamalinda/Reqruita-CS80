@@ -5,6 +5,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Reqruita Dashboard",
   description: "Recruitment Management System",
+  // This adds the logo to your browser tab
+  icons: {
+    icon: "/ReqruitaLogo.png",
+    apple: "/ReqruitaLogo.png",
+  },
 };
 
 export default function RootLayout({
@@ -18,9 +23,9 @@ export default function RootLayout({
         {/* Sidebar */}
         <aside className="w-64 bg-[#5D20B3] text-white hidden md:flex flex-col p-6">
           <div className="text-2xl font-bold mb-10 flex items-center gap-2">
-            {/* Logo Image added here */}
+            {/* Logo Image in the sidebar */}
             <Image
-              src="/ReqruitaLogo.png" // Change to .svg if that is your file extension
+              src="/ReqruitaLogo.png"
               alt="Reqruita Logo"
               width={32}
               height={32}
