@@ -1,24 +1,45 @@
+"use client";
+
 import type { Metadata } from "next";
 import Image from "next/image"; // Import the Image component
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Reqruita Dashboard",
-  description: "Recruitment Management System",
-  // This adds the logo to your browser tab
-  icons: {
-    icon: "/ReqruitaLogo.png",
-    apple: "/ReqruitaLogo.png",
-  },
-};
+// Note: Metadata is only for server-side rendering at the root level
+// For client components, we'll need to handle this differently
+// Keeping the metadata export for static generation
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
+  const navItems = [
+    { label: "Home", href: "/" },
+    { label: "Job Forms", href: "/job-forms" },
+    { label: "User & Roles", href: "/user-roles" },
+    { label: "Sessions", href: "/sessions" },
+    { label: "Live Monitor", href: "/live-monitor" },
+    { label: "Candidates", href: "/candidates" },
+  ];
+
+  const isActive = (href: string) => {
+    if (href === "/") {
+      return pathname === "/" || pathname === "/dashboard";
+    }
+    return pathname.startsWith(href);
+  };
+
   return (
     <html lang="en">
+      <head>
+        <title>Reqruita Dashboard</title>
+        <meta name="description" content="Recruitment Management System" />
+        <link rel="icon" href="/ReqruitaLogo.png" />
+      </head>
       <body className="bg-gray-50 flex h-screen overflow-hidden">
         {/* Sidebar */}
         <aside className="w-64 bg-[#5D20B3] text-white hidden md:flex flex-col p-6">
@@ -35,28 +56,21 @@ export default function RootLayout({
           </div>
 
           <nav className="space-y-4">
-            {[
-              "Home",
-              "Job Forms",
-              "User & Roles",
-              "Sessions",
-              "Live Monitor",
-              "Candidates",
-            ].map((item) => (
-              <button
-                key={item}
-                className={`w-full text-left py-3 px-4 rounded-lg transition ${
-                  item === "Home"
+            {navItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`w-full block text-left py-3 px-4 rounded-lg transition ${
+                  isActive(item.href)
                     ? "bg-white text-[#5D20B3] font-semibold"
                     : "bg-white/10 text-white hover:bg-white/20"
                 }`}
               >
-                {item}
-              </button>
+                {item.label}
+              </Link>
             ))}
           </nav>
         </aside>
-
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Nav */}
