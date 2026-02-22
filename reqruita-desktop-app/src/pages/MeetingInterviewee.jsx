@@ -1,6 +1,7 @@
 // src/pages/MeetingInterviewee.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./auth-ui.css";
+import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
 
@@ -37,10 +38,12 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
     //chat UI
     const [chatOpen, setChatOpen] = useState(false);
-    const [chatMessages, setChatMessages] = useState([]);
-    const [chatText, setChatText] = useState("");
+    const [chatInput, setChatInput] = useState("");
+    const [messages, setMessages] = useState([]);
 
-
+    //socket ref for chat
+    const socketRef = useRef(null);
+    
     // Candidate display name (later replace with real input)
     const candidateName = session?.candidateName || session?.name || "Candidate";
 
