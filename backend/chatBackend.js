@@ -1,6 +1,6 @@
-const mongose =require ("mongoose");
+const mongoose =require ("mongoose");
 
-const MONGO_URI=process.env.MONGO_URL || "mongodb://127.0.0.1:27017/reqruita";
+const MONGO_URI=process.env.MONGO_URI  || "mongodb://127.0.0.1:27017/reqruita";
 
 async function connectMongo() {
   try{
