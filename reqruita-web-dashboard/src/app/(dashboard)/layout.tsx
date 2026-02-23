@@ -28,13 +28,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <html lang="en">
-      <head>
-        <title>Reqruita Dashboard</title>
-        <meta name="description" content="Recruitment Management System" />
-        <link rel="icon" href="/ReqruitaLogo.png" />
-      </head>
-      <body className="bg-gray-50 flex h-screen overflow-hidden">
+      <div className="bg-gray-50 flex h-screen overflow-hidden">
         {/* Sidebar */}
         <aside className="w-64 bg-[#5D20B3] text-white hidden md:flex flex-col p-6">
           <div className="text-2xl font-bold mb-10 flex items-center gap-2">
@@ -85,7 +79,6 @@ export default function DashboardLayout({
             {children}
           </main>
         </div>
-      </body>
-    </html>
+      </div>
   );
 }
