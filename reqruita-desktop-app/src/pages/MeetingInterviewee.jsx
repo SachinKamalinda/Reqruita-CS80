@@ -344,6 +344,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                         )}
                         <div className="jm-label">Interviewer</div>
                     </div>
+                   
 
                     {/* Chat panel */}
                     {chatOpen && (
@@ -360,13 +361,13 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                        <div className="mt-side-body" style={{ padding: 0 }}>
                         <div className="mt-chat">
                          <div className="mt-chat-list">
-                          {messages.map((m) => (
-                           <div key={m.id} className={`mt-msg ${m.who}`}>
+                          {messages.map((m,idx) => (
+                           <div key={idx} className={`mt-msg ${m.senderRole}`}>
                             <div className="mt-msgmeta">
-                             <span>{m.name}</span>
-                             <span>{m.time}</span>
+                             <span>{m.senderName}</span>
+                             
                            </div>
-                           <div className="mt-bubble">{m.text}</div>
+                           <div className="mt-bubble">{m.message}</div>
                            </div>
                     ))}
                      </div>
@@ -376,9 +377,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                      value={chatInput}
                      onChange={(e) => setChatInput(e.target.value)}
                      placeholder="Type a message…"
-                     onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }}
+                     onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
                     />
-                  <button className="mt-send" onClick={sendMessage} disabled={!chatInput.trim()}>
+                  <button className="mt-send" onClick={sendChatMessage} disabled={!chatInput.trim()}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                    </svg>
@@ -388,8 +389,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
            </div>
          </aside>
     )}
-                </div>
-            </div>
+ </div>
+ </div>
+           
 
             {/* Footer Toolbar */}
             <div className="jm-footer">
