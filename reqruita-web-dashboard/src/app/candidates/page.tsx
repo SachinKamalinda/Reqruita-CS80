@@ -101,7 +101,9 @@ export default function CandidatesPage() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(
+    null,
+  );
   const [newCandidateName, setNewCandidateName] = useState("");
   const [newCandidateEmail, setNewCandidateEmail] = useState("");
   const [noteText, setNoteText] = useState("");
@@ -141,8 +143,8 @@ export default function CandidatesPage() {
     if (selectedCandidate) {
       setCandidates(
         candidates.map((c) =>
-          c.id === selectedCandidate.id ? { ...c, notes: noteText } : c
-        )
+          c.id === selectedCandidate.id ? { ...c, notes: noteText } : c,
+        ),
       );
       setShowNoteModal(false);
       alert("Note saved successfully!");
@@ -178,10 +180,22 @@ export default function CandidatesPage() {
       {/* Candidates Pipeline */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {[
-          { stage: "Applied", count: candidates.filter((c) => c.stage === "Applied").length },
-          { stage: "Screening", count: candidates.filter((c) => c.stage === "Screening").length },
-          { stage: "Interview", count: candidates.filter((c) => c.stage === "Interview").length },
-          { stage: "Offer", count: candidates.filter((c) => c.stage === "Offer").length },
+          {
+            stage: "Applied",
+            count: candidates.filter((c) => c.stage === "Applied").length,
+          },
+          {
+            stage: "Screening",
+            count: candidates.filter((c) => c.stage === "Screening").length,
+          },
+          {
+            stage: "Interview",
+            count: candidates.filter((c) => c.stage === "Interview").length,
+          },
+          {
+            stage: "Offer",
+            count: candidates.filter((c) => c.stage === "Offer").length,
+          },
           { stage: "Hired", count: 2 },
         ].map((stage) => (
           <div
@@ -227,14 +241,19 @@ export default function CandidatesPage() {
                 <td className="py-4">{candidate.email}</td>
                 <td className="py-4">{candidate.position}</td>
                 <td className="py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(candidate.stage)}`}>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(candidate.stage)}`}
+                  >
                     {candidate.stage}
                   </span>
                 </td>
                 <td className="py-4">{candidate.appliedDate}</td>
                 <td className="py-4">
                   <div className="w-16 bg-gray-200 rounded-full h-2">
-                    <div className="bg-[#5D20B3] h-2 rounded-full" style={{ width: `${candidate.score}%` }}></div>
+                    <div
+                      className="bg-[#5D20B3] h-2 rounded-full"
+                      style={{ width: `${candidate.score}%` }}
+                    ></div>
                   </div>
                 </td>
                 <td className="py-4 flex gap-2">
@@ -262,14 +281,19 @@ export default function CandidatesPage() {
         <h2 className="text-xl font-bold mb-6">Top 3 Candidates</h2>
         <div className="space-y-4">
           {topCandidates.map((candidate, idx) => (
-            <div key={candidate.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+            <div
+              key={candidate.id}
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+            >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-[#5D20B3] text-white rounded-full flex items-center justify-center font-bold">
                   {idx + 1}
                 </div>
                 <div>
                   <h3 className="font-bold">{candidate.name}</h3>
-                  <p className="text-gray-600 text-sm">{candidate.position} • {candidate.score}% Match</p>
+                  <p className="text-gray-600 text-sm">
+                    {candidate.position} • {candidate.score}% Match
+                  </p>
                 </div>
               </div>
               <button
@@ -289,7 +313,10 @@ export default function CandidatesPage() {
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
           onClick={() => setShowAddModal(false)}
         >
-          <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-4">Add New Candidate</h2>
             <div className="space-y-4">
               <div>
@@ -337,8 +364,13 @@ export default function CandidatesPage() {
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
           onClick={() => setShowViewModal(false)}
         >
-          <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4">{selectedCandidate.name}</h2>
+          <div
+            className="bg-white rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-4">
+              {selectedCandidate.name}
+            </h2>
             <div className="space-y-3">
               <div>
                 <p className="text-sm text-gray-600">Email</p>
@@ -350,7 +382,9 @@ export default function CandidatesPage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Stage</p>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(selectedCandidate.stage)}`}>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(selectedCandidate.stage)}`}
+                >
                   {selectedCandidate.stage}
                 </span>
               </div>
@@ -379,8 +413,13 @@ export default function CandidatesPage() {
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
           onClick={() => setShowNoteModal(false)}
         >
-          <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4">Add Note for {selectedCandidate.name}</h2>
+          <div
+            className="bg-white rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-4">
+              Add Note for {selectedCandidate.name}
+            </h2>
             <textarea
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
@@ -412,13 +451,22 @@ export default function CandidatesPage() {
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
           onClick={() => setShowInterviewModal(false)}
         >
-          <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4">Send Interview Invitation</h2>
-            <p className="text-gray-600 mb-4">Send interview invitation to {selectedCandidate.name}?</p>
+          <div
+            className="bg-white rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-4">
+              Send Interview Invitation
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Send interview invitation to {selectedCandidate.name}?
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  alert(`Interview invitation sent to ${selectedCandidate.name}!`);
+                  alert(
+                    `Interview invitation sent to ${selectedCandidate.name}!`,
+                  );
                   setShowInterviewModal(false);
                 }}
                 className="flex-1 bg-[#5D20B3] text-white px-4 py-2 rounded-lg hover:bg-[#4a1a8a]"
