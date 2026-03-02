@@ -331,15 +331,18 @@ export default function JobFormsPage() {
 
       {/* Create New Form Modal */}
       {showCreateModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
           onClick={() => {
             setShowCreateModal(false);
-            setNewFormTitle('');
-            setNewFormDescription('');
+            setNewFormTitle("");
+            setNewFormDescription("");
           }}
         >
-          <div className="bg-white rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-4">
               Create New Form Template
             </h2>
@@ -393,14 +396,17 @@ export default function JobFormsPage() {
 
       {/* View Submission Modal */}
       {showViewModal && selectedSubmission && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
           onClick={() => {
             setShowViewModal(false);
             setSelectedSubmission(null);
           }}
         >
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-4">Application Details</h2>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -487,14 +493,17 @@ export default function JobFormsPage() {
 
       {/* Preview Modal */}
       {showPreviewModal && selectedTemplate && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
           onClick={() => {
             setShowPreviewModal(false);
             setSelectedTemplate(null);
           }}
         >
-          <div className="bg-white rounded-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-3xl font-bold mb-2">
@@ -601,14 +610,17 @@ export default function JobFormsPage() {
 
       {/* Edit Template Modal */}
       {showEditTemplateModal && selectedTemplate && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
           onClick={() => {
             setShowEditTemplateModal(false);
             setSelectedTemplate(null);
           }}
         >
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-4">
               Edit Template: {selectedTemplate.title}
             </h2>
