@@ -7,95 +7,162 @@ interface Candidate {
   name: string;
   email: string;
   position: string;
-  stage: "Applied" | "Screening" | "Interview" | "Offer";
+  stage: "Applied" | "Screening" | "Interview" | "Offer" | "Hired";
   appliedDate: string;
   score: number;
   notes: string;
+  interviewStatus?: "Not Started" | "Passed" | "Failed" | "Pending";
+  hired: boolean;
+}
+
+interface Job {
+  id: string;
+  title: string;
+  position: string;
 }
 
 export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([
     {
       id: 1,
-      name: "Candidate 1",
-      email: "candidate1@email.com",
+      name: "John Smith",
+      email: "john.smith@email.com",
       position: "Software Engineer",
       stage: "Applied",
-      appliedDate: "Nov 19, 2025",
-      score: 60,
-      notes: "Great technical skills",
+      appliedDate: "Mar 1, 2026",
+      score: 85,
+      notes: "Strong technical background",
+      interviewStatus: "Not Started",
+      hired: false,
     },
     {
       id: 2,
-      name: "Candidate 2",
-      email: "candidate2@email.com",
+      name: "Sarah Johnson",
+      email: "sarah.j@email.com",
       position: "Software Engineer",
-      stage: "Screening",
-      appliedDate: "Nov 18, 2025",
-      score: 65,
-      notes: "Good communication",
+      stage: "Interview",
+      appliedDate: "Feb 28, 2026",
+      score: 90,
+      notes: "Excellent problem solver",
+      interviewStatus: "Passed",
+      hired: false,
     },
     {
       id: 3,
-      name: "Candidate 3",
-      email: "candidate3@email.com",
+      name: "Mike Chen",
+      email: "mike.chen@email.com",
       position: "Software Engineer",
-      stage: "Interview",
-      appliedDate: "Nov 17, 2025",
-      score: 70,
-      notes: "Excellent problem solving",
+      stage: "Hired",
+      appliedDate: "Feb 20, 2026",
+      score: 95,
+      notes: "Outstanding technical skills",
+      interviewStatus: "Passed",
+      hired: true,
     },
     {
       id: 4,
-      name: "Candidate 4",
-      email: "candidate4@email.com",
-      position: "Software Engineer",
-      stage: "Offer",
-      appliedDate: "Nov 16, 2025",
-      score: 75,
-      notes: "Perfect fit for team",
+      name: "Emily Davis",
+      email: "emily.d@email.com",
+      position: "Frontend Developer",
+      stage: "Applied",
+      appliedDate: "Mar 2, 2026",
+      score: 80,
+      notes: "Good UI/UX understanding",
+      interviewStatus: "Not Started",
+      hired: false,
     },
     {
       id: 5,
-      name: "Candidate 5",
-      email: "candidate5@email.com",
-      position: "Software Engineer",
-      stage: "Applied",
-      appliedDate: "Nov 15, 2025",
-      score: 80,
-      notes: "Strong portfolio",
+      name: "Alex Martinez",
+      email: "alex.m@email.com",
+      position: "Frontend Developer",
+      stage: "Interview",
+      appliedDate: "Feb 25, 2026",
+      score: 88,
+      notes: "Creative designer",
+      interviewStatus: "Passed",
+      hired: false,
     },
     {
       id: 6,
-      name: "Candidate 6",
-      email: "candidate6@email.com",
-      position: "Software Engineer",
-      stage: "Screening",
-      appliedDate: "Nov 14, 2025",
-      score: 85,
-      notes: "Impressive experience",
+      name: "Lisa Wang",
+      email: "lisa.wang@email.com",
+      position: "Frontend Developer",
+      stage: "Hired",
+      appliedDate: "Feb 15, 2026",
+      score: 92,
+      notes: "Exceptional front-end skills",
+      interviewStatus: "Passed",
+      hired: true,
     },
     {
       id: 7,
-      name: "Candidate 7",
-      email: "candidate7@email.com",
-      position: "Software Engineer",
-      stage: "Interview",
-      appliedDate: "Nov 13, 2025",
-      score: 90,
-      notes: "Outstanding candidate",
+      name: "David Brown",
+      email: "david.b@email.com",
+      position: "DevOps Engineer",
+      stage: "Applied",
+      appliedDate: "Mar 3, 2026",
+      score: 75,
+      notes: "Cloud infrastructure experience",
+      interviewStatus: "Not Started",
+      hired: false,
     },
     {
       id: 8,
-      name: "Candidate 8",
-      email: "candidate8@email.com",
+      name: "Rachel Green",
+      email: "rachel.g@email.com",
+      position: "DevOps Engineer",
+      stage: "Screening",
+      appliedDate: "Feb 27, 2026",
+      score: 82,
+      notes: "Strong DevOps background",
+      interviewStatus: "Pending",
+      hired: false,
+    },
+    {
+      id: 9,
+      name: "Tom Wilson",
+      email: "tom.w@email.com",
+      position: "DevOps Engineer",
+      stage: "Interview",
+      appliedDate: "Feb 22, 2026",
+      score: 87,
+      notes: "Kubernetes expert",
+      interviewStatus: "Passed",
+      hired: false,
+    },
+    {
+      id: 10,
+      name: "Jessica Lee",
+      email: "jessica.lee@email.com",
       position: "Software Engineer",
-      stage: "Applied",
-      appliedDate: "Nov 12, 2025",
-      score: 95,
-      notes: "Top candidate",
+      stage: "Interview",
+      appliedDate: "Feb 26, 2026",
+      score: 78,
+      notes: "Good fundamentals",
+      interviewStatus: "Failed",
+      hired: false,
     },
   ]);
+
+  const [jobs] = useState<Job[]>([
+    {
+      id: "1",
+      title: "Senior Software Engineer",
+      position: "Software Engineer",
+    },
+    { id: "2", title: "Frontend Developer", position: "Frontend Developer" },
+    { id: "3", title: "DevOps Engineer", position: "DevOps Engineer" },
+  ]);
+
+  // Filter states for Container 1
+  const [filterPosition, setFilterPosition] = useState<string>("all");
+  const [filterStage, setFilterStage] = useState<string>("all");
+  const [filterInterviewStatus, setFilterInterviewStatus] =
+    useState<string>("all");
+
+  // Expanded job state for Container 2
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -116,9 +183,15 @@ export default function CandidatesPage() {
         email: newCandidateEmail,
         position: "Software Engineer",
         stage: "Applied",
-        appliedDate: new Date().toLocaleDateString(),
+        appliedDate: new Date().toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
         score: 50,
         notes: "",
+        interviewStatus: "Not Started",
+        hired: false,
       };
       setCandidates([...candidates, newCandidate]);
       setNewCandidateName("");
@@ -162,8 +235,35 @@ export default function CandidatesPage() {
       Screening: "bg-yellow-100 text-yellow-800",
       Interview: "bg-purple-100 text-purple-800",
       Offer: "bg-green-100 text-green-800",
+      Hired: "bg-emerald-100 text-emerald-800",
     };
     return colors[stage] || "bg-gray-100 text-gray-800";
+  };
+
+  // Filter candidates for Container 1
+  const getFilteredCandidates = () => {
+    let filtered = candidates;
+
+    if (filterPosition !== "all") {
+      filtered = filtered.filter((c) => c.position === filterPosition);
+    }
+
+    if (filterStage !== "all") {
+      filtered = filtered.filter((c) => c.stage === filterStage);
+    }
+
+    if (filterInterviewStatus !== "all") {
+      filtered = filtered.filter(
+        (c) => c.interviewStatus === filterInterviewStatus,
+      );
+    }
+
+    return filtered;
+  };
+
+  // Get candidates by job position
+  const getCandidatesByJob = (position: string) => {
+    return candidates.filter((c) => c.position === position);
   };
 
   const topCandidates = candidates
@@ -196,7 +296,10 @@ export default function CandidatesPage() {
             stage: "Offer",
             count: candidates.filter((c) => c.stage === "Offer").length,
           },
-          { stage: "Hired", count: 2 },
+          {
+            stage: "Hired",
+            count: candidates.filter((c) => c.stage === "Hired").length,
+          },
         ].map((stage) => (
           <div
             key={stage.stage}
@@ -222,6 +325,58 @@ export default function CandidatesPage() {
           </button>
         </div>
 
+        {/* Filters */}
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">
+              Filter by Position
+            </label>
+            <select
+              value={filterPosition}
+              onChange={(e) => setFilterPosition(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
+            >
+              <option value="all">All Positions</option>
+              <option value="Software Engineer">Software Engineer</option>
+              <option value="Frontend Developer">Frontend Developer</option>
+              <option value="DevOps Engineer">DevOps Engineer</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">
+              Filter by Stage
+            </label>
+            <select
+              value={filterStage}
+              onChange={(e) => setFilterStage(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
+            >
+              <option value="all">All Stages</option>
+              <option value="Applied">Applied</option>
+              <option value="Screening">Screening</option>
+              <option value="Interview">Interview</option>
+              <option value="Offer">Offer</option>
+              <option value="Hired">Hired</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">
+              Filter by Interview Status
+            </label>
+            <select
+              value={filterInterviewStatus}
+              onChange={(e) => setFilterInterviewStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
+            >
+              <option value="all">All Status</option>
+              <option value="Not Started">Not Started</option>
+              <option value="Pending">Pending</option>
+              <option value="Passed">Passed</option>
+              <option value="Failed">Failed</option>
+            </select>
+          </div>
+        </div>
+
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="text-gray-400 border-b">
@@ -235,7 +390,7 @@ export default function CandidatesPage() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {candidates.map((candidate) => (
+            {getFilteredCandidates().map((candidate) => (
               <tr key={candidate.id} className="hover:bg-gray-50">
                 <td className="py-4 font-medium">{candidate.name}</td>
                 <td className="py-4">{candidate.email}</td>
@@ -274,36 +429,194 @@ export default function CandidatesPage() {
             ))}
           </tbody>
         </table>
+        {getFilteredCandidates().length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No candidates found matching the selected filters.
+          </div>
+        )}
       </div>
 
-      {/* Top Candidates */}
+      {/* Jobs with Candidates Status */}
       <div className="bg-white rounded-2xl border p-6">
-        <h2 className="text-xl font-bold mb-6">Top 3 Candidates</h2>
+        <h2 className="text-xl font-bold mb-6">Candidates by Job Position</h2>
         <div className="space-y-4">
-          {topCandidates.map((candidate, idx) => (
-            <div
-              key={candidate.id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-[#5D20B3] text-white rounded-full flex items-center justify-center font-bold">
-                  {idx + 1}
-                </div>
-                <div>
-                  <h3 className="font-bold">{candidate.name}</h3>
-                  <p className="text-gray-600 text-sm">
-                    {candidate.position} • {candidate.score}% Match
-                  </p>
-                </div>
+          {jobs.map((job) => {
+            const jobCandidates = getCandidatesByJob(job.position);
+            const appliedCandidates = jobCandidates.filter(
+              (c) => !c.hired && c.interviewStatus === "Not Started",
+            );
+            const passedCandidates = jobCandidates.filter(
+              (c) => !c.hired && c.interviewStatus === "Passed",
+            );
+            const hiredCandidates = jobCandidates.filter((c) => c.hired);
+            const isExpanded = expandedJobId === job.id;
+
+            return (
+              <div key={job.id} className="border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setExpandedJobId(isExpanded ? null : job.id)}
+                  className="w-full p-4 bg-gray-50 hover:bg-gray-100 transition flex justify-between items-center"
+                >
+                  <div className="text-left">
+                    <h3 className="font-bold text-lg">{job.title}</h3>
+                    <p className="text-sm text-gray-600">
+                      Total: {jobCandidates.length} candidates • Applied:{" "}
+                      {appliedCandidates.length} • Passed:{" "}
+                      {passedCandidates.length} • Hired:{" "}
+                      {hiredCandidates.length}
+                    </p>
+                  </div>
+                  <svg
+                    className={`w-6 h-6 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+
+                {isExpanded && (
+                  <div className="p-4 space-y-6">
+                    {/* Applied Candidates */}
+                    <div>
+                      <h4 className="font-semibold text-md mb-3 flex items-center gap-2">
+                        <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs">
+                          {appliedCandidates.length}
+                        </span>
+                        Applied Candidates
+                      </h4>
+                      {appliedCandidates.length > 0 ? (
+                        <div className="space-y-2">
+                          {appliedCandidates.map((candidate) => (
+                            <div
+                              key={candidate.id}
+                              className="flex justify-between items-center p-3 bg-blue-50 rounded-lg"
+                            >
+                              <div>
+                                <p className="font-medium">{candidate.name}</p>
+                                <p className="text-sm text-gray-600">
+                                  {candidate.email}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Applied: {candidate.appliedDate}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(candidate.stage)}`}
+                                >
+                                  {candidate.stage}
+                                </span>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Score: {candidate.score}%
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">
+                          No candidates currently applied
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Passed Interview Candidates */}
+                    <div>
+                      <h4 className="font-semibold text-md mb-3 flex items-center gap-2">
+                        <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs">
+                          {passedCandidates.length}
+                        </span>
+                        Passed Interview
+                      </h4>
+                      {passedCandidates.length > 0 ? (
+                        <div className="space-y-2">
+                          {passedCandidates.map((candidate) => (
+                            <div
+                              key={candidate.id}
+                              className="flex justify-between items-center p-3 bg-green-50 rounded-lg"
+                            >
+                              <div>
+                                <p className="font-medium">{candidate.name}</p>
+                                <p className="text-sm text-gray-600">
+                                  {candidate.email}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Applied: {candidate.appliedDate}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(candidate.stage)}`}
+                                >
+                                  {candidate.stage}
+                                </span>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Score: {candidate.score}%
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">
+                          No candidates have passed interviews yet
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Hired Candidates */}
+                    <div>
+                      <h4 className="font-semibold text-md mb-3 flex items-center gap-2">
+                        <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs">
+                          {hiredCandidates.length}
+                        </span>
+                        Hired
+                      </h4>
+                      {hiredCandidates.length > 0 ? (
+                        <div className="space-y-2">
+                          {hiredCandidates.map((candidate) => (
+                            <div
+                              key={candidate.id}
+                              className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg"
+                            >
+                              <div>
+                                <p className="font-medium">{candidate.name}</p>
+                                <p className="text-sm text-gray-600">
+                                  {candidate.email}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Applied: {candidate.appliedDate}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-medium">
+                                  Hired
+                                </span>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  Score: {candidate.score}%
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">
+                          No candidates hired for this position yet
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => handleSendInterview(candidate)}
-                className="bg-[#5D20B3] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#4a1a8a]"
-              >
-                Send Interview
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
