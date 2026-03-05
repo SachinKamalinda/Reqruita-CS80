@@ -2637,6 +2637,29 @@ body.rq-noscr {
   color: rgba(255, 255, 255, 0.55);
 }
 
+/* Dimmed non-openable files */
+.fe-entry.fe-entry-dimmed {
+  opacity: 0.38;
+}
+
+.fe-entry.fe-entry-dimmed:hover {
+  background: transparent;
+}
+
+/* PDF badge pill on openable PDF entries */
+.fe-entry-pdf-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #f87171;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* Files toolbar button active state */
 .mt-icon-btn.mt-icon-files {
   border-color: rgba(16, 185, 129, 0.5);

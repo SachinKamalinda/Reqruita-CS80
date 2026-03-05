@@ -1,7 +1,7 @@
 // src/components/FileExplorer.jsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-/* ─── helper: format file size ─────────────────────────── */
+/* â”€â”€â”€ helper: format file size â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function fmtSize(bytes) {
     if (bytes == null) return "";
     if (bytes < 1024) return `${bytes} B`;
@@ -10,7 +10,7 @@ function fmtSize(bytes) {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-/* ─── helper: icon by extension ───────────────────────── */
+/* â”€â”€â”€ helper: icon by extension â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function FileIcon({ isDir, ext }) {
     if (isDir) {
         return (
@@ -80,13 +80,13 @@ function FileIcon({ isDir, ext }) {
     );
 }
 
-/* ─── breadcrumbs helper ──────────────────────────────── */
+/* â”€â”€â”€ breadcrumbs helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function buildBreadcrumbs(fullPath, sep) {
     const parts = fullPath.split(sep).filter(Boolean);
     const crumbs = [];
 
     if (sep === "\\") {
-        // Windows: first part is like "C:" → root is "C:\"
+        // Windows: first part is like "C:" â†’ root is "C:\"
         parts.forEach((part, i) => {
             const path = (i === 0 ? part + sep : crumbs[i - 1].path + sep + part);
             crumbs.push({ label: part || sep, path });
@@ -102,41 +102,19 @@ function buildBreadcrumbs(fullPath, sep) {
     return crumbs;
 }
 
-/* ─── main component ──────────────────────────────────── */
+/* â”€â”€â”€ main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* File-type buckets */
-const IMAGE_EXTS  = new Set([".jpg",".jpeg",".png",".gif",".bmp",".webp",".svg",".ico"]);
-const PDF_EXTS    = new Set([".pdf"]);
-const TEXT_EXTS   = new Set([
-    // plain text
-    ".txt",".md",".markdown",".csv",".log",".ini",".env",".toml",
-    // web
-    ".html",".htm",".css",".scss",".less",
-    // JS / TS
-    ".js",".jsx",".ts",".tsx",".mjs",".cjs",
-    // backend languages
-    ".py",".java",".c",".cpp",".cc",".cs",".go",".rs",".rb",".php",".swift",".kt",".r",
-    // shell / config
-    ".sh",".bash",".zsh",".bat",".ps1",
-    // data
-    ".json",".yaml",".yml",".xml",".sql",
-]);
+/* Only PDFs can be opened inline */
+const PDF_EXT = ".pdf";
 
-export default function FileExplorer({ onClose }) {
-    const [pathStack, setPathStack] = useState([]); // stack of visited paths
+export default function FileExplorer({ onClose, onOpenPDF }) {
+    const [pathStack, setPathStack] = useState([]);
     const [entries, setEntries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [sep, setSep] = useState("\\");
     const [openingFile, setOpeningFile] = useState(null);
     const openingRef = useRef(false);
-
-    // Viewer state
-    const [imagePreview, setImagePreview] = useState(null); // { src, name }
-    const [docPreview, setDocPreview] = useState(null);    // { type:'text'|'pdf'|'unsupported', content?, name, ext }
-    const [wrapLines, setWrapLines] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const copiedTimer = useRef(null);
 
     const currentPath = pathStack[pathStack.length - 1] || "";
 
@@ -205,47 +183,23 @@ export default function FileExplorer({ onClose }) {
             navigateTo(entry.path);
             return;
         }
+        // Only PDFs are openable
+        if (entry.ext !== PDF_EXT) return;
 
-        // Guard against double-click
         if (openingRef.current) return;
         openingRef.current = true;
         setOpeningFile(entry.name);
-
         try {
-            if (IMAGE_EXTS.has(entry.ext)) {
-                const src = await window.reqruita.readFileBase64(entry.path);
-                setImagePreview({ src, name: entry.name });
-
-            } else if (PDF_EXTS.has(entry.ext)) {
-                const src = await window.reqruita.readFileBase64(entry.path);
-                setDocPreview({ type: "pdf", content: src, name: entry.name, ext: entry.ext });
-
-            } else if (TEXT_EXTS.has(entry.ext)) {
-                const text = await window.reqruita.readFileText(entry.path);
-                setWrapLines(false);
-                setCopied(false);
-                setDocPreview({ type: "text", content: text, name: entry.name, ext: entry.ext });
-
-            } else {
-                // Binary / unsupported formats
-                setDocPreview({ type: "unsupported", name: entry.name, ext: entry.ext });
-            }
+            const src = await window.reqruita.readFileBase64(entry.path);
+            onOpenPDF?.(src, entry.name);
         } catch (e) {
-            setError(`Could not open file: ${e?.message || e}`);
+            setError(`Could not open PDF: ${e?.message || e}`);
         } finally {
             setTimeout(() => {
                 setOpeningFile(null);
                 openingRef.current = false;
-            }, 1500);
+            }, 1200);
         }
-    }
-
-    function copyCode() {
-        if (!docPreview?.content) return;
-        navigator.clipboard.writeText(docPreview.content);
-        setCopied(true);
-        clearTimeout(copiedTimer.current);
-        copiedTimer.current = setTimeout(() => setCopied(false), 2000);
     }
 
     const crumbs = currentPath ? buildBreadcrumbs(currentPath, sep) : [];
@@ -283,7 +237,7 @@ export default function FileExplorer({ onClose }) {
                 <div className="fe-breadcrumb">
                     {crumbs.map((crumb, i) => (
                         <React.Fragment key={crumb.path}>
-                            {i > 0 && <span className="fe-bc-sep">›</span>}
+                            {i > 0 && <span className="fe-bc-sep">â€º</span>}
                             <button
                                 className={`fe-bc-part ${i === crumbs.length - 1 ? "fe-bc-active" : ""}`}
                                 onClick={() => {
@@ -317,7 +271,7 @@ export default function FileExplorer({ onClose }) {
                 {loading && (
                     <div className="fe-state">
                         <div className="fe-spinner" />
-                        <span>Loading…</span>
+                        <span>Loadingâ€¦</span>
                     </div>
                 )}
 
@@ -343,179 +297,41 @@ export default function FileExplorer({ onClose }) {
 
                 {!loading && !error && entries.length > 0 && (
                     <div className="fe-list">
-                        {entries.map((entry) => (
-                            <button
-                                key={entry.path}
-                                className={`fe-entry ${entry.isDir ? "fe-entry-dir" : "fe-entry-file"} ${openingFile === entry.name ? "fe-entry-opening" : ""}`}
-                                onClick={() => handleEntryClick(entry)}
-                                title={entry.isDir ? `Open folder: ${entry.name}` : `Open file: ${entry.name}`}
-                            >
-                                <FileIcon isDir={entry.isDir} ext={entry.ext} />
-                                <span className="fe-entry-name">{entry.name}</span>
-                                {!entry.isDir && entry.size != null && (
-                                    <span className="fe-entry-size">{fmtSize(entry.size)}</span>
-                                )}
-                                {entry.isDir && (
-                                    <svg className="fe-entry-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="9 18 15 12 9 6" />
-                                    </svg>
-                                )}
-                            </button>
-                        ))}
+                        {entries.map((entry) => {
+                            const isPDF = !entry.isDir && entry.ext === PDF_EXT;
+                            const isClickable = entry.isDir || isPDF;
+                            return (
+                                <button
+                                    key={entry.path}
+                                    className={[
+                                        "fe-entry",
+                                        entry.isDir ? "fe-entry-dir" : "fe-entry-file",
+                                        !isClickable ? "fe-entry-dimmed" : "",
+                                        openingFile === entry.name ? "fe-entry-opening" : "",
+                                    ].join(" ").trim()}
+                                    onClick={() => isClickable && handleEntryClick(entry)}
+                                    style={!isClickable ? { cursor: "default" } : undefined}
+                                    title={entry.isDir ? `Open folder: ${entry.name}` : isPDF ? `Open PDF: ${entry.name}` : entry.name}
+                                >
+                                    <FileIcon isDir={entry.isDir} ext={entry.ext} />
+                                    <span className="fe-entry-name">{entry.name}</span>
+                                    {!entry.isDir && entry.size != null && (
+                                        <span className="fe-entry-size">{fmtSize(entry.size)}</span>
+                                    )}
+                                    {isPDF && (
+                                        <span className="fe-entry-pdf-badge">PDF</span>
+                                    )}
+                                    {entry.isDir && (
+                                        <svg className="fe-entry-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="9 18 15 12 9 6" />
+                                        </svg>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
             </div>
-
-            {/* Inline image preview overlay */}
-            {imagePreview && (
-                <div className="fe-img-overlay" onClick={() => setImagePreview(null)}>
-                    <div className="fe-img-box" onClick={(e) => e.stopPropagation()}>
-                        <div className="fe-img-topbar">
-                            <span className="fe-img-name">{imagePreview.name}</span>
-                            <button
-                                className="jm-google-close"
-                                onClick={() => setImagePreview(null)}
-                                title="Close preview"
-                            >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div className="fe-img-body">
-                            <img src={imagePreview.src} alt={imagePreview.name} className="fe-img-el" />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Document / code viewer overlay ───────────────── */}
-            {docPreview && (
-                <div className="fe-doc-overlay">
-                    {/* ── PDF viewer ── */}
-                    {docPreview.type === "pdf" && (
-                        <div className="fe-doc-box">
-                            <div className="fe-doc-topbar">
-                                <svg className="fe-doc-badge fe-doc-badge-pdf" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                                </svg>
-                                <span className="fe-doc-name">{docPreview.name}</span>
-                                <button className="jm-google-close" onClick={() => setDocPreview(null)} title="Close">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <iframe
-                                className="fe-pdf-frame"
-                                title={docPreview.name}
-                                src={docPreview.content}
-                            />
-                        </div>
-                    )}
-
-                    {/* ── Text / code viewer ── */}
-                    {docPreview.type === "text" && (
-                        <div className="fe-doc-box">
-                            <div className="fe-doc-topbar">
-                                <svg className="fe-doc-badge fe-doc-badge-code" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                                    <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-                                </svg>
-                                <span className="fe-doc-name">{docPreview.name}</span>
-                                <span className="fe-doc-meta">
-                                    {docPreview.content.split("\n").length} lines
-                                </span>
-                                {/* Wrap toggle */}
-                                <button
-                                    className={`fe-doc-action ${wrapLines ? "fe-doc-action-on" : ""}`}
-                                    onClick={() => setWrapLines((v) => !v)}
-                                    title={wrapLines ? "Disable line wrap" : "Enable line wrap"}
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="17 10 21 10" /><polyline points="3 10 13 10" />
-                                        <path d="M17 14a4 4 0 0 0 0-8" /><polyline points="13 6 13 14" /><polyline points="9 10 13 14 17 10" />
-                                    </svg>
-                                    Wrap
-                                </button>
-                                {/* Copy */}
-                                <button
-                                    className={`fe-doc-action ${copied ? "fe-doc-action-copied" : ""}`}
-                                    onClick={copyCode}
-                                    title="Copy to clipboard"
-                                >
-                                    {copied ? (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="20 6 9 17 4 12" />
-                                        </svg>
-                                    ) : (
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                        </svg>
-                                    )}
-                                    {copied ? "Copied!" : "Copy"}
-                                </button>
-                                <button className="jm-google-close" onClick={() => setDocPreview(null)} title="Close">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div className="fe-code-body">
-                                <pre className={`fe-code-pre ${wrapLines ? "fe-code-wrap" : ""}`}>
-                                    {docPreview.content.split("\n").map((line, i) => (
-                                        <div key={i} className="fe-code-line">
-                                            <span className="fe-code-num">{i + 1}</span>
-                                            <span className="fe-code-text">{line}</span>
-                                        </div>
-                                    ))}
-                                </pre>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── Unsupported format ── */}
-                    {docPreview.type === "unsupported" && (
-                        <div className="fe-doc-box fe-doc-box-sm">
-                            <div className="fe-doc-topbar">
-                                <span className="fe-doc-name">{docPreview.name}</span>
-                                <button className="jm-google-close" onClick={() => setDocPreview(null)} title="Close">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div className="fe-unsupported">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" style={{ color: "rgba(255,255,255,0.25)" }}>
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                    <line x1="12" y1="12" x2="12" y2="16" />
-                                    <circle cx="12" cy="18.5" r="0.5" fill="currentColor" />
-                                </svg>
-                                <p className="fe-unsupported-title">Cannot preview <strong>{docPreview.ext || "this file"}</strong></p>
-                                <p className="fe-unsupported-sub">
-                                    Binary formats like Word, Excel and PowerPoint can't be rendered inside the app.<br />
-                                    Open the file normally — it will appear on your desktop while your screen share shows it to the interviewer.
-                                </p>
-                                <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
-                                    <button
-                                        className="jm-files-btn"
-                                        onClick={async () => {
-                                            setDocPreview(null);
-                                            // Reuse the entry path stored in docPreview — reconstruct from name
-                                            // We don't have path here, so close and let user click again if needed
-                                        }}
-                                    >
-                                        Close
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 }
