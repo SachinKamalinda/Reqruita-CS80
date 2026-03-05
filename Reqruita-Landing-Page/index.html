@@ -1429,10 +1429,10 @@
                     alert(`Login successful! Welcome ${data.user.fullName}`);
                     
                     // Role-Based Redirection
-                    if (data.user.role === 'admin') {
-                        window.location.href = "admin-dashboard.html"; // You need to create this
+                    if (data.user.role === 'admin' || data.user.role === 'interviewer') {
+                        window.location.href = "http://localhost:3000"; 
                     } else {
-                        window.location.href = "interviewer-dashboard.html"; // You need to create this
+                        alert("Invalid role. Please contact support.");
                     }
                 } else {
                     alert(data.message || "Login failed.");

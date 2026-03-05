@@ -35,10 +35,12 @@ function setupDisplayMediaHandler() {
                     types: ["screen", "window"],
                 });
 
-                // Prefer a full-display capture so the interviewer always sees the entire desktop
+                // Prefer capturing OUR Electron app window so the interviewer
+                // sees only the app content (Google iframe), not the full desktop.
+                const winTitle = win?.getTitle() || "";
                 const source =
-                    sources.find((src) => src.id?.toLowerCase().startsWith("screen:")) ||
-                    sources.find((src) => src.display_id) ||
+                    sources.find((src) => winTitle && src.name === winTitle) ||
+                    sources.find((src) => src.id?.toLowerCase().startsWith("window:")) ||
                     sources[0];
                 if (!source) return callback({}); // deny cleanly
 
