@@ -20,4 +20,9 @@ contextBridge.exposeInMainWorld("reqruita", {
     getPathSep: () => ipcRenderer.invoke("fs:getPathSep"),
     readFileBase64: (filePath) => ipcRenderer.invoke("fs:readFileBase64", filePath),
     readFileText: (filePath) => ipcRenderer.invoke("fs:readFileText", filePath),
+    // Build a reqruita-local:// URL for a local file path (no IPC needed)
+    getPDFUrl: (filePath) => {
+        const normalized = filePath.replace(/\\/g, '/');
+        return `reqruita-local:///${normalized}`;
+    },
 });

@@ -1,5 +1,5 @@
 // electron/main.cjs
-const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut, shell } = require("electron");
+const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut, shell, protocol, net } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -7,6 +7,11 @@ const os = require("os");
 // Helps screen share during dev on http://localhost
 app.commandLine.appendSwitch("enable-usermedia-screen-capturing");
 app.commandLine.appendSwitch("allow-http-screen-capture");
+
+// Must register the scheme BEFORE app is ready
+protocol.registerSchemesAsPrivileged([
+    { scheme: 'reqruita-local', privileges: { secure: true, standard: true, supportFetchAPI: true, bypassCSP: true } }
+]);
 
 let win;
 
@@ -188,6 +193,14 @@ function setupFileExplorerIPC() {
 }
 
 app.whenReady().then(() => {
+    // Serve local files (PDFs) via reqruita-local:///path/to/file
+    protocol.handle('reqruita-local', (request) => {
+        const url = new URL(request.url);
+        // pathname on Windows looks like /C:/path/file.pdf – strip the leading slash
+        const filePath = decodeURIComponent(url.pathname.replace(/^\//, ''));
+        return net.fetch('file:///' + filePath);
+    });
+
     setupDisplayMediaHandler();
     createWindow();
     setupInterviewModeIPC();
