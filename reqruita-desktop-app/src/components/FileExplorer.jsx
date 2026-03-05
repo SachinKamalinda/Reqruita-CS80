@@ -178,7 +178,7 @@ export default function FileExplorer({ onClose, onOpenPDF }) {
         setPathStack((s) => (s.length > 0 ? [s[0]] : s));
     }
 
-    async function handleEntryClick(entry) {
+    function handleEntryClick(entry) {
         if (entry.isDir) {
             navigateTo(entry.path);
             return;
@@ -190,7 +190,7 @@ export default function FileExplorer({ onClose, onOpenPDF }) {
         openingRef.current = true;
         setOpeningFile(entry.name);
         try {
-            const src = await window.reqruita.readFileBase64(entry.path);
+            const src = window.reqruita.getPDFUrl(entry.path);
             onOpenPDF?.(src, entry.name);
         } catch (e) {
             setError(`Could not open PDF: ${e?.message || e}`);
