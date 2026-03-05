@@ -1,5 +1,5 @@
 // src/components/FileExplorer.jsx
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 /* ─── helper: format file size ─────────────────────────── */
 function fmtSize(bytes) {
@@ -110,6 +110,7 @@ export default function FileExplorer({ onClose }) {
     const [error, setError] = useState("");
     const [sep, setSep] = useState("\\");
     const [openingFile, setOpeningFile] = useState(null); // file currently being opened
+    const openingRef = useRef(false); // synchronous guard against double-click
 
     const currentPath = pathStack[pathStack.length - 1] || "";
 
@@ -177,13 +178,19 @@ export default function FileExplorer({ onClose }) {
         if (entry.isDir) {
             navigateTo(entry.path);
         } else {
+            // Guard: ignore rapid double-clicks while a file is already being opened
+            if (openingRef.current) return;
+            openingRef.current = true;
             setOpeningFile(entry.name);
             try {
                 await window.reqruita.openFile(entry.path);
             } catch (e) {
                 setError(`Could not open file: ${e?.message || e}`);
             } finally {
-                setTimeout(() => setOpeningFile(null), 1500);
+                setTimeout(() => {
+                    setOpeningFile(null);
+                    openingRef.current = false;
+                }, 1500);
             }
         }
     }
