@@ -300,7 +300,10 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                                     <button
                                         className="jm-google-close"
                                         style={{ marginLeft: 4, flexShrink: 0 }}
-                                        onClick={() => setActivePanel('files')}
+                                        onClick={() => {
+                                            if (pdfSrc?.startsWith('blob:')) URL.revokeObjectURL(pdfSrc);
+                                            setActivePanel('files');
+                                        }}
                                         title="Back to File Explorer"
                                     >
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -309,7 +312,11 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                                     </button>
                                     <button
                                         className="jm-google-close"
-                                        onClick={() => { setActivePanel(null); setPdfSrc(null); }}
+                                        onClick={() => {
+                                            if (pdfSrc?.startsWith('blob:')) URL.revokeObjectURL(pdfSrc);
+                                            setActivePanel(null);
+                                            setPdfSrc(null);
+                                        }}
                                         title="Close"
                                     >
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
