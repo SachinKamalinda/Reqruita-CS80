@@ -178,7 +178,7 @@ export default function FileExplorer({ onClose, onOpenPDF }) {
         setPathStack((s) => (s.length > 0 ? [s[0]] : s));
     }
 
-    function handleEntryClick(entry) {
+    async function handleEntryClick(entry) {
         if (entry.isDir) {
             navigateTo(entry.path);
             return;
@@ -190,8 +190,14 @@ export default function FileExplorer({ onClose, onOpenPDF }) {
         openingRef.current = true;
         setOpeningFile(entry.name);
         try {
-            const src = window.reqruita.getPDFUrl(entry.path);
-            onOpenPDF?.(src, entry.name);
+            // Read PDF bytes via IPC then convert to a same-origin blob URL
+            // so the iframe can load it without cross-scheme restrictions
+            const dataUrl = await window.reqruita.readFileBase64(entry.path);
+            const base64 = dataUrl.split(',')[1];
+            const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const blobUrl = URL.createObjectURL(blob);
+            onOpenPDF?.(blobUrl, entry.name);
         } catch (e) {
             setError(`Could not open PDF: ${e?.message || e}`);
         } finally {
