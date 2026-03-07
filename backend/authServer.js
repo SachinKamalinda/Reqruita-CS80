@@ -10,8 +10,10 @@ app.use(cors());
 
 console.log("Starting Auth Server...");
 
-const MONGO_URI = "mongodb+srv://ishanmalindhaims_db_user:Palaya610%40@cluster0.yebywof.mongodb.net/reqruita?retryWrites=true&w=majority&appName=Cluster0";
-const JWT_SECRET = "your_super_secret_key_here"; // In a real app, use an environment variable
+require('dotenv').config();
+
+const MONGO_URI = process.env.MONGO_URI;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log(" Connected to MongoDB Atlas"))
@@ -22,7 +24,8 @@ const userSchema = new mongoose.Schema({
     fullName: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'interviewer'], required: true }
+    visiblePassword: { type: String }, // Stored purely for admin dashboard visibility at creation
+    role: { type: String, enum: ['admin', 'interviewer', 'recruiter', 'hr manager', 'candidate'], required: true }
 }, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);
@@ -55,7 +58,23 @@ app.post('/api/register', async (req, res) => {
 
         // Save the user to the MongoDB collection
         await newUser.save();
-        res.status(201).json({ message: "Account created successfully!" });
+
+        // Create a JWT Token to auto-login the new user
+        const token = jwt.sign(
+            { id: newUser._id, role: newUser.role },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        res.status(201).json({
+            message: "Account created successfully!",
+            token,
+            user: {
+                id: newUser._id,
+                fullName: newUser.fullName,
+                role: newUser.role
+            }
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -114,36 +133,9 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// 3. Add Interviewer Route - Admins only
-app.post('/api/add-interviewer', authenticateToken, async (req, res) => {
-    try {
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ message: "Access Denied: Requires Admin Role" });
-        }
-
-        const { email, password } = req.body; // In this context, password is the passkey
-
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: "Email already registered" });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const newInterviewer = new User({
-            fullName: "Interviewer", // Default name, or can be passed if needed
-            email,
-            password: hashedPassword,
-            role: 'interviewer'
-        });
-
-        await newInterviewer.save();
-        res.status(201).json({ message: "Interviewer added successfully!" });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// --- Dashboard Routes ---
+const usersAndRolesRouter = require('./dashboard/usersAndRoles')(User, authenticateToken);
+app.use('/api/dashboard/users', usersAndRolesRouter);
 
 // --- Start Server ---
 const PORT = 3003;

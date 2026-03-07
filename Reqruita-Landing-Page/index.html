@@ -1686,8 +1686,8 @@
                     // showSignupSuccessModal(); 
                     // setTimeout(() => { window.location.href = "http://localhost:3000/payment"; }, 2000);
 
-                    // Direct redirect
-                    window.location.href = "http://localhost:3000/payment";
+                    // Direct redirect with token
+                    window.location.href = `http://localhost:3000/payment?token=${data.token}`;
                 } else {
                     alert(data.message || "Registration failed.");
                 }
@@ -1719,16 +1719,16 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Save Session Details (JWT Token) to Local Storage
+                    // Save Session Details (JWT Token) to Local Storage (just in case they stay on same port)
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
 
-                    // Role-Based Redirection
+                    // Role-Based Redirection with token
                     if (data.user.role === 'admin') {
-                        window.location.href = "http://localhost:3000/home";
+                        window.location.href = `http://localhost:3000/home?token=${data.token}`;
                     } else if (data.user.role === 'interviewer') {
                         alert(`Login successful! Welcome ${data.user.fullName}`);
-                        window.location.href = "http://localhost:3000/home";
+                        window.location.href = `http://localhost:3000/home?token=${data.token}`;
                     } else {
                         alert("Invalid role. Please contact support.");
                     }
