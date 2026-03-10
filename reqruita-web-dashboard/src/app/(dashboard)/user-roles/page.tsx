@@ -214,11 +214,8 @@ export default function UserRolesPage() {
                   onChange={(e) => setRole(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#5D20B3]/20 focus:border-[#5D20B3] outline-none transition-all appearance-none cursor-pointer"
                 >
-                  <option value="admin">Administrator (Full Access)</option>
-                  <option value="interviewer">Interviewer (Conduct & Review)</option>
-                  <option value="recruiter">Recruiter (Post Jobs)</option>
-                  <option value="hr manager">HR Manager (Reports)</option>
-                  <option value="candidate">Candidate (Read-only)</option>
+                  <option value="admin">Administrator</option>
+                  <option value="interviewer">Interviewer</option>
                 </select>
               </div>
 
@@ -234,7 +231,7 @@ export default function UserRolesPage() {
                   type="submit"
                   className="px-5 py-2 bg-[#5D20B3] text-white font-medium hover:bg-[#4a1a8a] rounded-lg transition-all shadow-sm flex items-center gap-2"
                 >
-                  Confirm & Add
+                  Confirm
                 </button>
               </div>
             </form>
