@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 interface Job {
   id: string;
@@ -30,17 +30,6 @@ interface Candidate {
     | "Did Not Attend";
 }
 
-interface Assignment {
-  id: number;
-  candidateName: string;
-  candidateId: number;
-  jobPosition: string;
-  assignedInterviewer: string;
-  deadline: string;
-  requirements: string;
-  remarks: string;
-}
-
 interface AssignedToInterviewer {
   id: number;
   candidateName: string;
@@ -57,12 +46,13 @@ interface PastInterview {
   candidateName: string;
   jobPosition: string;
   interviewDate: string;
+  interviewerName: string;
   remarks: string;
   grade: "Pass" | "Fail" | "Next Stage" | "On Hold";
+  additionalNotes?: string[];
 }
 
 export default function SessionsPage() {
-  // Container 1: Jobs
   const [jobs] = useState<Job[]>([
     {
       id: "JOB-001",
@@ -92,10 +82,14 @@ export default function SessionsPage() {
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [jobFilterStatus, setJobFilterStatus] = useState<
-    "all" | "passed" | "failed" | "on_hold" | "not_completed"
+    | "all"
+    | "passed"
+    | "failed"
+    | "on_hold"
+    | "not_completed"
+    | "did_not_attend"
   >("all");
 
-  // Container 2: Applied Candidates
   const [appliedCandidates, setAppliedCandidates] = useState<Candidate[]>([
     {
       id: 1,
@@ -153,59 +147,6 @@ export default function SessionsPage() {
     },
   ]);
 
-  // Filter candidates based on selected job position and session result status
-  const getFilteredCandidates = () => {
-    let filtered = appliedCandidates;
-
-    // Filter by job position
-    if (selectedJob) {
-      filtered = filtered.filter(
-        (candidate) => candidate.position === selectedJob.position,
-      );
-    }
-
-    // Filter by session result status
-    if (jobFilterStatus && jobFilterStatus !== "all") {
-      // Convert filter value to proper format
-      const statusMap: { [key: string]: string } = {
-        passed: "Passed",
-        failed: "Failed",
-        on_hold: "On Hold",
-        not_completed: "Not Completed",
-        did_not_attend: "Did Not Attend",
-      };
-      const mappedStatus = statusMap[jobFilterStatus];
-      filtered = filtered.filter(
-        (candidate) => candidate.sessionStatus === mappedStatus,
-      );
-    }
-
-    return filtered;
-  };
-
-  const filteredCandidates = getFilteredCandidates();
-
-  // Filter past interviews based on selected position and grade
-  const getFilteredPastInterviews = () => {
-    let filtered = pastInterviews;
-
-    // Filter by job position
-    if (pastInterviewJobFilter) {
-      filtered = filtered.filter(
-        (interview) => interview.jobPosition === pastInterviewJobFilter,
-      );
-    }
-
-    // Filter by grade
-    if (pastInterviewGradeFilter && pastInterviewGradeFilter !== "all") {
-      filtered = filtered.filter(
-        (interview) => interview.grade === pastInterviewGradeFilter,
-      );
-    }
-
-    return filtered;
-  };
-
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(
     null,
@@ -215,7 +156,6 @@ export default function SessionsPage() {
   const [assignRequirements, setAssignRequirements] = useState("");
   const [assignRemarks, setAssignRemarks] = useState("");
 
-  // Container 3: Assigned to Interviewer
   const [assignedToInterviewer, setAssignedToInterviewer] = useState<
     AssignedToInterviewer[]
   >([
@@ -229,7 +169,21 @@ export default function SessionsPage() {
       remarks: "Strong technical background",
       candidateEmail: "alice@example.com",
     },
+    {
+      id: 2,
+      candidateName: "Kevin Cross",
+      jobPosition: "Frontend Developer",
+      interviewDate: "2026-03-12",
+      interviewTime: "10:00",
+      requirements: "Portfolio walkthrough",
+      remarks: "Focus on React architecture decisions",
+      candidateEmail: "kevin@example.com",
+    },
   ]);
+
+  const [interviewStatusFilter, setInterviewStatusFilter] = useState<
+    "all" | "scheduled" | "unscheduled"
+  >("all");
 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedAssigned, setSelectedAssigned] =
@@ -237,21 +191,26 @@ export default function SessionsPage() {
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
 
-  // Container 4: Past Interviews
   const [pastInterviews, setPastInterviews] = useState<PastInterview[]>([
     {
       id: 1,
       candidateName: "Michael Davis",
       jobPosition: "Software Engineer",
       interviewDate: "Feb 25, 2026",
+      interviewerName: "Mia Carter",
       remarks: "Good technical skills, needs improvement in communication",
       grade: "Next Stage",
+      additionalNotes: [
+        "Candidate requested feedback summary by email.",
+        "Follow-up coding task shared.",
+      ],
     },
     {
       id: 2,
       candidateName: "Sarah Wilson",
       jobPosition: "Frontend Developer",
       interviewDate: "Feb 20, 2026",
+      interviewerName: "Liam Green",
       remarks: "Excellent problem-solving skills",
       grade: "Pass",
     },
@@ -260,6 +219,7 @@ export default function SessionsPage() {
       candidateName: "Tom Hardy",
       jobPosition: "DevOps Engineer",
       interviewDate: "Feb 15, 2026",
+      interviewerName: "Noah Hall",
       remarks: "Limited experience in cloud technologies",
       grade: "Fail",
     },
@@ -268,6 +228,7 @@ export default function SessionsPage() {
       candidateName: "Linda Chen",
       jobPosition: "Software Engineer",
       interviewDate: "Feb 18, 2026",
+      interviewerName: "Emma Stone",
       remarks: "Strong problem-solving, good communication skills",
       grade: "Pass",
     },
@@ -276,6 +237,7 @@ export default function SessionsPage() {
       candidateName: "James Wilson",
       jobPosition: "Frontend Developer",
       interviewDate: "Feb 12, 2026",
+      interviewerName: "Olivia Reed",
       remarks: "Needs more experience with modern frameworks",
       grade: "On Hold",
     },
@@ -284,26 +246,75 @@ export default function SessionsPage() {
       candidateName: "Daniel Park",
       jobPosition: "DevOps Engineer",
       interviewDate: "Feb 8, 2026",
+      interviewerName: "Ava Brooks",
       remarks: "Excellent infrastructure knowledge",
       grade: "Pass",
     },
   ]);
 
-  // Filter states for Past Interviews
   const [pastInterviewJobFilter, setPastInterviewJobFilter] = useState<
     string | null
   >(null);
   const [pastInterviewGradeFilter, setPastInterviewGradeFilter] =
     useState<string>("all");
 
-  // Edit interview modal states
-  const [showEditInterviewModal, setShowEditInterviewModal] = useState(false);
+  const [showInterviewDetailsModal, setShowInterviewDetailsModal] =
+    useState(false);
   const [selectedInterview, setSelectedInterview] =
     useState<PastInterview | null>(null);
-  const [editRemarks, setEditRemarks] = useState("");
-  const [editGrade, setEditGrade] = useState<
-    "Pass" | "Fail" | "Next Stage" | "On Hold"
-  >("Pass");
+  const [extraNote, setExtraNote] = useState("");
+
+  const getFilteredCandidates = () => {
+    let filtered = appliedCandidates;
+
+    if (selectedJob) {
+      filtered = filtered.filter(
+        (candidate) => candidate.position === selectedJob.position,
+      );
+    }
+
+    if (jobFilterStatus !== "all") {
+      const statusMap: Record<string, Candidate["sessionStatus"]> = {
+        passed: "Passed",
+        failed: "Failed",
+        on_hold: "On Hold",
+        not_completed: "Not Completed",
+        did_not_attend: "Did Not Attend",
+      };
+      filtered = filtered.filter(
+        (candidate) => candidate.sessionStatus === statusMap[jobFilterStatus],
+      );
+    }
+
+    return filtered;
+  };
+
+  const filteredAssignedCandidates = useMemo(() => {
+    if (interviewStatusFilter === "all") return assignedToInterviewer;
+
+    return assignedToInterviewer.filter((candidate) => {
+      const isScheduled = Boolean(candidate.interviewDate && candidate.interviewTime);
+      return interviewStatusFilter === "scheduled" ? isScheduled : !isScheduled;
+    });
+  }, [assignedToInterviewer, interviewStatusFilter]);
+
+  const getFilteredPastInterviews = () => {
+    let filtered = pastInterviews;
+
+    if (pastInterviewJobFilter) {
+      filtered = filtered.filter(
+        (interview) => interview.jobPosition === pastInterviewJobFilter,
+      );
+    }
+
+    if (pastInterviewGradeFilter !== "all") {
+      filtered = filtered.filter(
+        (interview) => interview.grade === pastInterviewGradeFilter,
+      );
+    }
+
+    return filtered;
+  };
 
   const handleAssignCandidate = (candidate: Candidate) => {
     setSelectedCandidate(candidate);
@@ -322,12 +333,16 @@ export default function SessionsPage() {
         remarks: assignRemarks,
         candidateEmail: selectedCandidate.email,
       };
-      setAssignedToInterviewer([...assignedToInterviewer, newAssignment]);
-      setAppliedCandidates(
-        appliedCandidates.map((c) =>
-          c.id === selectedCandidate.id ? { ...c, status: "Assigned" } : c,
+
+      setAssignedToInterviewer((prev) => [...prev, newAssignment]);
+      setAppliedCandidates((prev) =>
+        prev.map((candidate) =>
+          candidate.id === selectedCandidate.id
+            ? { ...candidate, status: "Assigned" }
+            : candidate,
         ),
       );
+
       setShowAssignModal(false);
       setAssignInterviewer("");
       setAssignDeadline("");
@@ -346,13 +361,18 @@ export default function SessionsPage() {
 
   const handleConfirmSchedule = () => {
     if (selectedAssigned && scheduleDate && scheduleTime) {
-      setAssignedToInterviewer(
-        assignedToInterviewer.map((a) =>
-          a.id === selectedAssigned.id
-            ? { ...a, interviewDate: scheduleDate, interviewTime: scheduleTime }
-            : a,
+      setAssignedToInterviewer((prev) =>
+        prev.map((assignment) =>
+          assignment.id === selectedAssigned.id
+            ? {
+                ...assignment,
+                interviewDate: scheduleDate,
+                interviewTime: scheduleTime,
+              }
+            : assignment,
         ),
       );
+
       setShowScheduleModal(false);
       alert(
         `Interview scheduled for ${selectedAssigned.candidateName}! Email invitation sent.`,
@@ -360,35 +380,37 @@ export default function SessionsPage() {
     }
   };
 
-  const handleEditInterview = (interview: PastInterview) => {
+  const handleViewInterviewDetails = (interview: PastInterview) => {
     setSelectedInterview(interview);
-    setEditRemarks(interview.remarks);
-    setEditGrade(interview.grade);
-    setShowEditInterviewModal(true);
+    setExtraNote("");
+    setShowInterviewDetailsModal(true);
   };
 
-  const handleSaveInterviewEdit = () => {
-    if (selectedInterview) {
-      setPastInterviews(
-        pastInterviews.map((interview) =>
-          interview.id === selectedInterview.id
-            ? { ...interview, remarks: editRemarks, grade: editGrade }
-            : interview,
-        ),
-      );
-      setShowEditInterviewModal(false);
-      setSelectedInterview(null);
-      alert(
-        `Interview details updated for ${selectedInterview.candidateName}!`,
-      );
-    }
-  };
+  const handleAddExtraNote = () => {
+    if (!selectedInterview || !extraNote.trim()) return;
 
-  const getJobCandidates = (jobId: string) => {
-    // Filter candidates by job position based on selected job
-    const job = jobs.find((j) => j.id === jobId);
-    if (!job) return [];
-    return appliedCandidates.filter((c) => c.position === job.position);
+    const noteToAdd = extraNote.trim();
+
+    setPastInterviews((prev) =>
+      prev.map((interview) =>
+        interview.id === selectedInterview.id
+          ? {
+              ...interview,
+              additionalNotes: [noteToAdd, ...(interview.additionalNotes || [])],
+            }
+          : interview,
+      ),
+    );
+
+    setSelectedInterview((prev) =>
+      prev
+        ? {
+            ...prev,
+            additionalNotes: [noteToAdd, ...(prev.additionalNotes || [])],
+          }
+        : prev,
+    );
+    setExtraNote("");
   };
 
   const getGradeColor = (grade: string) => {
@@ -398,6 +420,7 @@ export default function SessionsPage() {
       "Next Stage": "bg-blue-100 text-blue-800",
       "On Hold": "bg-yellow-100 text-yellow-800",
     };
+
     return colors[grade] || "bg-gray-100 text-gray-800";
   };
 
@@ -408,16 +431,12 @@ export default function SessionsPage() {
         <h1 className="text-3xl font-bold">Interview Sessions</h1>
       </div>
 
-      {/* CONTAINER 1: Jobs with Applied Candidates & Session History */}
       <div className="bg-white rounded-2xl border p-6">
         <div className="mb-6">
           <h2 className="text-xl font-bold mb-4">Applied Candidates</h2>
 
-          {/* Job Selection */}
           <div className="mb-6">
-            <p className="text-sm font-medium text-gray-600 mb-3">
-              Filter by Position:
-            </p>
+            <p className="text-sm font-medium text-gray-600 mb-3">Filter by Position:</p>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedJob(null)}
@@ -447,14 +466,21 @@ export default function SessionsPage() {
             </div>
           </div>
 
-          {/* Session Result Filter */}
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-gray-600">
-              Interview Session Result:
-            </p>
+            <p className="text-sm font-medium text-gray-600">Interview Session Result:</p>
             <select
               value={jobFilterStatus}
-              onChange={(e) => setJobFilterStatus(e.target.value as any)}
+              onChange={(e) =>
+                setJobFilterStatus(
+                  e.target.value as
+                    | "all"
+                    | "passed"
+                    | "failed"
+                    | "on_hold"
+                    | "not_completed"
+                    | "did_not_attend",
+                )
+              }
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
             >
               <option value="all">All Candidates</option>
@@ -467,34 +493,31 @@ export default function SessionsPage() {
           </div>
         </div>
 
-        {/* Applied Candidates Table */}
-        <div className="overflow-x-auto">
+        <div className="max-h-[540px] overflow-y-auto rounded-xl border border-gray-100">
           <table className="w-full text-left text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b text-gray-600">
-                <th className="py-3 font-medium">Name</th>
-                <th className="py-3 font-medium">Email</th>
-                <th className="py-3 font-medium">Position</th>
-                <th className="py-3 font-medium">Applied Date</th>
-                <th className="py-3 font-medium">Status</th>
-                <th className="py-3 font-medium">Session Status</th>
+                <th className="py-3 px-4 font-medium">Name</th>
+                <th className="py-3 px-4 font-medium">Email</th>
+                <th className="py-3 px-4 font-medium">Position</th>
+                <th className="py-3 px-4 font-medium">Applied Date</th>
+                <th className="py-3 px-4 font-medium">Status</th>
+                <th className="py-3 px-4 font-medium">Session Status</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {getFilteredCandidates().map((candidate) => (
                 <tr key={candidate.id} className="hover:bg-gray-50">
-                  <td className="py-4 font-medium">{candidate.name}</td>
-                  <td className="py-4 text-gray-600">{candidate.email}</td>
-                  <td className="py-4">{candidate.position}</td>
-                  <td className="py-4 text-gray-600">
-                    {candidate.appliedDate}
-                  </td>
-                  <td className="py-4">
+                  <td className="py-4 px-4 font-medium">{candidate.name}</td>
+                  <td className="py-4 px-4 text-gray-600">{candidate.email}</td>
+                  <td className="py-4 px-4">{candidate.position}</td>
+                  <td className="py-4 px-4 text-gray-600">{candidate.appliedDate}</td>
+                  <td className="py-4 px-4">
                     <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
                       {candidate.status}
                     </span>
                   </td>
-                  <td className="py-4">
+                  <td className="py-4 px-4">
                     <span className="text-xs text-gray-600">
                       {candidate.sessionStatus || "Pending"}
                     </span>
@@ -511,38 +534,33 @@ export default function SessionsPage() {
         </div>
       </div>
 
-      {/* CONTAINER 2: Applied Candidates - Admin Assignment */}
       <div className="bg-white rounded-2xl border p-6">
-        <h2 className="text-xl font-bold mb-6">
-          Applied Candidates (Admin Assignment)
-        </h2>
-        <div className="overflow-x-auto">
+        <h2 className="text-xl font-bold mb-6">Applied Candidates (Admin Assignment)</h2>
+        <div className="max-h-[540px] overflow-y-auto rounded-xl border border-gray-100">
           <table className="w-full text-left text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b text-gray-600">
-                <th className="py-3 font-medium">Name</th>
-                <th className="py-3 font-medium">Position</th>
-                <th className="py-3 font-medium">Applied Date</th>
-                <th className="py-3 font-medium">Status</th>
-                <th className="py-3 font-medium">Action</th>
+                <th className="py-3 px-4 font-medium">Name</th>
+                <th className="py-3 px-4 font-medium">Position</th>
+                <th className="py-3 px-4 font-medium">Applied Date</th>
+                <th className="py-3 px-4 font-medium">Status</th>
+                <th className="py-3 px-4 font-medium">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {appliedCandidates
-                .filter((c) => c.status === "Applied")
+                .filter((candidate) => candidate.status === "Applied")
                 .map((candidate) => (
                   <tr key={candidate.id} className="hover:bg-gray-50">
-                    <td className="py-4 font-medium">{candidate.name}</td>
-                    <td className="py-4">{candidate.position}</td>
-                    <td className="py-4 text-gray-600">
-                      {candidate.appliedDate}
-                    </td>
-                    <td className="py-4">
+                    <td className="py-4 px-4 font-medium">{candidate.name}</td>
+                    <td className="py-4 px-4">{candidate.position}</td>
+                    <td className="py-4 px-4 text-gray-600">{candidate.appliedDate}</td>
+                    <td className="py-4 px-4">
                       <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
                         Applied
                       </span>
                     </td>
-                    <td className="py-4">
+                    <td className="py-4 px-4">
                       <button
                         onClick={() => handleAssignCandidate(candidate)}
                         className="bg-[#5D20B3] text-white px-3 py-1 rounded text-xs hover:bg-[#4a1a8a]"
@@ -557,33 +575,42 @@ export default function SessionsPage() {
         </div>
       </div>
 
-      {/* CONTAINER 3: Assigned to Interviewer - Schedule Interviews */}
       <div className="bg-white rounded-2xl border p-6">
-        <h2 className="text-xl font-bold mb-6">
-          Assigned Candidates (Interviewer View)
-        </h2>
-        <div className="space-y-4">
-          {assignedToInterviewer.map((assigned) => (
-            <div
-              key={assigned.id}
-              className="border rounded-lg p-4 hover:bg-gray-50"
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+          <h2 className="text-xl font-bold">Assigned Candidates (Interviewer View)</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-600">Interview Status:</label>
+            <select
+              value={interviewStatusFilter}
+              onChange={(e) =>
+                setInterviewStatusFilter(
+                  e.target.value as "all" | "scheduled" | "unscheduled",
+                )
+              }
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
             >
+              <option value="all">All</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="unscheduled">Unscheduled</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="max-h-[620px] overflow-y-auto space-y-4 pr-1">
+          {filteredAssignedCandidates.map((assigned) => (
+            <div key={assigned.id} className="border rounded-lg p-4 hover:bg-gray-50">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                 <div>
                   <p className="text-xs text-gray-600 font-medium">Candidate</p>
                   <p className="font-bold">{assigned.candidateName}</p>
-                  <p className="text-xs text-gray-600">
-                    {assigned.candidateEmail}
-                  </p>
+                  <p className="text-xs text-gray-600">{assigned.candidateEmail}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-600 font-medium">Position</p>
                   <p className="font-bold">{assigned.jobPosition}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 font-medium">
-                    Interview Date & Time
-                  </p>
+                  <p className="text-xs text-gray-600 font-medium">Interview Date & Time</p>
                   <p className="font-bold">
                     {assigned.interviewDate && assigned.interviewTime
                       ? `${assigned.interviewDate} at ${assigned.interviewTime}`
@@ -594,20 +621,12 @@ export default function SessionsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <p className="text-xs text-gray-600 font-medium">
-                    Requirements
-                  </p>
-                  <p className="text-sm">
-                    {assigned.requirements || "No requirements set"}
-                  </p>
+                  <p className="text-xs text-gray-600 font-medium">Requirements</p>
+                  <p className="text-sm">{assigned.requirements || "No requirements set"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 font-medium">
-                    Remarks & Questions
-                  </p>
-                  <p className="text-sm">
-                    {assigned.remarks || "No remarks set"}
-                  </p>
+                  <p className="text-xs text-gray-600 font-medium">Remarks & Questions</p>
+                  <p className="text-sm">{assigned.remarks || "No remarks set"}</p>
                 </div>
               </div>
 
@@ -624,13 +643,11 @@ export default function SessionsPage() {
                   }
                   className="border border-[#5D20B3] text-[#5D20B3] px-4 py-2 rounded text-xs hover:bg-[#5D20B3]/10"
                 >
-                  Send Email Invite
+                  Conduct Interview
                 </button>
                 <button
                   onClick={() =>
-                    alert(
-                      `View candidate details for ${assigned.candidateName}`,
-                    )
+                    alert(`View candidate details for ${assigned.candidateName}`)
                   }
                   className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-xs hover:bg-gray-50"
                 >
@@ -639,19 +656,20 @@ export default function SessionsPage() {
               </div>
             </div>
           ))}
+          {filteredAssignedCandidates.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No assigned candidates for the selected interview status.
+            </div>
+          )}
         </div>
       </div>
 
-      {/* CONTAINER 4: Past Interviews */}
       <div className="bg-white rounded-2xl border p-6">
         <div className="mb-6">
           <h2 className="text-xl font-bold mb-4">Past Interviews & Results</h2>
 
-          {/* Job Position Filter */}
           <div className="mb-6">
-            <p className="text-sm font-medium text-gray-600 mb-3">
-              Filter by Position:
-            </p>
+            <p className="text-sm font-medium text-gray-600 mb-3">Filter by Position:</p>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setPastInterviewJobFilter(null)}
@@ -668,9 +686,7 @@ export default function SessionsPage() {
                   key={job.id}
                   onClick={() =>
                     setPastInterviewJobFilter(
-                      pastInterviewJobFilter === job.position
-                        ? null
-                        : job.position,
+                      pastInterviewJobFilter === job.position ? null : job.position,
                     )
                   }
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
@@ -685,11 +701,8 @@ export default function SessionsPage() {
             </div>
           </div>
 
-          {/* Grade Filter */}
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-gray-600">
-              Interview Result:
-            </p>
+            <p className="text-sm font-medium text-gray-600">Interview Result:</p>
             <select
               value={pastInterviewGradeFilter}
               onChange={(e) => setPastInterviewGradeFilter(e.target.value)}
@@ -704,21 +717,18 @@ export default function SessionsPage() {
           </div>
         </div>
 
-        {/* Past Interviews List */}
-        <div className="space-y-3">
+        <div className="max-h-[620px] overflow-y-auto space-y-3 pr-1">
           {getFilteredPastInterviews().map((interview) => (
-            <div
-              key={interview.id}
-              className="border rounded-lg p-4 hover:bg-gray-50"
-            >
+            <div key={interview.id} className="border rounded-lg p-4 hover:bg-gray-50">
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <h3 className="font-bold">{interview.candidateName}</h3>
-                  <p className="text-gray-600 text-sm">
-                    {interview.jobPosition}
-                  </p>
+                  <p className="text-gray-600 text-sm">{interview.jobPosition}</p>
                   <p className="text-gray-600 text-xs mt-1">
                     Interviewed on {interview.interviewDate}
+                  </p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Interviewer: {interview.interviewerName}
                   </p>
                 </div>
                 <span
@@ -728,15 +738,14 @@ export default function SessionsPage() {
                 </span>
               </div>
               <p className="text-sm text-gray-700 mt-3 mb-3">
-                <span className="font-medium">Remarks:</span>{" "}
-                {interview.remarks}
+                <span className="font-medium">Remarks:</span> {interview.remarks}
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleEditInterview(interview)}
+                  onClick={() => handleViewInterviewDetails(interview)}
                   className="bg-[#5D20B3] text-white px-4 py-2 rounded text-xs hover:bg-[#4a1a8a]"
                 >
-                  View Details & Edit
+                  View Details
                 </button>
               </div>
             </div>
@@ -749,7 +758,6 @@ export default function SessionsPage() {
         </div>
       </div>
 
-      {/* Assign to Interviewer Modal */}
       {showAssignModal && selectedCandidate && (
         <div
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
@@ -759,26 +767,20 @@ export default function SessionsPage() {
             className="bg-white rounded-xl p-6 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold mb-4">
-              Assign {selectedCandidate.name}
-            </h2>
+            <h2 className="text-2xl font-bold mb-4">Assign {selectedCandidate.name}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Assign to Interviewer
-                </label>
+                <label className="block text-sm font-medium mb-2">Assign to Interviewer</label>
                 <input
                   type="text"
                   value={assignInterviewer}
                   onChange={(e) => setAssignInterviewer(e.target.value)}
-                  placeholder="Interviewer name"
+                  placeholder="Interviewer Email"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Deadline
-                </label>
+                <label className="block text-sm font-medium mb-2">Deadline</label>
                 <input
                   type="date"
                   value={assignDeadline}
@@ -787,9 +789,7 @@ export default function SessionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Requirements
-                </label>
+                <label className="block text-sm font-medium mb-2">Requirements</label>
                 <textarea
                   value={assignRequirements}
                   onChange={(e) => setAssignRequirements(e.target.value)}
@@ -799,9 +799,7 @@ export default function SessionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Remarks & Questions
-                </label>
+                <label className="block text-sm font-medium mb-2">Remarks & Questions</label>
                 <textarea
                   value={assignRemarks}
                   onChange={(e) => setAssignRemarks(e.target.value)}
@@ -829,7 +827,6 @@ export default function SessionsPage() {
         </div>
       )}
 
-      {/* Schedule Interview Modal */}
       {showScheduleModal && selectedAssigned && (
         <div
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
@@ -844,9 +841,7 @@ export default function SessionsPage() {
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Interview Date
-                </label>
+                <label className="block text-sm font-medium mb-2">Interview Date</label>
                 <input
                   type="date"
                   value={scheduleDate}
@@ -855,9 +850,7 @@ export default function SessionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Interview Time
-                </label>
+                <label className="block text-sm font-medium mb-2">Interview Time</label>
                 <input
                   type="time"
                   value={scheduleTime}
@@ -867,9 +860,9 @@ export default function SessionsPage() {
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-800">
-                  <span className="font-semibold">Note:</span> An automated
-                  email invitation will be sent to{" "}
-                  {selectedAssigned.candidateEmail} once scheduled.
+                  <span className="font-semibold">Note:</span> An automated email
+                  invitation will be sent to {selectedAssigned.candidateEmail} once
+                  scheduled.
                 </p>
               </div>
               <div className="flex gap-3 mt-6">
@@ -891,85 +884,94 @@ export default function SessionsPage() {
         </div>
       )}
 
-      {/* Edit Interview Modal */}
-      {showEditInterviewModal && selectedInterview && (
+      {showInterviewDetailsModal && selectedInterview && (
         <div
           className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
-          onClick={() => setShowEditInterviewModal(false)}
+          onClick={() => setShowInterviewDetailsModal(false)}
         >
           <div
-            className="bg-white rounded-xl p-6 w-full max-w-lg"
+            className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-bold mb-4">
               Interview Details - {selectedInterview.candidateName}
             </h2>
 
-            {/* Interview Details Display */}
             <div className="space-y-3 mb-6 p-4 bg-gray-50 rounded-lg">
               <div>
-                <p className="text-xs text-gray-600 font-medium">
-                  Candidate Name
-                </p>
-                <p className="text-sm font-bold">
-                  {selectedInterview.candidateName}
-                </p>
+                <p className="text-xs text-gray-600 font-medium">Candidate Name</p>
+                <p className="text-sm font-bold">{selectedInterview.candidateName}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 font-medium">
-                  Job Position
-                </p>
+                <p className="text-xs text-gray-600 font-medium">Job Position</p>
                 <p className="text-sm">{selectedInterview.jobPosition}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 font-medium">
-                  Interview Date
-                </p>
+                <p className="text-xs text-gray-600 font-medium">Interview Date</p>
                 <p className="text-sm">{selectedInterview.interviewDate}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-600 font-medium">Interviewr</p>
+                <p className="text-sm">{selectedInterview.interviewerName}</p>
               </div>
             </div>
 
-            {/* Editable Fields */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Interview Result
-                </label>
-                <select
-                  value={editGrade}
-                  onChange={(e) => setEditGrade(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
-                >
-                  <option value="Pass">Pass</option>
-                  <option value="Fail">Fail</option>
-                  <option value="Next Stage">Next Stage</option>
-                  <option value="On Hold">On Hold</option>
-                </select>
+                <label className="block text-sm font-medium mb-2">Interview Result</label>
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm">
+                  {selectedInterview.grade}
+                </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Remarks
-                </label>
+                <label className="block text-sm font-medium mb-2">Remarks</label>
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm min-h-[120px] whitespace-pre-wrap">
+                  {selectedInterview.remarks}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Add Extra Note</label>
                 <textarea
-                  value={editRemarks}
-                  onChange={(e) => setEditRemarks(e.target.value)}
-                  placeholder="Add or update interview remarks..."
-                  rows={5}
+                  value={extraNote}
+                  onChange={(e) => setExtraNote(e.target.value)}
+                  rows={3}
+                  placeholder="Add additional interviewer notes..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
                 />
+                <button
+                  onClick={handleAddExtraNote}
+                  className="mt-2 bg-[#5D20B3] text-white px-4 py-2 rounded text-xs hover:bg-[#4a1a8a]"
+                >
+                  Save Note
+                </button>
               </div>
+
+              <div>
+                <p className="text-sm font-medium mb-2">Extra Notes</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                  {(selectedInterview.additionalNotes || []).length > 0 ? (
+                    selectedInterview.additionalNotes?.map((note, index) => (
+                      <div
+                        key={`${selectedInterview.id}-note-${index}`}
+                        className="text-sm bg-gray-50 border border-gray-200 rounded-lg p-2"
+                      >
+                        {note}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No extra notes added yet.</p>
+                  )}
+                </div>
+              </div>
+
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={handleSaveInterviewEdit}
-                  className="flex-1 bg-[#5D20B3] text-white px-4 py-2 rounded-lg hover:bg-[#4a1a8a]"
-                >
-                  Save Changes
-                </button>
-                <button
-                  onClick={() => setShowEditInterviewModal(false)}
+                  onClick={() => setShowInterviewDetailsModal(false)}
                   className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  Close
                 </button>
               </div>
             </div>
