@@ -5,9 +5,6 @@ import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<
-    "upcoming" | "overdue" | "completed"
-  >("upcoming");
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // March 2026
   const [taskTitle, setTaskTitle] = useState("");
@@ -79,7 +76,7 @@ export default function Dashboard() {
     );
   };
 
-  const currentInterviews = interviews[activeTab];
+  const currentInterviews = interviews["upcoming"];
 
   return (
     <div className="grid gap-8">
@@ -92,42 +89,10 @@ export default function Dashboard() {
 
         {/* Interviews Card */}
         <div className="bg-white rounded-2xl border p-6 min-h-[200px]">
-          <h2 className="text-xl font-bold mb-4">Assigned Interviews</h2>
-          <div className="flex gap-6 border-b text-sm font-medium mb-10">
-            <button
-              onClick={() => setActiveTab("upcoming")}
-              className={`pb-2 transition ${
-                activeTab === "upcoming"
-                  ? "border-b-2 border-[#5D20B3] text-[#5D20B3]"
-                  : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              Upcoming
-            </button>
-            <button
-              onClick={() => setActiveTab("overdue")}
-              className={`pb-2 transition ${
-                activeTab === "overdue"
-                  ? "border-b-2 border-[#5D20B3] text-[#5D20B3]"
-                  : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              Overdue
-            </button>
-            <button
-              onClick={() => setActiveTab("completed")}
-              className={`pb-2 transition ${
-                activeTab === "completed"
-                  ? "border-b-2 border-[#5D20B3] text-[#5D20B3]"
-                  : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              Completed
-            </button>
-          </div>
-          {currentInterviews.length > 0 ? (
+          <h2 className="text-xl font-bold mb-6">Upcoming Interviews</h2>
+          {interviews.upcoming.length > 0 ? (
             <div className="space-y-4">
-              {currentInterviews.map((interview) => (
+              {interviews.upcoming.map((interview) => (
                 <div
                   key={interview.id}
                   className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
@@ -140,16 +105,28 @@ export default function Dashboard() {
                         {interview.date}
                       </p>
                     </div>
-                    <span className="text-sm font-medium text-[#5D20B3] bg-purple-100 px-3 py-1 rounded-full">
-                      {interview.time}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          alert(
+                            `Conducting interview with ${interview.candidate}`,
+                          )
+                        }
+                        className="text-sm font-medium text-[#5D20B3] bg-purple-100 px-3 py-1 rounded-full hover:bg-purple-200 transition"
+                      >
+                        Conduct Interview
+                      </button>
+                      <span className="text-sm font-medium text-[#5D20B3] bg-purple-100 px-3 py-1 rounded-full">
+                        {interview.time}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-10 text-gray-400">
-              No {activeTab} interviews assigned
+              No upcoming interviews
             </div>
           )}
         </div>
@@ -195,7 +172,6 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
-
-         </div>
+    </div>
   );
 }

@@ -82,12 +82,7 @@ export default function SessionsPage() {
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [jobFilterStatus, setJobFilterStatus] = useState<
-    | "all"
-    | "passed"
-    | "failed"
-    | "on_hold"
-    | "not_completed"
-    | "did_not_attend"
+    "all" | "passed" | "failed" | "on_hold" | "not_completed" | "did_not_attend"
   >("all");
 
   const [appliedCandidates, setAppliedCandidates] = useState<Candidate[]>([
@@ -293,7 +288,9 @@ export default function SessionsPage() {
     if (interviewStatusFilter === "all") return assignedToInterviewer;
 
     return assignedToInterviewer.filter((candidate) => {
-      const isScheduled = Boolean(candidate.interviewDate && candidate.interviewTime);
+      const isScheduled = Boolean(
+        candidate.interviewDate && candidate.interviewTime,
+      );
       return interviewStatusFilter === "scheduled" ? isScheduled : !isScheduled;
     });
   }, [assignedToInterviewer, interviewStatusFilter]);
@@ -396,7 +393,10 @@ export default function SessionsPage() {
         interview.id === selectedInterview.id
           ? {
               ...interview,
-              additionalNotes: [noteToAdd, ...(interview.additionalNotes || [])],
+              additionalNotes: [
+                noteToAdd,
+                ...(interview.additionalNotes || []),
+              ],
             }
           : interview,
       ),
@@ -436,7 +436,9 @@ export default function SessionsPage() {
           <h2 className="text-xl font-bold mb-4">Applied Candidates</h2>
 
           <div className="mb-6">
-            <p className="text-sm font-medium text-gray-600 mb-3">Filter by Position:</p>
+            <p className="text-sm font-medium text-gray-600 mb-3">
+              Filter by Position:
+            </p>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSelectedJob(null)}
@@ -467,7 +469,9 @@ export default function SessionsPage() {
           </div>
 
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-gray-600">Interview Session Result:</p>
+            <p className="text-sm font-medium text-gray-600">
+              Interview Session Result:
+            </p>
             <select
               value={jobFilterStatus}
               onChange={(e) =>
@@ -511,7 +515,9 @@ export default function SessionsPage() {
                   <td className="py-4 px-4 font-medium">{candidate.name}</td>
                   <td className="py-4 px-4 text-gray-600">{candidate.email}</td>
                   <td className="py-4 px-4">{candidate.position}</td>
-                  <td className="py-4 px-4 text-gray-600">{candidate.appliedDate}</td>
+                  <td className="py-4 px-4 text-gray-600">
+                    {candidate.appliedDate}
+                  </td>
                   <td className="py-4 px-4">
                     <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
                       {candidate.status}
@@ -535,7 +541,9 @@ export default function SessionsPage() {
       </div>
 
       <div className="bg-white rounded-2xl border p-6">
-        <h2 className="text-xl font-bold mb-6">Applied Candidates (Admin Assignment)</h2>
+        <h2 className="text-xl font-bold mb-6">
+          Applied Candidates (Admin Assignment)
+        </h2>
         <div className="max-h-[540px] overflow-y-auto rounded-xl border border-gray-100">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 bg-white z-10">
@@ -554,7 +562,9 @@ export default function SessionsPage() {
                   <tr key={candidate.id} className="hover:bg-gray-50">
                     <td className="py-4 px-4 font-medium">{candidate.name}</td>
                     <td className="py-4 px-4">{candidate.position}</td>
-                    <td className="py-4 px-4 text-gray-600">{candidate.appliedDate}</td>
+                    <td className="py-4 px-4 text-gray-600">
+                      {candidate.appliedDate}
+                    </td>
                     <td className="py-4 px-4">
                       <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
                         Applied
@@ -576,10 +586,107 @@ export default function SessionsPage() {
       </div>
 
       <div className="bg-white rounded-2xl border p-6">
+        <h2 className="text-xl font-bold mb-6">Scheduled Interviews</h2>
+        <div className="max-h-[540px] overflow-y-auto space-y-4 pr-1">
+          {assignedToInterviewer
+            .filter((a) => Boolean(a.interviewDate && a.interviewTime))
+            .map((assigned) => (
+              <div
+                key={assigned.id}
+                className="border rounded-lg p-4 hover:bg-gray-50"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">
+                      Candidate
+                    </p>
+                    <p className="font-bold">{assigned.candidateName}</p>
+                    <p className="text-xs text-gray-600">
+                      {assigned.candidateEmail}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">
+                      Position
+                    </p>
+                    <p className="font-bold">{assigned.jobPosition}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">
+                      Interview Date & Time
+                    </p>
+                    <p className="font-bold">
+                      {assigned.interviewDate} at {assigned.interviewTime}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">
+                      Requirements
+                    </p>
+                    <p className="text-sm">
+                      {assigned.requirements || "No requirements set"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium">
+                      Remarks & Questions
+                    </p>
+                    <p className="text-sm">
+                      {assigned.remarks || "No remarks set"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      alert(
+                        `Conducting interview with ${assigned.candidateName}`,
+                      )
+                    }
+                    className="bg-[#5D20B3] text-white px-4 py-2 rounded text-xs hover:bg-[#4a1a8a]"
+                  >
+                    Conduct Interview
+                  </button>
+                  <button
+                    onClick={() => handleScheduleInterview(assigned)}
+                    className="border border-[#5D20B3] text-[#5D20B3] px-4 py-2 rounded text-xs hover:bg-[#5D20B3]/10"
+                  >
+                    Reschedule
+                  </button>
+                  <button
+                    onClick={() =>
+                      alert(
+                        `View candidate details for ${assigned.candidateName}`,
+                      )
+                    }
+                    className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-xs hover:bg-gray-50"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            ))}
+          {assignedToInterviewer.filter((a) =>
+            Boolean(a.interviewDate && a.interviewTime),
+          ).length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No interviews have been scheduled yet.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border p-6">
         <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-          <h2 className="text-xl font-bold">Assigned Candidates (Interviewer View)</h2>
+          <h2 className="text-xl font-bold">
+            Assigned Candidates (Interviewer View)
+          </h2>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-600">Interview Status:</label>
+            <label className="text-sm font-medium text-gray-600">
+              Interview Status:
+            </label>
             <select
               value={interviewStatusFilter}
               onChange={(e) =>
@@ -598,19 +705,26 @@ export default function SessionsPage() {
 
         <div className="max-h-[620px] overflow-y-auto space-y-4 pr-1">
           {filteredAssignedCandidates.map((assigned) => (
-            <div key={assigned.id} className="border rounded-lg p-4 hover:bg-gray-50">
+            <div
+              key={assigned.id}
+              className="border rounded-lg p-4 hover:bg-gray-50"
+            >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                 <div>
                   <p className="text-xs text-gray-600 font-medium">Candidate</p>
                   <p className="font-bold">{assigned.candidateName}</p>
-                  <p className="text-xs text-gray-600">{assigned.candidateEmail}</p>
+                  <p className="text-xs text-gray-600">
+                    {assigned.candidateEmail}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-600 font-medium">Position</p>
                   <p className="font-bold">{assigned.jobPosition}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 font-medium">Interview Date & Time</p>
+                  <p className="text-xs text-gray-600 font-medium">
+                    Interview Date & Time
+                  </p>
                   <p className="font-bold">
                     {assigned.interviewDate && assigned.interviewTime
                       ? `${assigned.interviewDate} at ${assigned.interviewTime}`
@@ -621,12 +735,20 @@ export default function SessionsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <p className="text-xs text-gray-600 font-medium">Requirements</p>
-                  <p className="text-sm">{assigned.requirements || "No requirements set"}</p>
+                  <p className="text-xs text-gray-600 font-medium">
+                    Requirements
+                  </p>
+                  <p className="text-sm">
+                    {assigned.requirements || "No requirements set"}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 font-medium">Remarks & Questions</p>
-                  <p className="text-sm">{assigned.remarks || "No remarks set"}</p>
+                  <p className="text-xs text-gray-600 font-medium">
+                    Remarks & Questions
+                  </p>
+                  <p className="text-sm">
+                    {assigned.remarks || "No remarks set"}
+                  </p>
                 </div>
               </div>
 
@@ -639,15 +761,9 @@ export default function SessionsPage() {
                 </button>
                 <button
                   onClick={() =>
-                    alert(`Email invitation sent to ${assigned.candidateName}!`)
-                  }
-                  className="border border-[#5D20B3] text-[#5D20B3] px-4 py-2 rounded text-xs hover:bg-[#5D20B3]/10"
-                >
-                  Conduct Interview
-                </button>
-                <button
-                  onClick={() =>
-                    alert(`View candidate details for ${assigned.candidateName}`)
+                    alert(
+                      `View candidate details for ${assigned.candidateName}`,
+                    )
                   }
                   className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-xs hover:bg-gray-50"
                 >
@@ -669,7 +785,9 @@ export default function SessionsPage() {
           <h2 className="text-xl font-bold mb-4">Past Interviews & Results</h2>
 
           <div className="mb-6">
-            <p className="text-sm font-medium text-gray-600 mb-3">Filter by Position:</p>
+            <p className="text-sm font-medium text-gray-600 mb-3">
+              Filter by Position:
+            </p>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setPastInterviewJobFilter(null)}
@@ -686,7 +804,9 @@ export default function SessionsPage() {
                   key={job.id}
                   onClick={() =>
                     setPastInterviewJobFilter(
-                      pastInterviewJobFilter === job.position ? null : job.position,
+                      pastInterviewJobFilter === job.position
+                        ? null
+                        : job.position,
                     )
                   }
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
@@ -702,7 +822,9 @@ export default function SessionsPage() {
           </div>
 
           <div className="flex justify-between items-center">
-            <p className="text-sm font-medium text-gray-600">Interview Result:</p>
+            <p className="text-sm font-medium text-gray-600">
+              Interview Result:
+            </p>
             <select
               value={pastInterviewGradeFilter}
               onChange={(e) => setPastInterviewGradeFilter(e.target.value)}
@@ -719,11 +841,16 @@ export default function SessionsPage() {
 
         <div className="max-h-[620px] overflow-y-auto space-y-3 pr-1">
           {getFilteredPastInterviews().map((interview) => (
-            <div key={interview.id} className="border rounded-lg p-4 hover:bg-gray-50">
+            <div
+              key={interview.id}
+              className="border rounded-lg p-4 hover:bg-gray-50"
+            >
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <h3 className="font-bold">{interview.candidateName}</h3>
-                  <p className="text-gray-600 text-sm">{interview.jobPosition}</p>
+                  <p className="text-gray-600 text-sm">
+                    {interview.jobPosition}
+                  </p>
                   <p className="text-gray-600 text-xs mt-1">
                     Interviewed on {interview.interviewDate}
                   </p>
@@ -738,7 +865,8 @@ export default function SessionsPage() {
                 </span>
               </div>
               <p className="text-sm text-gray-700 mt-3 mb-3">
-                <span className="font-medium">Remarks:</span> {interview.remarks}
+                <span className="font-medium">Remarks:</span>{" "}
+                {interview.remarks}
               </p>
               <div className="flex gap-2">
                 <button
@@ -767,10 +895,14 @@ export default function SessionsPage() {
             className="bg-white rounded-xl p-6 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold mb-4">Assign {selectedCandidate.name}</h2>
+            <h2 className="text-2xl font-bold mb-4">
+              Assign {selectedCandidate.name}
+            </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Assign to Interviewer</label>
+                <label className="block text-sm font-medium mb-2">
+                  Assign to Interviewer
+                </label>
                 <input
                   type="text"
                   value={assignInterviewer}
@@ -780,7 +912,9 @@ export default function SessionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Deadline</label>
+                <label className="block text-sm font-medium mb-2">
+                  Deadline
+                </label>
                 <input
                   type="date"
                   value={assignDeadline}
@@ -789,7 +923,9 @@ export default function SessionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Requirements</label>
+                <label className="block text-sm font-medium mb-2">
+                  Requirements
+                </label>
                 <textarea
                   value={assignRequirements}
                   onChange={(e) => setAssignRequirements(e.target.value)}
@@ -799,7 +935,9 @@ export default function SessionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Remarks & Questions</label>
+                <label className="block text-sm font-medium mb-2">
+                  Remarks & Questions
+                </label>
                 <textarea
                   value={assignRemarks}
                   onChange={(e) => setAssignRemarks(e.target.value)}
@@ -841,7 +979,9 @@ export default function SessionsPage() {
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Interview Date</label>
+                <label className="block text-sm font-medium mb-2">
+                  Interview Date
+                </label>
                 <input
                   type="date"
                   value={scheduleDate}
@@ -850,7 +990,9 @@ export default function SessionsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Interview Time</label>
+                <label className="block text-sm font-medium mb-2">
+                  Interview Time
+                </label>
                 <input
                   type="time"
                   value={scheduleTime}
@@ -860,9 +1002,9 @@ export default function SessionsPage() {
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <p className="text-xs text-blue-800">
-                  <span className="font-semibold">Note:</span> An automated email
-                  invitation will be sent to {selectedAssigned.candidateEmail} once
-                  scheduled.
+                  <span className="font-semibold">Note:</span> An automated
+                  email invitation will be sent to{" "}
+                  {selectedAssigned.candidateEmail} once scheduled.
                 </p>
               </div>
               <div className="flex gap-3 mt-6">
@@ -899,15 +1041,23 @@ export default function SessionsPage() {
 
             <div className="space-y-3 mb-6 p-4 bg-gray-50 rounded-lg">
               <div>
-                <p className="text-xs text-gray-600 font-medium">Candidate Name</p>
-                <p className="text-sm font-bold">{selectedInterview.candidateName}</p>
+                <p className="text-xs text-gray-600 font-medium">
+                  Candidate Name
+                </p>
+                <p className="text-sm font-bold">
+                  {selectedInterview.candidateName}
+                </p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 font-medium">Job Position</p>
+                <p className="text-xs text-gray-600 font-medium">
+                  Job Position
+                </p>
                 <p className="text-sm">{selectedInterview.jobPosition}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 font-medium">Interview Date</p>
+                <p className="text-xs text-gray-600 font-medium">
+                  Interview Date
+                </p>
                 <p className="text-sm">{selectedInterview.interviewDate}</p>
               </div>
               <div>
@@ -918,21 +1068,27 @@ export default function SessionsPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Interview Result</label>
+                <label className="block text-sm font-medium mb-2">
+                  Interview Result
+                </label>
                 <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm">
                   {selectedInterview.grade}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Remarks</label>
+                <label className="block text-sm font-medium mb-2">
+                  Remarks
+                </label>
                 <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm min-h-[120px] whitespace-pre-wrap">
                   {selectedInterview.remarks}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Add Extra Note</label>
+                <label className="block text-sm font-medium mb-2">
+                  Add Extra Note
+                </label>
                 <textarea
                   value={extraNote}
                   onChange={(e) => setExtraNote(e.target.value)}
@@ -961,7 +1117,9 @@ export default function SessionsPage() {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-500">No extra notes added yet.</p>
+                    <p className="text-sm text-gray-500">
+                      No extra notes added yet.
+                    </p>
                   )}
                 </div>
               </div>
