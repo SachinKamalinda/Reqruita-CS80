@@ -1300,6 +1300,11 @@
                     <i class="fa-solid fa-user-lock"></i>
                 </div>
                 <h3 class="text-2xl font-bold text-slate-900 dark:text-white mb-2">Welcome Back</h3>
+<<<<<<< HEAD
+                <p class="text-slate-600 dark:text-slate-400 mb-8 text-sm">Sign in to your dashboard.</p>
+                
+                <div class="space-y-4 mb-6 text-left">
+=======
                 <p class="text-slate-600 dark:text-slate-400 mb-8 text-sm">Select your role to continue securely.</p>
 
                 <div class="space-y-3">
@@ -1328,6 +1333,7 @@
                     <p class="text-slate-600 dark:text-slate-400 text-sm">Enter your credentials below.</p>
                 </div>
                 <div class="space-y-4 mb-6">
+>>>>>>> upstream/main
                     <div>
                         <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 uppercase">Work
                             Email</label>
@@ -1624,34 +1630,7 @@
             }, 300);
         }
 
-        // Signup Success Modal Logic
-        const signupSuccessModal = document.getElementById('signupSuccessModal');
-        const signupSuccessModalContent = document.getElementById('signupSuccessModalContent');
-
-        function showSignupSuccessModal() {
-            signupSuccessModal.classList.remove('hidden');
-            setTimeout(() => {
-                signupSuccessModalContent.classList.remove('scale-95', 'opacity-0');
-                signupSuccessModalContent.classList.add('scale-100', 'opacity-100');
-            }, 10);
-        }
-
-        function closeSignupSuccessModal() {
-            signupSuccessModalContent.classList.remove('scale-100', 'opacity-100');
-            signupSuccessModalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                signupSuccessModal.classList.add('hidden');
-            }, 300);
-        }
-
-        function goToLoginFromSuccess() {
-            closeSignupSuccessModal();
-            setTimeout(() => {
-                showLoginModal();
-            }, 350);
-        }
-
-        const AUTH_API_URL = "http://localhost:3003/api";
+        const API_BASE_URL = 'http://localhost:3001/api';
 
         // SIGN UP HANDLER - Collects data and saves to MongoDB
         async function handleSignup() {

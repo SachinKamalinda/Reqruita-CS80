@@ -4,7 +4,10 @@ import { BACKEND_URL } from "../config";
 
 const RTC_CONFIG = {
     iceServers: [
-        { urls: "stun:stun.l.google.com:19302" }, // ok for MVP
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun.services.mozilla.com" },
     ],
 };
 
@@ -97,8 +100,16 @@ export function useWebRTC({ meetingId, role }) {
 
         async function start() {
             // 1) socket
-            const socket = io(BACKEND_URL, { transports: ["websocket"] });
+            const socket = io(BACKEND_URL);
             socketRef.current = socket;
+
+            socket.on("connect", () => {
+                console.log("Connected to signaling server:", socket.id);
+            });
+
+            socket.on("connect_error", (err) => {
+                console.error("Socket connection error:", err);
+            });
 
             // 2) peer connection
             const pc = new RTCPeerConnection(RTC_CONFIG);
@@ -158,6 +169,19 @@ export function useWebRTC({ meetingId, role }) {
 
             socket.on("webrtc-signal", async ({ from, data }) => {
                 peerIdRef.current = from;
+
+                if (data.type === "renegotiate") {
+                    if (role === "interviewer") {
+                        const offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        socket.emit("webrtc-signal", {
+                            meetingId,
+                            to: from,
+                            data: { type: "offer", sdp: pc.localDescription },
+                        });
+                    }
+                    return;
+                }
 
                 if (data.type === "offer") {
                     await pc.setRemoteDescription(data.sdp);
@@ -234,6 +258,7 @@ export function useWebRTC({ meetingId, role }) {
         await requestScreenOffer();
     }
 
+    
     function setMicEnabled(enabled) {
         if (!localCamStream) return;
         localCamStream.getAudioTracks().forEach((t) => (t.enabled = enabled));

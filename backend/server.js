@@ -6,6 +6,7 @@ const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
+const connectMongo = require("./chatBackend");
 
 const app = express();
 const PORT = 3001;
@@ -22,6 +23,9 @@ app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
     next();
 });
+
+// Connect to MongoDB for chat data
+connectMongo();
 
 // -------------------- DB SETUP --------------------
 const db = new sqlite3.Database(DB_PATH, (err) => {
@@ -214,7 +218,22 @@ app.post("/api/participants/join", (req, res) => {
             getAllParticipants(res, "Joined");
         }
     );
+
+/* GET /api/chat/{interviewId} */
+const ChatMessage =require("./ChatMessage");
+app.get("/api/chat/:interviewId",async(req,res)=>{
+    try{
+        const messages=await ChatMessage.find({
+            interviewId:req.params.interviewId,
+        }).sort({createdAt:1});
+        res.json(messages);}
+    catch(err){
+        res.status(500).json({error:"Failed to load chat"});
+        }
+    });
+
 });
+
 
 // -------------------- SOCKET.IO (SIGNALING) --------------------
 // WebRTC needs signaling: offer/answer/ice messages.
@@ -256,7 +275,32 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", () => {
         console.log("Socket disconnected:", socket.id);
+
     });
+    
+    /*-------------------- SOCKET.IO (CHAT) --------------------*/
+    
+    const ChatMessage =require("./ChatMessage");
+    socket.on("join-chat",({interviewId}) =>{
+        if(!interviewId) return;
+        socket.join(`chat:${interviewId}`);
+    });
+
+    socket.on("chat-message", async (data) => {
+    const { interviewId, senderRole, senderName, message } = data;
+    if (!interviewId || !message) return;
+
+    const saved = await ChatMessage.create({
+     interviewId,
+     senderRole,
+     senderName,
+     message,
+  });
+
+    if (saved) {
+        io.to(`chat:${interviewId}`).emit("new-chat-message", saved);
+    }
+});
 });
 
 // -------------------- START SERVER --------------------
