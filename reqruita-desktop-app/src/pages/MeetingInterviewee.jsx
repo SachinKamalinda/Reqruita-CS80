@@ -112,8 +112,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             message: text,
         });
 
-        setMessages((prev) => [...prev, { senderRole: "interviewee", senderName: candidateName, message: text }]);
-
+        // We don't need to manually update local messages here, 
+        // because the socket listener will catch the 'chat-message' 
+        // event from the server and update it for us.
         setChatInput("");
     }
 
