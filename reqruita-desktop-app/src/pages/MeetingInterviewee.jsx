@@ -1,12 +1,9 @@
-```javascript
 // src/pages/MeetingInterviewee.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
-import MediaControls from "../components/MediaControls.jsx";
-import UserProfile from "../components/UserProfile.jsx";
 
 /**
  * MeetingInterviewee.jsx (FINAL - WebRTC + Candidate Google Window + Screen Share)
@@ -38,6 +35,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     // UI state
     const [error, setError] = useState("");
     const [isSharing, setIsSharing] = useState(false);
+    const [activePanel, setActivePanel] = useState(null); // 'files' | null
 
     //chat UI
     const [chatOpen, setChatOpen] = useState(false);
@@ -63,7 +61,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     } = useWebRTC({ meetingId, role: "interviewee" });
 
     //chat shocket connection
-     useEffect(() => {
+    useEffect(() => {
         if (!meetingId) return;
 
         // Create socket connection ONLY for chat
@@ -85,19 +83,19 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     }, [meetingId]);
 
     //Load chat history
-     useEffect(() => {
+    useEffect(() => {
         if (!meetingId) return;
 
         fetch(`${BACKEND_URL}/api/chat/${meetingId}`)
             .then((res) => res.json())
             .then(setMessages)
-            .catch(() => {});
+            .catch(() => { });
     }, [meetingId]);
 
     //toggle chat panel
-     function toggleChatPanel() {
-       setChatOpen((prev) => !prev);
-     }
+    function toggleChatPanel() {
+        setChatOpen((prev) => !prev);
+    }
 
     // Send chat message
     function sendChatMessage() {
@@ -208,7 +206,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             // Close detached workspace window
             try {
                 window.reqruita?.closeWorkspace?.();
-            } catch (e) {}
+            } catch (e) { }
         }
     }, [localScreenStream, addToast]);
 
@@ -245,7 +243,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 await stopScreenShare();
                 try {
                     window.reqruita?.closeWorkspace?.();
-                } catch (e) {}
+                } catch (e) { }
             } else {
                 await startScreenShare();
             }
@@ -292,7 +290,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 <span className="mt-conn-text">
                     {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
                 </span>
-                <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                <span className="mt-conn-text" style={{ marginLeft: 8, opacity: 0.6 }}>
+                    Meeting: {meetingId || "—"}
+                </span>
             </div>
 
             <div className="jm-row">
@@ -344,54 +344,54 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                         )}
                         <div className="jm-label">Interviewer</div>
                     </div>
-                   
+
 
                     {/* Chat panel */}
                     {chatOpen && (
-                       <aside className="mt-side mt-side-enter">
-                        <div className="mt-side-head">
-                         <div className="mt-side-title">Chat</div>
-                        <button className="mt-side-close" onClick={toggleChatPanel}>
-                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                         </svg>
-                        </button>
-                       </div>
-                       <div className="mt-side-body" style={{ padding: 0 }}>
-                        <div className="mt-chat">
-                         <div className="mt-chat-list">
-                          {messages.map((m,idx) => (
-                           <div key={idx} className={`mt-msg ${m.senderRole}`}>
-                            <div className="mt-msgmeta">
-                             <span>{m.senderName}</span>
-                             
-                           </div>
-                           <div className="mt-bubble">{m.message}</div>
-                           </div>
-                    ))}
-                     </div>
-                     <div className="mt-chat-input">
-                     <input
-                     className="mt-chat-field"
-                     value={chatInput}
-                     onChange={(e) => setChatInput(e.target.value)}
-                     placeholder="Type a message…"
-                     onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
-                    />
-                  <button className="mt-send" onClick={sendChatMessage} disabled={!chatInput.trim()}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                   </svg>
-                 </button>
-               </div>
-             </div>
-           </div>
-         </aside>
-    )}
- </div>
- </div>
-           
+                        <aside className="mt-side mt-side-enter">
+                            <div className="mt-side-head">
+                                <div className="mt-side-title">Chat</div>
+                                <button className="mt-side-close" onClick={toggleChatPanel}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div className="mt-side-body" style={{ padding: 0 }}>
+                                <div className="mt-chat">
+                                    <div className="mt-chat-list">
+                                        {messages.map((m, idx) => (
+                                            <div key={idx} className={`mt-msg ${m.senderRole}`}>
+                                                <div className="mt-msgmeta">
+                                                    <span>{m.senderName}</span>
+
+                                                </div>
+                                                <div className="mt-bubble">{m.message}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-chat-input">
+                                        <input
+                                            className="mt-chat-field"
+                                            value={chatInput}
+                                            onChange={(e) => setChatInput(e.target.value)}
+                                            placeholder="Type a message…"
+                                            onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
+                                        />
+                                        <button className="mt-send" onClick={sendChatMessage} disabled={!chatInput.trim()}>
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </aside>
+                    )}
+                </div>
+            </div>
+
 
             {/* Footer Toolbar */}
             <div className="jm-footer">
@@ -425,7 +425,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                             </svg>
                         ) : (
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1-2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                                 <circle cx="12" cy="13" r="4" />
                             </svg>
                         )}
@@ -462,12 +462,12 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                         <span className="mt-icon-label">{sharing ? "Stop" : "Share"}</span>
                     </button>
                     {/*Chat*/}
-                   <button className={`mt-icon-btn ${chatOpen ? "mt-icon-active" : ""}`} onClick={toggleChatPanel} title="Chat">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
-                   <span className="mt-icon-label">Chat</span>
-                  </button>
+                    <button className={`mt-icon-btn ${chatOpen ? "mt-icon-active" : ""}`} onClick={toggleChatPanel} title="Chat">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span className="mt-icon-label">Chat</span>
+                    </button>
                 </div>
 
                 <button className="mt-end" onClick={leave}>
@@ -478,10 +478,10 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                     <span>Leave</span>
                 </button>
             </div>
-        
 
-         </div>
 
-         
+        </div>
+
+
     );
 }
