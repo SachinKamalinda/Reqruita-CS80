@@ -44,10 +44,8 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
     // Chat
     const [chatInput, setChatInput] = useState("");
-    const [messages, setMessages] = useState([
-        { id: 1, who: "them", name: "Interviewee", text: "Hi! Can you hear me okay?", time: "09:12" },
-        { id: 2, who: "me", name: "You", text: "Yes, loud and clear. Let’s start.", time: "09:12" },
-    ]);
+    const [messages, setMessages] = useState([]);
+    const chatSocketRef = useRef(null);
 
     // Notes
     const [notesTab, setNotesTab] = useState("remarks"); // remarks | details
@@ -109,6 +107,57 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         document.body.classList.add("rq-noscr");
         return () => document.body.classList.remove("rq-noscr");
     }, []);
+
+    // chat socket connection
+    useEffect(() => {
+        if (!meetingId) return;
+
+        // Create socket connection ONLY for chat
+        const socket = io(BACKEND_URL);
+        chatSocketRef.current = socket;
+
+        // Join chat room
+        socket.emit("join-chat", { interviewId: meetingId });
+
+        // Listen for incoming messages
+        socket.on("chat-message", (msg) => {
+            // Convert backend message format to UI format
+            const uiMsg = {
+                id: msg._id || Date.now(),
+                who: msg.senderRole === "interviewer" ? "me" : "them",
+                name: msg.senderName,
+                text: msg.message,
+                time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            };
+            setMessages((prev) => [...prev, uiMsg]);
+        });
+
+        // Cleanup on unmount
+        return () => {
+            socket.disconnect();
+        };
+    }, [meetingId]);
+
+    // Load chat history
+    useEffect(() => {
+        if (!meetingId) return;
+
+        fetch(`${BACKEND_URL}/api/chat/${meetingId}`)
+            .then((res) => res.json())
+            .then((data) => {
+                if (Array.isArray(data)) {
+                    const uiMessages = data.map(msg => ({
+                        id: msg._id,
+                        who: msg.senderRole === "interviewer" ? "me" : "them",
+                        name: msg.senderName,
+                        text: msg.message,
+                        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    }));
+                    setMessages(uiMessages);
+                }
+            })
+            .catch(() => { });
+    }, [meetingId]);
 
     // Attach local stream to local preview
     useEffect(() => {
@@ -261,12 +310,15 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     // Chat send
     function sendMessage() {
         const text = chatInput.trim();
-        if (!text) return;
+        if (!text || !chatSocketRef.current) return;
 
-        const now = new Date();
-        const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        chatSocketRef.current.emit("chat-message", {
+            interviewId: meetingId,
+            senderRole: "interviewer",
+            senderName: "Interviewer", // or use session user name
+            message: text,
+        });
 
-        setMessages((m) => [...m, { id: Date.now(), who: "me", name: "You", text, time }]);
         setChatInput("");
     }
 
