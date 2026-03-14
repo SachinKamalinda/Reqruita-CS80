@@ -25,4 +25,8 @@ contextBridge.exposeInMainWorld("reqruita", {
         const normalized = filePath.replace(/\\/g, '/');
         return `reqruita-local:///${normalized}`;
     },
+
+    // Workspace window management
+    openWorkspace: () => ipcRenderer.invoke("rq:open-workspace"),
+    closeWorkspace: () => ipcRenderer.invoke("rq:close-workspace"),
 });

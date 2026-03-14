@@ -1,10 +1,12 @@
+```javascript
 // src/pages/MeetingInterviewee.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
-import FileExplorer from "../components/FileExplorer";
+import MediaControls from "../components/MediaControls.jsx";
+import UserProfile from "../components/UserProfile.jsx";
 
 /**
  * MeetingInterviewee.jsx (FINAL - WebRTC + Candidate Google Window + Screen Share)
@@ -35,10 +37,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
     // UI state
     const [error, setError] = useState("");
-    // activePanel: null | 'google' | 'files' | 'pdf'
-    const [activePanel, setActivePanel] = useState(null);
-    const [pdfSrc, setPdfSrc] = useState(null);
-    const [pdfName, setPdfName] = useState("");
+    const [isSharing, setIsSharing] = useState(false);
 
     //chat UI
     const [chatOpen, setChatOpen] = useState(false);
@@ -56,6 +55,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         localCamStream,
         localScreenStream,
         remoteCamStream,
+        remoteScreenStream,
         startScreenShare,
         stopScreenShare,
         setMicEnabled,
@@ -128,6 +128,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         return () => {
             try {
                 window.reqruita?.exitInterviewMode?.();
+                window.reqruita?.closeWorkspace?.(); // Ensure workspace is closed on exit
             } catch (e) {
                 // ignore
             }
@@ -196,8 +197,18 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             return isSharing;
         });
         if (isSharing) {
-            // Auto-open google panel when screen share starts (if no panel is open)
-            setActivePanel((prev) => prev || 'google');
+            // Open detached workspace window
+            try {
+                window.reqruita?.openWorkspace?.();
+            } catch (e) {
+                // Fallback to embedded if not in Electron? 
+                // Currently just doing nothing, as the window is detached.
+            }
+        } else {
+            // Close detached workspace window
+            try {
+                window.reqruita?.closeWorkspace?.();
+            } catch (e) {}
         }
     }, [localScreenStream, addToast]);
 
@@ -232,6 +243,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             setError("");
             if (sharing) {
                 await stopScreenShare();
+                try {
+                    window.reqruita?.closeWorkspace?.();
+                } catch (e) {}
             } else {
                 await startScreenShare();
             }
@@ -245,6 +259,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         if (!window.confirm("Are you sure you want to leave the interview?")) return;
         try {
             window.reqruita?.exitInterviewMode?.();
+            window.reqruita?.closeWorkspace?.(); // Ensure workspace is closed on leaving
         } catch (e) { }
 
         try {
@@ -283,117 +298,22 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             <div className="jm-row">
                 {/* Main area */}
                 <div className="jm-main">
-                    <div className="jm-google">
-                        {/* No panel open: show two launch cards */}
-                        {!activePanel && (
-                            <div className="jm-launch-row">
-                                {/* Google launch card */}
-                                <div className="jm-google-launch">
-                                    <div className="jm-google-badge">G</div>
-                                    <div className="jm-google-title">Google</div>
-                                    <div className="jm-google-sub">
-                                        Open Google for quick searches during the interview.
-                                    </div>
-                                    <button className="jm-google-btn" onClick={() => setActivePanel('google')}>
-                                        Open Google
-                                    </button>
-                                </div>
-
-                                {/* File Explorer launch card */}
-                                <div className="jm-files-launch">
-                                    <div className="jm-files-badge">
-                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                                        </svg>
-                                    </div>
-                                    <div className="jm-files-title">File Explorer</div>
-                                    <div className="jm-files-sub">
-                                        Browse and open files on your computer to show the interviewer.
-                                    </div>
-                                    <button className="jm-files-btn" onClick={() => setActivePanel('files')}>
-                                        Open Files
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Google panel */}
-                        {activePanel === 'google' && (
-                            <div className="jm-google-shell">
-                                <div className="jm-google-bar">
-                                    <div className="jm-google-badge sm">G</div>
-                                    <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>Google</div>
-                                    <button className="jm-google-close" onClick={() => setActivePanel(null)} title="Close Google">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                            <line x1="6" y1="6" x2="18" y2="18" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <iframe
-                                    className="jm-google-frame"
-                                    title="Google"
-                                    src="https://www.google.com/webhp?igu=1"
-                                    referrerPolicy="no-referrer"
-                                />
-                            </div>
-                        )}
-
-                        {/* File Explorer panel */}
-                        {activePanel === 'files' && (
-                            <FileExplorer
-                                onClose={() => setActivePanel(null)}
-                                onOpenPDF={(src, name) => {
-                                    setPdfSrc(src);
-                                    setPdfName(name);
-                                    setActivePanel('pdf');
-                                }}
+                    <div className="jm-share">
+                        {remoteScreenStream ? (
+                            <video
+                                autoPlay
+                                playsInline
+                                ref={(v) => v && (v.srcObject = remoteScreenStream)}
                             />
-                        )}
-
-                        {/* PDF panel – uses the same shell as Google */}
-                        {activePanel === 'pdf' && (
-                            <div className="jm-google-shell">
-                                <div className="jm-google-bar">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                                    </svg>
-                                    <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: 'rgba(255,255,255,0.92)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {pdfName}
-                                    </div>
-                                    <button
-                                        className="jm-google-close"
-                                        style={{ marginLeft: 4, flexShrink: 0 }}
-                                        onClick={() => {
-                                            if (pdfSrc?.startsWith('blob:')) URL.revokeObjectURL(pdfSrc);
-                                            setActivePanel('files');
-                                        }}
-                                        title="Back to File Explorer"
-                                    >
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="15 18 9 12 15 6" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        className="jm-google-close"
-                                        onClick={() => {
-                                            if (pdfSrc?.startsWith('blob:')) URL.revokeObjectURL(pdfSrc);
-                                            setActivePanel(null);
-                                            setPdfSrc(null);
-                                        }}
-                                        title="Close"
-                                    >
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                            <line x1="6" y1="6" x2="18" y2="18" />
-                                        </svg>
-                                    </button>
+                        ) : (
+                            <div className="jm-share-placeholder">
+                                <div className="jm-google-badge">R</div>
+                                <div style={{ marginTop: 24, fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
+                                    Sharing Workspace
                                 </div>
-                                <iframe
-                                    className="jm-google-frame"
-                                    title={pdfName}
-                                    src={pdfSrc}
-                                />
+                                <div style={{ marginTop: 8, fontSize: 13, color: 'rgba(255,255,255,0.4)', maxWidth: 300, textAlign: 'center' }}>
+                                    Your standalone workspace window is being shared with the interviewer.
+                                </div>
                             </div>
                         )}
                     </div>

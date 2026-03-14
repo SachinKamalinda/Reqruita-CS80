@@ -7,6 +7,7 @@ import DeviceCheck from "./pages/DeviceCheck.jsx";
 
 import MeetingInterviewer from "./pages/MeetingInterviewer.jsx";
 import MeetingInterviewee from "./pages/MeetingInterviewee.jsx";
+import MeetingWorkspace from "./pages/MeetingWorkspace.jsx";
 
 import ToastContainer from "./components/Toast.jsx";
 import useToast from "./hooks/useToast.js";
@@ -28,7 +29,7 @@ const USERS = [
 ];
 
 export default function App() {
-  const [step, setStep] = useState("role"); // role | login | devices | meeting
+  const [step, setStep] = useState("role"); // role | login | devices | meeting | workspace
   const [role, setRole] = useState(null); // "join" | "conduct"
   const [session, setSession] = useState(null);
   const [transitioning, setTransitioning] = useState(false);
@@ -38,6 +39,11 @@ export default function App() {
   const users = useMemo(() => USERS, []);
 
   useEffect(() => {
+    // Check if we are in the workspace view via URL check
+    if (window.location.search.includes("view=workspace")) {
+      setStep("workspace");
+    }
+    
     document.documentElement.style.background = "#fff";
     document.body.style.background = "#fff";
   }, []);
@@ -152,6 +158,8 @@ export default function App() {
           ) : (
             <MeetingInterviewee session={session} onLeave={onEnd} addToast={addToast} />
           ))}
+
+        {step === "workspace" && <MeetingWorkspace />}
       </div>
     </>
   );

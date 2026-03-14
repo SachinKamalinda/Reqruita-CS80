@@ -14,6 +14,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let win;
+let workspaceWin;
 
 function createWindow() {
     win = new BrowserWindow({
@@ -97,6 +98,43 @@ function setupInterviewModeIPC() {
 
         // If you used setClosable(false) above:
         // win.setClosable(true);
+    });
+}
+
+/**
+ * Workspace management (Detached Google/Files)
+ */
+function setupWorkspaceIPC() {
+    ipcMain.handle("rq:open-workspace", () => {
+        if (workspaceWin) {
+            workspaceWin.focus();
+            return;
+        }
+
+        workspaceWin = new BrowserWindow({
+            width: 1000,
+            height: 750,
+            title: "Reqruita Workspace",
+            webPreferences: {
+                preload: path.join(__dirname, "preload.cjs"),
+                contextIsolation: true,
+                nodeIntegration: false,
+            },
+        });
+
+        // Load same URL but with a flag so App.jsx renders only MeetingWorkspace
+        workspaceWin.loadURL("http://localhost:5173?view=workspace");
+
+        workspaceWin.on("closed", () => {
+            workspaceWin = null;
+        });
+    });
+
+    ipcMain.handle("rq:close-workspace", () => {
+        if (workspaceWin) {
+            workspaceWin.close();
+            workspaceWin = null;
+        }
     });
 }
 
@@ -207,6 +245,7 @@ app.whenReady().then(() => {
     setupInterviewModeIPC();
     setupFileExplorerIPC();
     setupEmergencyUnlockShortcut();
+    setupWorkspaceIPC();
 
     app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
