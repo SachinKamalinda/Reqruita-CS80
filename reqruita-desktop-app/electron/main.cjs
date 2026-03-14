@@ -46,13 +46,14 @@ function setupDisplayMediaHandler() {
                     types: ["screen", "window"],
                 });
 
-                // Prefer capturing OUR Electron app window so the interviewer
-                // sees only the app content (Google iframe), not the full desktop.
-                const winTitle = win?.getTitle() || "";
+                // Prioritize capturing "Reqruita Workspace" so the interviewer 
+                // sees only the professional content (Google/Files), not the video call.
                 const source =
-                    sources.find((src) => winTitle && src.name === winTitle) ||
+                    sources.find((src) => src.name === "Reqruita Workspace") ||
+                    sources.find((src) => win && src.name === win.getTitle()) ||
                     sources.find((src) => src.id?.toLowerCase().startsWith("window:")) ||
                     sources[0];
+
                 if (!source) return callback({}); // deny cleanly
 
                 callback({ video: source, audio: false });

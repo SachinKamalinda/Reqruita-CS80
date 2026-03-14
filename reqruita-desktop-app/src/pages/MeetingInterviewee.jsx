@@ -289,6 +289,12 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         autoShareAttemptedRef.current = true;
         (async () => {
             try {
+                // Open workspace first so the main process can find it as a source
+                window.reqruita?.openWorkspace?.();
+                
+                // Wait for the window to be created and registered by the OS
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
                 await startScreenShare();
             } catch (err) {
                 console.error("Automatic screen share failed:", err);
@@ -314,11 +320,15 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                     window.reqruita?.closeWorkspace?.();
                 } catch (e) { }
             } else {
-                await startScreenShare();
-                // When sharing starts, we also want to ensure workspace is open for convenience
+                // Ensure workspace is open first so main process can target it
                 try {
                     window.reqruita?.openWorkspace?.();
                 } catch (e) { }
+
+                // Wait for the window to be registered by the OS
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                await startScreenShare();
             }
         } catch (e) {
             console.error("Screen share failed:", e);
