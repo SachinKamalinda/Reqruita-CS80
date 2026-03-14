@@ -2009,6 +2009,11 @@ body.rq-noscr {
   min-height: 0;
 }
 
+/* When chat panel is open: add a 3rd column for the chat aside */
+.jm-row.jm-chat-open {
+  grid-template-columns: 1fr 360px 320px;
+}
+
 @media (max-width: 980px) {
   .jm-row {
     grid-template-columns: 1fr 300px;

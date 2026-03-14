@@ -40,12 +40,13 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
 
-    //chat UI
+    // Chat UI
     const [chatOpen, setChatOpen] = useState(false);
     const [chatInput, setChatInput] = useState("");
     const [messages, setMessages] = useState([]);
+    const chatEndRef = useRef(null);
 
-    //socket ref for chat
+    // Socket ref for chat
     const chatSocketRef = useRef(null);
 
     // Candidate display name (later replace with real input)
@@ -74,9 +75,16 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         // Join chat room (same interviewId as interviewer)
         socket.emit("join-chat", { interviewId: meetingId });
 
-        // Listen for incoming messages
+        // Listen for incoming messages 
         socket.on("chat-message", (msg) => {
-            setMessages((prev) => [...prev, msg]);
+            const uiMsg = {
+                id: msg._id || Date.now(),
+                who: msg.senderRole === "interviewee" ? "me" : "them",
+                name: msg.senderName,
+                text: msg.message,
+                time: new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            };
+            setMessages((prev) => [...prev, uiMsg]);
         });
 
         // Cleanup on unmount
@@ -85,15 +93,31 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         };
     }, [meetingId]);
 
-    //Load chat history
+    // Load chat history
     useEffect(() => {
         if (!meetingId) return;
 
         fetch(`${BACKEND_URL}/api/chat/${meetingId}`)
             .then((res) => res.json())
-            .then(setMessages)
+            .then((data) => {
+                if (Array.isArray(data)) {
+                    const uiMessages = data.map((msg) => ({
+                        id: msg._id,
+                        who: msg.senderRole === "interviewee" ? "me" : "them",
+                        name: msg.senderName,
+                        text: msg.message,
+                        time: new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                    }));
+                    setMessages(uiMessages);
+                }
+            })
             .catch(() => { });
     }, [meetingId]);
+
+    // Auto-scroll chat to bottom on new messages
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
     //toggle chat panel
     function toggleChatPanel() {
@@ -112,9 +136,8 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             message: text,
         });
 
-        // We don't need to manually update local messages here, 
-        // because the socket listener will catch the 'chat-message' 
-        // event from the server and update it for us.
+        // Socket listener on "chat-message" from server will add the
+        // message to state so we don't push a duplicate here.
         setChatInput("");
     }
 
@@ -325,7 +348,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 </span>
             </div>
 
-            <div className="jm-row">
+            <div className={`jm-row ${chatOpen ? "jm-chat-open" : ""}`}>
                 {/* Main area */}
                 <div className="jm-main">
                     <div className="jm-share">
@@ -442,52 +465,52 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                         )}
                         <div className="jm-label">Interviewer</div>
                     </div>
+                </div>
 
-
-                    {/* Chat panel */}
-                    {chatOpen && (
-                        <aside className="mt-side mt-side-enter">
-                            <div className="mt-side-head">
-                                <div className="mt-side-title">Chat</div>
-                                <button className="mt-side-close" onClick={toggleChatPanel}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                        <line x1="18" y1="6" x2="6" y2="18" />
-                                        <line x1="6" y1="6" x2="18" y2="18" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div className="mt-side-body" style={{ padding: 0 }}>
-                                <div className="mt-chat">
-                                    <div className="mt-chat-list">
-                                        {messages.map((m, idx) => (
-                                            <div key={idx} className={`mt-msg ${m.senderRole}`}>
-                                                <div className="mt-msgmeta">
-                                                    <span>{m.senderName}</span>
-
-                                                </div>
-                                                <div className="mt-bubble">{m.message}</div>
+                {/* Chat Panel – sibling of main + side, not inside side */}
+                {chatOpen && (
+                    <aside className="mt-side mt-side-enter">
+                        <div className="mt-side-head">
+                            <div className="mt-side-title">Chat</div>
+                            <button className="mt-side-close" onClick={toggleChatPanel}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="mt-side-body" style={{ padding: 0 }}>
+                            <div className="mt-chat">
+                                <div className="mt-chat-list">
+                                    {messages.map((m) => (
+                                        <div key={m.id} className={`mt-msg ${m.who}`}>
+                                            <div className="mt-msgmeta">
+                                                <span>{m.name}</span>
+                                                <span>{m.time}</span>
                                             </div>
-                                        ))}
-                                    </div>
-                                    <div className="mt-chat-input">
-                                        <input
-                                            className="mt-chat-field"
-                                            value={chatInput}
-                                            onChange={(e) => setChatInput(e.target.value)}
-                                            placeholder="Type a message…"
-                                            onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
-                                        />
-                                        <button className="mt-send" onClick={sendChatMessage} disabled={!chatInput.trim()}>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                                            </svg>
-                                        </button>
-                                    </div>
+                                            <div className="mt-bubble">{m.text}</div>
+                                        </div>
+                                    ))}
+                                    <div ref={chatEndRef} />
+                                </div>
+                                <div className="mt-chat-input">
+                                    <input
+                                        className="mt-chat-field"
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        placeholder="Type a message…"
+                                        onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
+                                    />
+                                    <button className="mt-send" onClick={sendChatMessage} disabled={!chatInput.trim()}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
-                        </aside>
-                    )}
-                </div>
+                        </div>
+                    </aside>
+                )}
             </div>
 
 
