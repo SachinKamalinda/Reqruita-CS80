@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getToken } from "@/lib/api";
+import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getToken } from '@/lib/api';
 
 const PRICE_PER_ADMIN = 75;
 const PRICE_PER_INTERVIEWER = 45;
@@ -10,26 +10,26 @@ const PRICE_PER_INTERVIEWEE = 25;
 
 export default function PaymentPage() {
   const router = useRouter();
-  const [numAdmins, setNumAdmins] = useState("");
-  const [numInterviewers, setNumInterviewers] = useState("");
-  const [numInterviews, setNumInterviews] = useState("");
+  const [numAdmins, setNumAdmins] = useState('');
+  const [numInterviewers, setNumInterviewers] = useState('');
+  const [numInterviews, setNumInterviews] = useState('');
 
   // Auth guard — redirect to /signin if not logged in
   useEffect(() => {
     if (!getToken()) {
-      router.replace("/signin");
+      router.replace('/signin');
     }
   }, [router]);
 
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const [couponCode, setCouponCode] = useState("");
+  const [couponCode, setCouponCode] = useState('');
   const [couponApplied, setCouponApplied] = useState(false);
-  const [couponError, setCouponError] = useState("");
+  const [couponError, setCouponError] = useState('');
 
   const yearlyPayment = useMemo(() => {
     const admins = parseInt(numAdmins) || 0;
@@ -45,20 +45,20 @@ export default function PaymentPage() {
   const nextBillingDate = useMemo(() => {
     const date = new Date();
     date.setFullYear(date.getFullYear() + 1);
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
   }, []);
 
   const formatCardNumber = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 16);
-    return digits.replace(/(.{4})/g, "$1 ").trim();
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(.{4})/g, '$1 ').trim();
   };
 
   const formatExpiry = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 4);
+    const digits = value.replace(/\D/g, '').slice(0, 4);
     if (digits.length >= 3) {
       return `${digits.slice(0, 2)}/${digits.slice(2)}`;
     }
@@ -66,11 +66,11 @@ export default function PaymentPage() {
   };
 
   const handleApplyCoupon = () => {
-    if (couponCode.toUpperCase() === "WELCOME20") {
+    if (couponCode.toUpperCase() === 'WELCOME20') {
       setCouponApplied(true);
-      setCouponError("");
+      setCouponError('');
     } else {
-      setCouponError("Invalid coupon code");
+      setCouponError('Invalid coupon code');
       setCouponApplied(false);
     }
   };
@@ -81,11 +81,11 @@ export default function PaymentPage() {
     // TODO: replace with real payment API call
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setIsProcessing(false);
-    router.push("/home");
+    router.push('/home');
   };
 
   const inputClass =
-    "w-full py-3 px-4 border border-gray-200 rounded-xl bg-gray-50/60 outline-none text-sm text-gray-900 transition-all duration-200 placeholder:text-gray-400 hover:border-purple-200 hover:bg-white focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/10 focus:shadow-sm";
+    'w-full py-3 px-4 border border-gray-200 rounded-xl bg-gray-50/60 outline-none text-sm text-gray-900 transition-all duration-200 placeholder:text-gray-400 hover:border-purple-200 hover:bg-white focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/10 focus:shadow-sm';
 
   return (
     <div
@@ -251,7 +251,7 @@ export default function PaymentPage() {
                       type="password"
                       value={cvv}
                       onChange={(e) =>
-                        setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))
+                        setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))
                       }
                       placeholder="&bull;&bull;&bull;"
                       maxLength={4}
@@ -284,8 +284,8 @@ export default function PaymentPage() {
                   onClick={() => setAgreedToTerms(!agreedToTerms)}
                   className={`w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
                     agreedToTerms
-                      ? "bg-gradient-to-br from-purple-600 to-indigo-600 shadow-sm shadow-purple-500/30"
-                      : "border-[1.5px] border-gray-300 bg-white hover:border-purple-400"
+                      ? 'bg-gradient-to-br from-purple-600 to-indigo-600 shadow-sm shadow-purple-500/30'
+                      : 'border-[1.5px] border-gray-300 bg-white hover:border-purple-400'
                   }`}
                 >
                   {agreedToTerms && (
@@ -305,14 +305,14 @@ export default function PaymentPage() {
                   )}
                 </button>
                 <p className="text-[13px] text-gray-500">
-                  I have read and I agree to the{" "}
+                  I have read and I agree to the{' '}
                   <a
                     href="#"
                     className="text-purple-600 font-semibold hover:text-purple-700 underline decoration-purple-200 underline-offset-2 hover:decoration-purple-400 transition-colors"
                   >
                     Terms of Use
-                  </a>{" "}
-                  and{" "}
+                  </a>{' '}
+                  and{' '}
                   <a
                     href="#"
                     className="text-purple-600 font-semibold hover:text-purple-700 underline decoration-purple-200 underline-offset-2 hover:decoration-purple-400 transition-colors"
@@ -329,8 +329,8 @@ export default function PaymentPage() {
                 disabled={!agreedToTerms || isProcessing}
                 className={`w-full py-3.5 rounded-xl font-semibold text-[15px] transition-all duration-300 flex items-center justify-center gap-2.5 active:scale-[0.98] ${
                   agreedToTerms && !isProcessing
-                    ? "bg-gradient-to-r from-purple-600 via-purple-600 to-indigo-600 hover:from-purple-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-600/25 hover:shadow-xl hover:shadow-purple-600/30 cursor-pointer"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                    ? 'bg-gradient-to-r from-purple-600 via-purple-600 to-indigo-600 hover:from-purple-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-600/25 hover:shadow-xl hover:shadow-purple-600/30 cursor-pointer'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
                 }`}
               >
                 {isProcessing ? (
@@ -431,7 +431,7 @@ export default function PaymentPage() {
                       Yearly payment
                     </span>
                     <span
-                      className={`text-[15px] font-bold tabular-nums transition-colors duration-300 ${yearlyPayment > 0 ? "text-purple-700" : "text-gray-900"}`}
+                      className={`text-[15px] font-bold tabular-nums transition-colors duration-300 ${yearlyPayment > 0 ? 'text-purple-700' : 'text-gray-900'}`}
                     >
                       ${yearlyPayment.toFixed(2)}
                     </span>
@@ -474,16 +474,16 @@ export default function PaymentPage() {
                   value={couponCode}
                   onChange={(e) => {
                     setCouponCode(e.target.value);
-                    setCouponError("");
+                    setCouponError('');
                   }}
                   placeholder="Coupon code"
                   disabled={couponApplied}
                   className={`w-full py-3 pl-10 pr-4 border rounded-full bg-white outline-none text-sm text-gray-900 placeholder:text-gray-400 transition-all duration-200 ${
                     couponApplied
-                      ? "border-green-300 bg-green-50/50 text-green-700"
+                      ? 'border-green-300 bg-green-50/50 text-green-700'
                       : couponError
-                        ? "border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                        : "border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 hover:border-purple-200"
+                        ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100'
+                        : 'border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 hover:border-purple-200'
                   }`}
                 />
               </div>
@@ -492,7 +492,7 @@ export default function PaymentPage() {
                   type="button"
                   onClick={() => {
                     setCouponApplied(false);
-                    setCouponCode("");
+                    setCouponCode('');
                   }}
                   className="py-3 px-5 rounded-full text-sm font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all duration-200 whitespace-nowrap cursor-pointer"
                 >

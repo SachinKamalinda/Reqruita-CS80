@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { signin, saveToken, saveUser } from "@/lib/api";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { signin, saveToken, saveUser } from '@/lib/api';
 
 export default function SigninPage() {
   const router = useRouter();
 
   const [formData, setFormData] = useState({
-    email: "",
-    password: "",
+    email: '',
+    password: '',
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -35,10 +35,10 @@ export default function SigninPage() {
       });
       saveToken(result.token);
       saveUser(result.user);
-      router.push("/home");
+      router.push('/home');
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Login failed. Please try again.",
+        err instanceof Error ? err.message : 'Login failed. Please try again.',
       );
     } finally {
       setIsLoading(false);
@@ -46,7 +46,7 @@ export default function SigninPage() {
   };
 
   const inputBase =
-    "w-full py-2.5 px-3.5 border-[1.5px] border-gray-200 rounded-xl bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 placeholder:text-gray-400 placeholder:font-normal hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)]";
+    'w-full py-2.5 px-3.5 border-[1.5px] border-gray-200 rounded-xl bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 placeholder:text-gray-400 placeholder:font-normal hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)]';
 
   return (
     <div
@@ -143,7 +143,7 @@ export default function SigninPage() {
                 </div>
                 <div className="relative">
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
@@ -156,7 +156,7 @@ export default function SigninPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                     aria-label={
-                      showPassword ? "Hide password" : "Show password"
+                      showPassword ? 'Hide password' : 'Show password'
                     }
                   >
                     {showPassword ? (
@@ -211,10 +211,10 @@ export default function SigninPage() {
                   <div
                     className={`w-4.5 h-4.5 rounded-[5px] border-[1.5px] flex items-center justify-center transition-all duration-150 ${
                       rememberMe
-                        ? "bg-purple-600 border-purple-600"
-                        : "bg-white border-gray-300 group-hover:border-purple-400"
+                        ? 'bg-purple-600 border-purple-600'
+                        : 'bg-white border-gray-300 group-hover:border-purple-400'
                     }`}
-                    style={{ width: "18px", height: "18px" }}
+                    style={{ width: '18px', height: '18px' }}
                   >
                     {rememberMe && (
                       <svg
@@ -269,7 +269,7 @@ export default function SigninPage() {
                     Signing in…
                   </>
                 ) : (
-                  "Sign In"
+                  'Sign In'
                 )}
               </button>
 
@@ -337,7 +337,7 @@ export default function SigninPage() {
 
               {/* Sign up link */}
               <p className="text-center text-sm text-gray-500 pt-1">
-                Don&apos;t have an account?{" "}
+                Don&apos;t have an account?{' '}
                 <Link
                   href="/signup"
                   className="font-semibold text-purple-600 hover:text-purple-700 transition-colors"

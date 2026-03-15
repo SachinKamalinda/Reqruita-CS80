@@ -1,24 +1,24 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { signup, saveToken, saveUser } from "@/lib/api";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { signup, saveToken, saveUser } from '@/lib/api';
 
 export default function SignupPage() {
   const router = useRouter();
 
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    phoneNumber: "",
-    companyName: "",
-    industry: "",
-    country: "",
-    address: "",
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phoneNumber: '',
+    companyName: '',
+    industry: '',
+    country: '',
+    address: '',
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -37,11 +37,11 @@ export default function SignupPage() {
     setError(null);
 
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
+      setError('Passwords do not match.');
       return;
     }
     if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError('Password must be at least 8 characters.');
       return;
     }
 
@@ -50,12 +50,12 @@ export default function SignupPage() {
       const result = await signup(formData);
       saveToken(result.token);
       saveUser(result.user);
-      router.push("/payment");
+      router.push('/payment');
     } catch (err: unknown) {
       setError(
         err instanceof Error
           ? err.message
-          : "Registration failed. Please try again.",
+          : 'Registration failed. Please try again.',
       );
     } finally {
       setIsLoading(false);
@@ -64,7 +64,7 @@ export default function SignupPage() {
 
   // Tailwind class constants for reuse
   const inputBase =
-    "w-full py-2.5 px-3.5 border-[1.5px] border-gray-200 rounded-xl bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 placeholder:text-gray-400 placeholder:font-normal hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)]";
+    'w-full py-2.5 px-3.5 border-[1.5px] border-gray-200 rounded-xl bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 placeholder:text-gray-400 placeholder:font-normal hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)]';
 
   return (
     <div
@@ -102,7 +102,7 @@ export default function SignupPage() {
               Create your Reqruita account
             </h2>
             <p className="text-sm text-gray-400 text-center mb-6">
-              Already have an account?{" "}
+              Already have an account?{' '}
               <Link
                 href="/signin"
                 className="text-purple-600 font-semibold hover:text-purple-700 transition-colors"
@@ -189,7 +189,7 @@ export default function SignupPage() {
                   </label>
                   <div className="relative">
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type={showPassword ? 'text' : 'password'}
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
@@ -246,7 +246,7 @@ export default function SignupPage() {
                   </label>
                   <div className="relative">
                     <input
-                      type={showConfirmPassword ? "text" : "password"}
+                      type={showConfirmPassword ? 'text' : 'password'}
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
@@ -405,7 +405,7 @@ export default function SignupPage() {
                     Creating account…
                   </>
                 ) : (
-                  "Create Account"
+                  'Create Account'
                 )}
               </button>
 
