@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut, shell, protocol, net } = require("electron");
+const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut, shell, protocol, net, screen } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -34,6 +34,32 @@ function createWindow() {
 }
 
 /**
+ * External monitor detection
+ * Get current display state and broadcast changes to renderer
+ */
+function getDisplayState() {
+    const displays = screen.getAllDisplays();
+    return {
+        displayCount: displays.length,
+        hasExternal: displays.length > 1,
+        displays: displays.map(d => ({
+            id: d.id,
+            width: d.bounds.width,
+            height: d.bounds.height,
+            primary: d.bounds.x === 0 && d.bounds.y === 0
+        }))
+    };
+}
+
+function broadcastDisplayChange() {
+    if (win && !win.isDestroyed()) {
+        const state = getDisplayState();
+        console.log("Display state changed:", state);
+        win.webContents.send("rq:display-changed", state);
+    }
+}
+
+/**
  * Screen share handler (keeps your current working behavior)
  */
 function setupDisplayMediaHandler() {
@@ -64,6 +90,15 @@ function setupDisplayMediaHandler() {
         },
         { useSystemPicker: false }
     );
+}
+
+/**
+ * Display detection IPC
+ */
+function setupDisplayDetectionIPC() {
+    ipcMain.handle("rq:get-display-info", () => {
+        return getDisplayState();
+    });
 }
 
 /**
@@ -246,9 +281,15 @@ app.whenReady().then(() => {
     setupDisplayMediaHandler();
     createWindow();
     setupInterviewModeIPC();
+    setupDisplayDetectionIPC();
     setupFileExplorerIPC();
     setupEmergencyUnlockShortcut();
     setupWorkspaceIPC();
+
+    // Listen for display changes and broadcast to renderer
+    screen.on('display-added', broadcastDisplayChange);
+    screen.on('display-removed', broadcastDisplayChange);
+    screen.on('display-metrics-changed', broadcastDisplayChange);
 
     app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

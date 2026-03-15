@@ -266,6 +266,24 @@ io.on("connection", (socket) => {
 
     });
     
+    /*-------------------- SOCKET.IO (ANTI-CHEAT) --------------------*/
+
+    socket.on("anti-cheat-violation", (data) => {
+        const { interviewId, violationType, displayCount, timestamp, candidateName } = data;
+        if (!interviewId) return;
+
+        console.log(`[VIOLATION] ${violationType} in interview ${interviewId}:`, { candidateName, displayCount, timestamp });
+
+        // Broadcast to all users in the interview room (interviewer will receive)
+        io.to(interviewId).emit("anti-cheat-violation", {
+            violationType,
+            displayCount,
+            timestamp,
+            candidateName,
+            detectedAt: new Date().toISOString(),
+        });
+    });
+
     /*-------------------- SOCKET.IO (CHAT) --------------------*/
     
     socket.on("join-chat",({interviewId}) =>{

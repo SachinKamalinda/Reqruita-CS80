@@ -93,6 +93,7 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
     const [micOn, setMicOn] = useState(false);
     const [camOn, setCamOn] = useState(false);
     const [screenOn, setScreenOn] = useState(false);
+    const [monitorOk, setMonitorOk] = useState(true);
 
     const [micStream, setMicStream] = useState(null);
     const [camStream, setCamStream] = useState(null);
@@ -103,10 +104,31 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
     const mustPassAll = role === "join";
 
     const canContinue = useMemo(() => {
-        return mustPassAll ? micOn && camOn && screenOn : true;
-    }, [mustPassAll, micOn, camOn, screenOn]);
+        return mustPassAll ? micOn && camOn && screenOn && monitorOk : true;
+    }, [mustPassAll, micOn, camOn, screenOn, monitorOk]);
 
     const readyCount = [micOn, camOn, screenOn].filter(Boolean).length;
+
+    // Monitor display detection on mount
+    useEffect(() => {
+        const checkDisplays = async () => {
+            try {
+                const info = await window.reqruita?.getDisplayInfo?.();
+                if (info) {
+                    const hasExternal = info.displayCount > 1;
+                    setMonitorOk(!hasExternal);
+                    if (hasExternal) {
+                        setError("External displays detected. Please disconnect all external monitors and use only your primary display.");
+                        addToast?.("External monitor detected", "warning");
+                    }
+                }
+            } catch (e) {
+                console.log("Display detection not available in browser");
+            }
+        };
+
+        checkDisplays();
+    }, [addToast]);
 
     useEffect(() => {
         document.body.classList.add("rq-noscr");
@@ -251,17 +273,27 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
                     </div>
                     <div className="dc-readiness">
                         <span className={`dc-ready-badge ${canContinue ? "dc-ready-go" : ""}`}>
-                            {readyCount}/3 Ready
+                            {readyCount}/{mustPassAll ? "4" : "3"} Ready {mustPassAll && !monitorOk && "(Monitor issue)"}
                         </span>
                     </div>
                 </div>
 
                 {error && (
-                    <div className="dc-err-v2">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="15" y1="9" x2="9" y2="15" />
-                            <line x1="9" y1="9" x2="15" y2="15" />
+                    <div className="dc-err-v2" style={{ background: error.includes("External") ? "rgba(234,179,8,0.15)" : "rgba(239,68,68,0.15)" }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={error.includes("External") ? "#ca8a04" : "currentColor"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            {error.includes("External") ? (
+                                <>
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </>
+                            ) : (
+                                <>
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="15" y1="9" x2="9" y2="15" />
+                                    <line x1="9" y1="9" x2="15" y2="15" />
+                                </>
+                            )}
                         </svg>
                         {error}
                     </div>

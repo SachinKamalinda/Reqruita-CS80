@@ -9,6 +9,14 @@ contextBridge.exposeInMainWorld("reqruita", {
     // Keep your existing ping
     ping: () => ipcRenderer.invoke("app:ping"),
 
+    // Display detection
+    getDisplayInfo: () => ipcRenderer.invoke("rq:get-display-info"),
+    onDisplayChanged: (callback) => {
+        const handler = (_, state) => callback(state);
+        ipcRenderer.on("rq:display-changed", handler);
+        return () => ipcRenderer.removeListener("rq:display-changed", handler);
+    },
+
     // Interview mode (fullscreen/kiosk lock)
     enterInterviewMode: () => ipcRenderer.invoke("rq:enter-interview-mode"),
     exitInterviewMode: () => ipcRenderer.invoke("rq:exit-interview-mode"),

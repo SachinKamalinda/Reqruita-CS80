@@ -58,6 +58,9 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     const [notesTab, setNotesTab] = useState("remarks"); // remarks | details
     const [remarks, setRemarks] = useState("");
 
+    // Anti-cheat violations
+    const [violations, setViolations] = useState([]);
+
     // Participants state
     const [participants, setParticipants] = useState([]);
 
@@ -150,6 +153,13 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                 setUnreadCount((n) => n + 1);
                 addToast?.(`${msg.senderName || "Candidate"}: ${msg.message}`, "info");
             }
+        });
+
+        // Listen for anti-cheat violations
+        socket.on("anti-cheat-violation", (violation) => {
+            console.log("[SECURITY] Anti-cheat violation detected:", violation);
+            setViolations((prev) => [...prev, violation]);
+            addToast?.(`🚨 ${violation.candidateName || "Candidate"} detected using external monitor!`, "error");
         });
 
         // Cleanup on unmount
@@ -375,6 +385,27 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     return (
         <div className="mt-wrap">
             {error && <div className="mt-err">{error}</div>}
+
+            {/* Anti-cheat violations alert */}
+            {violations.length > 0 && (
+                <div style={{
+                    padding: "12px 16px",
+                    background: "linear-gradient(135deg, rgba(220,38,38,0.95) 0%, rgba(185,28,28,0.95) 100%)",
+                    color: "white",
+                    borderBottom: "2px solid #dc2626",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    zIndex: 40
+                }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5m-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11m3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+                    </svg>
+                    <span>🚨 SECURITY VIOLATION: {violations[0].candidateName || "Candidate"} attempted to use external display {violations.length > 1 && `(${violations.length} incidents)`}</span>
+                </div>
+            )}
 
             {/* Connection status indicator */}
             <div className="mt-conn-status">

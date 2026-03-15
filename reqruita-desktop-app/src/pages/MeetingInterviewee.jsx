@@ -53,6 +53,10 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const chatOpenRef = useRef(false);
     useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
 
+    // Monitor violation detection
+    const monitorViolationRef = useRef(false);
+    const displayUnsubscribeRef = useRef(null);
+
     // Candidate display name (later replace with real input)
     const candidateName = session?.candidateName || session?.name || "Candidate";
 
@@ -278,6 +282,38 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             } catch (e) { }
         }
     }, [localScreenStream, addToast]);
+
+    // Monitor display changes during interview and emit violations
+    useEffect(() => {
+        const runningInDesktop = typeof window !== "undefined" && !!window.reqruita;
+        if (!runningInDesktop || !meetingId) return;
+
+        const unsubscribe = window.reqruita?.onDisplayChanged?.(({ displayCount, hasExternal }) => {
+            if (hasExternal && !monitorViolationRef.current) {
+                monitorViolationRef.current = true;
+                setError("External display detected! This violates interview security. The interviewer has been notified.");
+                addToast?.("⚠️ External monitor detected", "error");
+                
+                // Emit violation to backend so interviewer gets real-time alert
+                if (chatSocketRef.current) {
+                    chatSocketRef.current.emit("anti-cheat-violation", {
+                        interviewId: meetingId,
+                        violationType: "external-monitor",
+                        displayCount,
+                        timestamp: new Date().toISOString(),
+                        candidateName: candidateName,
+                    });
+                }
+            } else if (!hasExternal && monitorViolationRef.current) {
+                monitorViolationRef.current = false;
+                setError("");
+                addToast?.("External monitor disconnected", "info");
+            }
+        });
+
+        displayUnsubscribeRef.current = unsubscribe;
+        return () => unsubscribe?.();
+    }, [meetingId, candidateName, addToast]);
 
     // Automatically share the desktop on join inside the Electron shell so the interviewer sees the full screen immediately
     useEffect(() => {
