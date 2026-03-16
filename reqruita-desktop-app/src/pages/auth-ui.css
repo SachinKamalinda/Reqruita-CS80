@@ -2668,13 +2668,38 @@ body.rq-noscr {
 
 /* Files toolbar button active state */
 .mt-icon-btn.mt-icon-files {
-  border-color: rgba(16, 185, 129, 0.5);
+  border-color: rgba(234, 179, 8, 0.5);
+  color: #facc15;
+}
+
+.mt-icon-btn.mt-icon-files:hover {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: rgba(234, 179, 8, 0.7);
+  color: #fde047;
 }
 
 .mt-icon-btn.mt-icon-files.mt-icon-active {
-  background: rgba(16, 185, 129, 0.22);
-  border-color: rgba(16, 185, 129, 0.6);
-  color: #6ee7b7;
+  background: rgba(234, 179, 8, 0.22);
+  border-color: rgba(234, 179, 8, 0.8);
+  color: #facc15;
+}
+
+/* Google button – Blue theme */
+.mt-icon-btn.mt-icon-google {
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #60a5fa;
+}
+
+.mt-icon-btn.mt-icon-google:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.7);
+  color: #93c5fd;
+}
+
+.mt-icon-btn.mt-icon-google.mt-icon-active {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(59, 130, 246, 0.8);
+  color: #60a5fa;
 }
 
 /* ═══════════════════════════════════════════════════════
