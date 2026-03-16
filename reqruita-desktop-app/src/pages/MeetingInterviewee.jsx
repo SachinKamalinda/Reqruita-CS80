@@ -614,7 +614,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
                     {/* Google Search Panel */}
                     <button
-                        className={`mt-icon-btn ${googleOpen ? "mt-icon-active" : ""}`}
+                        className={`mt-icon-btn mt-icon-google ${googleOpen ? "mt-icon-active" : ""}`}
                         onClick={toggleGoogle}
                         title={googleOpen ? "Close Google Search" : "Open Google Search"}
                     >
