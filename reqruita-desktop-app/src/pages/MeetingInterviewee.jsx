@@ -86,7 +86,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
             // Deduplicate: skip if we already added this message optimistically (by clientId or msgId)
             if ((clientId && seenIdsRef.current.has(clientId)) || seenIdsRef.current.has(msgId)) return;
-            
+
             if (clientId) seenIdsRef.current.add(clientId);
             seenIdsRef.current.add(msgId);
 
@@ -291,7 +291,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             try {
                 // Open workspace first so the main process can find it as a source
                 window.reqruita?.openWorkspace?.();
-                
+
                 // Wait for the window to be created and registered by the OS
                 await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -412,12 +412,14 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                             />
                         ) : (
                             <div className="jm-share-placeholder">
-                                <div className="jm-google-badge">R</div>
-                                <div style={{ marginTop: 24, fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
-                                    Sharing Workspace
-                                </div>
-                                <div style={{ marginTop: 8, fontSize: 13, color: 'rgba(255,255,255,0.4)', maxWidth: 300, textAlign: 'center' }}>
-                                    Your standalone workspace window is being shared with the interviewer.
+                                <div className="mt-ph-content">
+                                    <div className="jm-google-badge">R</div>
+                                    <div className="mt-ph-title" style={{ marginTop: 24 }}>
+                                        Sharing Workspace
+                                    </div>
+                                    <div className="mt-ph-sub" style={{ marginTop: 8, maxWidth: 300, textAlign: 'center' }}>
+                                        Your standalone workspace window is being shared with the interviewer.
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -427,7 +429,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                             <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
                                 <div className="jm-google-bar">
                                     <div className="jm-google-badge sm">G</div>
-                                    <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>Google Workspace</div>
+                                    <div className="jm-google-bar-title">Google Workspace</div>
                                     <button className="jm-google-close" onClick={() => setGoogleOpen(false)}>
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -465,7 +467,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
                                     </svg>
-                                    <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: 'rgba(255,255,255,0.92)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <div className="jm-google-bar-title" style={{ color: 'rgba(255,255,255,0.92)' }}>
                                         {pdfName}
                                     </div>
                                     <button
@@ -497,7 +499,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                     {/* Candidate video */}
                     <div className="jm-tile">
                         <video ref={localCamRef} autoPlay playsInline muted />
-                        <div className="jm-label">You (Candidate)</div>
+                        <div className="jm-label">You</div>
                     </div>
 
                     {/* Interviewer remote video */}

@@ -132,7 +132,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
             const clientId = msg.clientId;
 
             if ((clientId && seenIdsRef.current.has(clientId)) || seenIdsRef.current.has(msgId)) return;
-            
+
             if (clientId) seenIdsRef.current.add(clientId);
             seenIdsRef.current.add(msgId);
 
@@ -396,7 +396,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                         ) : (
                             <div className="mt-share-placeholder">
                                 <div className="mt-ph-content">
-                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 drop-shadow-sm">
                                         <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
                                         <line x1="8" y1="21" x2="16" y2="21" />
                                         <line x1="12" y1="17" x2="12" y2="21" />
@@ -420,16 +420,16 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                         <circle cx="12" cy="7" r="4" />
                                     </svg>
                                 </div>
-                                <span className="mt-tile-ph-text">Connecting…</span>
+                                <span className="mt-tile-ph-text" style={{ color: '#94a3b8' }}>Connecting…</span>
                             </div>
                         )}
-                        <div className="mt-tile-label">Interviewee</div>
+                        <div className="mt-tile-label">Candidate</div>
                     </div>
 
                     {/* Interviewer tile (bottom-right) */}
                     <div className="mt-tile mt-tile-self">
                         <video ref={localVideoRef} autoPlay playsInline muted />
-                        <div className="mt-tile-label">You (Interviewer)</div>
+                        <div className="mt-tile-label">You</div>
                     </div>
                 </div>
 
