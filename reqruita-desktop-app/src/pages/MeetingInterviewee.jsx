@@ -292,8 +292,8 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 // Open workspace first so the main process can find it as a source
                 window.reqruita?.openWorkspace?.();
 
-                // Wait for the window to be created and registered by the OS
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Wait longer for the window to be created and registered by the OS
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 await startScreenShare();
             } catch (err) {
@@ -325,8 +325,8 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                     window.reqruita?.openWorkspace?.();
                 } catch (e) { }
 
-                // Wait for the window to be registered by the OS
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Wait longer for the window to be registered by the OS
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
                 await startScreenShare();
             }
@@ -440,7 +440,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                             <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
                                 <div className="jm-google-bar">
                                     <div className="jm-google-badge sm">G</div>
-                                    <div className="jm-google-bar-title">Google Workspace</div>
+                                    <div className="jm-google-bar-title" style={{ color: '#1e293b' }}>Google Workspace</div>
                                     <button className="jm-google-close" onClick={() => setGoogleOpen(false)}>
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -452,7 +452,6 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                                     className="jm-google-frame"
                                     title="Google"
                                     src="https://www.google.com/webhp?igu=1"
-                                    referrerPolicy="no-referrer"
                                 />
                             </div>
                         )}
@@ -478,7 +477,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
                                     </svg>
-                                    <div className="jm-google-bar-title" style={{ color: 'rgba(255,255,255,0.92)' }}>
+                                    <div className="jm-google-bar-title" style={{ color: '#1e293b' }}>
                                         {pdfName}
                                     </div>
                                     <button

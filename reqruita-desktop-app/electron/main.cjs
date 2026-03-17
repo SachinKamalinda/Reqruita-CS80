@@ -49,6 +49,8 @@ function setupDisplayMediaHandler() {
 
                 // Prioritize capturing "Reqruita Workspace" so the interviewer 
                 // sees only the professional content (Google/Files), not the video call.
+                console.log(`Available sources: ${sources.map((s) => s.name).join(", ")}`);
+
                 // Prioritize capturing the internal Workspace window source.
                 const source =
                     sources.find((src) => src.name.includes("Reqruita-Workspace-Source")) ||

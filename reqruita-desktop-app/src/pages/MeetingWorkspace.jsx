@@ -29,8 +29,8 @@ export default function MeetingWorkspace() {
                         <div className="jm-google-shell">
                             <div className="jm-google-bar">
                                 <div className="jm-google-badge sm">G</div>
-                                <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>Google Workspace</div>
-                                <button className="jm-google-btn sm" onClick={() => setActivePanel('files')} style={{ height: 28, fontSize: 11, padding: '0 12px' }}>
+                                <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: '#1e293b' }}>Google Workspace</div>
+                                <button className="mt-icon-btn sm" onClick={() => setActivePanel('files')} style={{ height: 28, fontSize: 11, padding: '0 12px', background: '#fff' }}>
                                     Open Files
                                 </button>
                             </div>
@@ -38,7 +38,6 @@ export default function MeetingWorkspace() {
                                 className="jm-google-frame"
                                 title="Google"
                                 src="https://www.google.com/webhp?igu=1"
-                                referrerPolicy="no-referrer"
                             />
                         </div>
                     )}
