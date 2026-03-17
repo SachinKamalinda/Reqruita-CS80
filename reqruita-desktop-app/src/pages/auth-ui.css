@@ -2450,10 +2450,22 @@ body.rq-noscr {
   z-index: 500; /* Above overlay panels but below modal-likes */
 }
 
-.jm-left {
+.jm-left,
+.jm-mid,
+.jm-right {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.jm-mid {
+  justify-content: center;
+  flex: 1.2;
+}
+
+.jm-right {
+  justify-content: flex-end;
+  flex: 1;
 }
 
 /* ── Chat overlay: position absolute so it never pushes the footer ── */
