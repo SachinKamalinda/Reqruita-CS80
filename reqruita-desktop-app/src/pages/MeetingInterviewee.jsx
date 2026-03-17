@@ -4,7 +4,7 @@ import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
-import FileExplorer from "../components/FileExplorer";
+
 
 /**
  * MeetingInterviewee.jsx (FINAL - WebRTC + Candidate Google Window + Screen Share)
@@ -35,10 +35,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
     // UI state
     const [error, setError] = useState("");
-    const [activePanel, setActivePanel] = useState(null); // 'files' | 'pdf' | null
-    const [googleOpen, setGoogleOpen] = useState(false);
-    const [pdfSrc, setPdfSrc] = useState(null);
-    const [pdfName, setPdfName] = useState("");
+
 
     // Chat UI
     const [chatOpen, setChatOpen] = useState(false);
@@ -336,26 +333,8 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         }
     }
 
-    function toggleGoogle() {
-        setGoogleOpen((prev) => {
-            const next = !prev;
-            if (next) {
-                setActivePanel(null); // Close files if opening google
-                try { window.reqruita?.openWorkspace?.(); } catch (e) { }
-            }
-            return next;
-        });
-    }
-
-    function toggleFiles() {
-        setActivePanel((prev) => {
-            const next = prev === 'files' ? null : 'files';
-            if (next === 'files') {
-                setGoogleOpen(false); // Close google if opening files
-                try { window.reqruita?.openWorkspace?.(); } catch (e) { }
-            }
-            return next;
-        });
+    function openWorkspaceWindow(panel) {
+        try { window.reqruita?.openWorkspace?.(panel); } catch (e) { }
     }
 
     function leave() {
@@ -426,81 +405,37 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                                 <div className="mt-ph-content">
                                     <div className="jm-google-badge">R</div>
                                     <div className="mt-ph-title" style={{ marginTop: 24 }}>
-                                        Sharing Workspace
+                                        {sharing ? "Workspace is being shared" : "Workspace"}
                                     </div>
-                                    <div className="mt-ph-sub" style={{ marginTop: 8, maxWidth: 300, textAlign: 'center' }}>
-                                        Your standalone workspace window is being shared with the interviewer.
+                                    <div className="mt-ph-sub" style={{ marginTop: 8, maxWidth: 340, textAlign: 'center' }}>
+                                        {sharing
+                                            ? "Your workspace window (Google Search & Files) is being shared with the interviewer."
+                                            : "Click Share Screen to open & share your workspace with the interviewer."}
                                     </div>
+                                    {!sharing && (
+                                        <button
+                                            className="mt-icon-btn"
+                                            onClick={toggleShare}
+                                            disabled={!meetingId}
+                                            style={{ marginTop: 18, padding: '8px 24px', fontSize: 13, fontWeight: 700, background: '#7c3aed', color: '#fff', borderRadius: 8, border: 'none' }}
+                                        >
+                                            Share Screen
+                                        </button>
+                                    )}
+                                    {sharing && (
+                                        <button
+                                            className="mt-icon-btn"
+                                            onClick={openWorkspaceWindow}
+                                            style={{ marginTop: 18, padding: '8px 24px', fontSize: 13, fontWeight: 700, background: 'rgba(124,58,237,0.15)', color: '#7c3aed', borderRadius: 8, border: '1px solid rgba(124,58,237,0.3)' }}
+                                        >
+                                            Open Workspace
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
 
-                        {/* Inline Google Panel Overlay */}
-                        {googleOpen && (
-                            <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
-                                <div className="jm-google-bar">
-                                    <div className="jm-google-badge sm">G</div>
-                                    <div className="jm-google-bar-title" style={{ color: '#1e293b' }}>Google Workspace</div>
-                                    <button className="jm-google-close" onClick={() => setGoogleOpen(false)}>
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                            <line x1="6" y1="6" x2="18" y2="18" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <iframe
-                                    className="jm-google-frame"
-                                    title="Google"
-                                    src="https://www.google.com/webhp?igu=1"
-                                />
-                            </div>
-                        )}
 
-                        {/* Inline File Explorer Panel Overlay */}
-                        {activePanel === 'files' && (
-                            <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 11 }}>
-                                <FileExplorer
-                                    onClose={() => setActivePanel(null)}
-                                    onOpenPDF={(src, name) => {
-                                        setPdfSrc(src);
-                                        setPdfName(name);
-                                        setActivePanel('pdf');
-                                    }}
-                                />
-                            </div>
-                        )}
-
-                        {/* Inline PDF Viewer Panel Overlay */}
-                        {activePanel === 'pdf' && (
-                            <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 12 }}>
-                                <div className="jm-google-bar">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
-                                    </svg>
-                                    <div className="jm-google-bar-title" style={{ color: '#1e293b' }}>
-                                        {pdfName}
-                                    </div>
-                                    <button
-                                        className="jm-google-close"
-                                        style={{ marginLeft: 4, flexShrink: 0 }}
-                                        onClick={() => {
-                                            if (pdfSrc?.startsWith('blob:')) URL.revokeObjectURL(pdfSrc);
-                                            setActivePanel('files');
-                                        }}
-                                        title="Back to File Explorer"
-                                    >
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="15 18 9 12 15 6" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <iframe
-                                    className="jm-google-frame"
-                                    title={pdfName}
-                                    src={pdfSrc}
-                                />
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -623,27 +558,26 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                         )}
                         <span className="mt-icon-label">{camOff ? "Start" : "Stop"}</span>
                     </button>
-
-                    {/* Google Search Panel */}
+                    {/* Google Search — opens workspace to Google panel */}
                     <button
-                        className={`mt-icon-btn mt-icon-google ${googleOpen ? "mt-icon-active" : ""}`}
-                        onClick={toggleGoogle}
-                        title={googleOpen ? "Close Google Search" : "Open Google Search"}
+                        className="mt-icon-btn"
+                        onClick={() => openWorkspaceWindow('google')}
+                        title="Open Google Search"
                     >
                         <div className="jm-google-badge sm" style={{ marginBottom: 4 }}>G</div>
-                        <span className="mt-icon-label">{googleOpen ? "Google ✓" : "Google"}</span>
+                        <span className="mt-icon-label">Google</span>
                     </button>
 
-                    {/* File Explorer */}
+                    {/* File Explorer — opens workspace to Files panel */}
                     <button
-                        className={`mt-icon-btn mt-icon-files ${activePanel === 'files' ? "mt-icon-active" : ""}`}
-                        onClick={toggleFiles}
-                        title={activePanel === 'files' ? "Close File Explorer" : "Open File Explorer"}
+                        className="mt-icon-btn"
+                        onClick={() => openWorkspaceWindow('files')}
+                        title="Open File Explorer"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                         </svg>
-                        <span className="mt-icon-label">{activePanel === 'files' ? "Files ✓" : "Files"}</span>
+                        <span className="mt-icon-label">Files</span>
                     </button>
 
                     {/* Share Screen */}

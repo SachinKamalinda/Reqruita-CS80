@@ -114,8 +114,12 @@ function setupInterviewModeIPC() {
  * Workspace management (Detached Google/Files)
  */
 function setupWorkspaceIPC() {
-    ipcMain.handle("rq:open-workspace", () => {
+    ipcMain.handle("rq:open-workspace", (_event, panel) => {
+        const panelParam = panel ? `&panel=${panel}` : "";
+
         if (workspaceWin) {
+            // Navigate to requested panel and re-focus
+            workspaceWin.loadURL(`http://localhost:5173?view=workspace${panelParam}`);
             workspaceWin.focus();
             return;
         }
@@ -132,7 +136,7 @@ function setupWorkspaceIPC() {
         });
 
         // Load same URL but with a flag so App.jsx renders only MeetingWorkspace
-        workspaceWin.loadURL("http://localhost:5173?view=workspace");
+        workspaceWin.loadURL(`http://localhost:5173?view=workspace${panelParam}`);
 
         workspaceWin.on("closed", () => {
             workspaceWin = null;
