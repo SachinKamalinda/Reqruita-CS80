@@ -372,23 +372,37 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     const hasRemoteScreen = !!remoteScreenStream;
     const totalParticipants = participants.length;
 
+    // Auto-hide connection status after 3 seconds
+    const [showConnStatus, setShowConnStatus] = useState(true);
+    useEffect(() => {
+        if (hasRemoteCam) {
+            setShowConnStatus(true);
+            const timer = setTimeout(() => setShowConnStatus(false), 3000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowConnStatus(true);
+        }
+    }, [hasRemoteCam]);
+
     return (
         <div className="mt-wrap">
             {error && <div className="mt-err">{error}</div>}
 
             {/* Connection status indicator */}
-            <div className="mt-conn-status">
-                <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                <span className="mt-conn-text">
-                    {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
-                </span>
-                <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
-            </div>
+            {showConnStatus && (
+                <div className="mt-conn-status">
+                    <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                    <span className="mt-conn-text">
+                        {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
+                    </span>
+                    <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                </div>
+            )}
 
             {/* Stage + Right Panel */}
             <div className={`mt-mainrow ${panel ? "withSide" : ""}`}>
                 {/* Main Stage */}
-                <div className="mt-stage">
+                <div className={`mt-stage ${hasRemoteScreen ? "mt-sharing-active" : ""}`}>
                     {/* Main shared screen (remote screen share) */}
                     <div className="mt-share">
                         {hasRemoteScreen ? (

@@ -1144,6 +1144,30 @@ body.rq-noscr {
   }
 }
 
+/* Larger tiles when sharing is active for more professional feel */
+.mt-sharing-active .mt-tile-peer {
+  width: 380px;
+  height: 238px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.mt-sharing-active .mt-tile-self {
+  width: 420px;
+  height: 262px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 1200px) {
+  .mt-sharing-active .mt-tile-peer {
+    width: 320px;
+    height: 200px;
+  }
+  .mt-sharing-active .mt-tile-self {
+    width: 350px;
+    height: 218px;
+  }
+}
+
 /* Footer bar */
 .mt-footer {
   position: absolute;

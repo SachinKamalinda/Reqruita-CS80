@@ -373,6 +373,17 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     }
 
     const hasRemote = !!remoteCamStream;
+    // Auto-hide connection status after 3 seconds
+    const [showConnStatus, setShowConnStatus] = useState(true);
+    useEffect(() => {
+        if (hasRemote) {
+            setShowConnStatus(true);
+            const timer = setTimeout(() => setShowConnStatus(false), 3000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowConnStatus(true);
+        }
+    }, [hasRemote]);
 
     return (
         <div className={`jm-wrap ${sharing ? "jm-sharing-active" : ""}`}>
@@ -389,16 +400,16 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 </div>
             )}
 
-            {/* Connection status indicator */}
-            <div className="mt-conn-status">
-                <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                <span className="mt-conn-text">
-                    {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
-                </span>
-                <span className="mt-conn-text" style={{ marginLeft: 8, opacity: 0.6 }}>
-                    Meeting: {meetingId || "—"}
-                </span>
-            </div>
+            {/* Connection status */}
+            {showConnStatus && (
+                <div className="mt-conn-status">
+                    <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                    <span className="mt-conn-text">
+                        {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
+                    </span>
+                    <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                </div>
+            )}
 
             <div className="jm-row">
                 {/* Main area */}

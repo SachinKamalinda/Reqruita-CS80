@@ -22,6 +22,7 @@ function createWindow() {
     win = new BrowserWindow({
         width: 1100,
         height: 700,
+        autoHideMenuBar: true,
         webPreferences: {
             preload: path.join(__dirname, "preload.cjs"),
             contextIsolation: true,
@@ -50,12 +51,13 @@ function setupDisplayMediaHandler() {
                 // sees only the professional content (Google/Files), not the video call.
                 const source =
                     sources.find((src) => src.name === "Reqruita Workspace") ||
-                    sources.find((src) => win && src.name === win.getTitle()) ||
                     sources.find((src) => src.id?.toLowerCase().startsWith("window:")) ||
+                    sources.find((src) => src.name === "Reqruita") ||
                     sources[0];
 
                 if (!source) return callback({}); // deny cleanly
 
+                console.log(`Sharing source: ${source.name} (${source.id})`);
                 callback({ video: source, audio: false });
             } catch (err) {
                 console.error("Display media request failed:", err);
