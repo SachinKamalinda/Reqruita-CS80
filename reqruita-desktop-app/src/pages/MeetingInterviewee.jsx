@@ -4,6 +4,7 @@ import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
+import FileExplorer from "../components/FileExplorer";
 
 
 /**
@@ -35,6 +36,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
     // UI state
     const [error, setError] = useState("");
+    const [activePanel, setActivePanel] = useState(null); // 'google' | 'files' | 'pdf'
+    const [pdfSrc, setPdfSrc] = useState(null);
+    const [pdfName, setPdfName] = useState("");
 
 
     // Chat UI
@@ -252,7 +256,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         setCamEnabled(!camOff);
     }, [camOff, setCamEnabled]);
 
-    // 7) Track screen share state + auto-open Google when sharing starts
+    // 7) Track screen share state via toast
     useEffect(() => {
         const isSharing = !!localScreenStream;
         setSharing((prev) => {
@@ -260,45 +264,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             if (!isSharing && prev) addToast?.("Screen sharing stopped", "warning");
             return isSharing;
         });
-        if (isSharing) {
-            // Open detached workspace window
-            try {
-                window.reqruita?.openWorkspace?.();
-            } catch (e) {
-                // Fallback to embedded if not in Electron? 
-                // Currently just doing nothing, as the window is detached.
-            }
-        } else {
-            // Close detached workspace window
-            try {
-                window.reqruita?.closeWorkspace?.();
-            } catch (e) { }
-        }
     }, [localScreenStream, addToast]);
 
-    // Automatically share the desktop on join inside the Electron shell so the interviewer sees the full screen immediately
-    useEffect(() => {
-        const runningInDesktop = typeof window !== "undefined" && !!window.reqruita;
-        if (!runningInDesktop) return;
-        if (autoShareAttemptedRef.current) return;
-        if (!meetingId || !localCamStream) return;
 
-        autoShareAttemptedRef.current = true;
-        (async () => {
-            try {
-                // Open workspace first so the main process can find it as a source
-                window.reqruita?.openWorkspace?.();
-
-                // Wait longer for the window to be created and registered by the OS
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                await startScreenShare();
-            } catch (err) {
-                console.error("Automatic screen share failed:", err);
-                setError((prev) => prev || "Automatic screen share failed. Use Share Screen or grant permissions.");
-            }
-        })();
-    }, [meetingId, localCamStream, startScreenShare]);
 
     function toggleMic() {
         setMicMuted((v) => !v);
@@ -313,41 +281,28 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             setError("");
             if (sharing) {
                 await stopScreenShare();
-                try {
-                    window.reqruita?.closeWorkspace?.();
-                } catch (e) { }
             } else {
-                // Ensure workspace is open first so main process can target it
-                try {
-                    window.reqruita?.openWorkspace?.();
-                } catch (e) { }
-
-                // Wait longer for the window to be registered by the OS
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
                 await startScreenShare();
             }
         } catch (e) {
             console.error("Screen share failed:", e);
-            setError("Screen share failed. Please check permissions / Electron settings.");
+            setError("Screen share failed. Please check system permissions.");
         }
     }
 
-    function openWorkspaceWindow(panel) {
-        try { window.reqruita?.openWorkspace?.(panel); } catch (e) { }
+    function toggleGoogle() {
+        setActivePanel((prev) => prev === 'google' ? null : 'google');
     }
+
+    function toggleFiles() {
+        setActivePanel((prev) => prev === 'files' ? null : 'files');
+    }
+
 
     function leave() {
         if (!window.confirm("Are you sure you want to leave the interview?")) return;
-        try {
-            window.reqruita?.exitInterviewMode?.();
-            window.reqruita?.closeWorkspace?.(); // Ensure workspace is closed on leaving
-        } catch (e) { }
-
-        try {
-            stopScreenShare();
-        } catch (e) { }
-
+        try { window.reqruita?.exitInterviewMode?.(); } catch (e) { }
+        try { stopScreenShare(); } catch (e) { }
         onLeave?.();
     }
 
@@ -404,38 +359,93 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                             <div className="jm-share-placeholder">
                                 <div className="mt-ph-content">
                                     <div className="jm-google-badge">R</div>
-                                    <div className="mt-ph-title" style={{ marginTop: 24 }}>
-                                        {sharing ? "Workspace is being shared" : "Workspace"}
+                                    <div className="mt-ph-title" style={{ marginTop: 24 }}>Workspace</div>
+                                    <div className="mt-ph-sub" style={{ marginTop: 8, maxWidth: 300, textAlign: 'center' }}>
+                                        Use the Google or Files buttons below to open a workspace panel.
                                     </div>
-                                    <div className="mt-ph-sub" style={{ marginTop: 8, maxWidth: 340, textAlign: 'center' }}>
-                                        {sharing
-                                            ? "Your workspace window (Google Search & Files) is being shared with the interviewer."
-                                            : "Click Share Screen to open & share your workspace with the interviewer."}
-                                    </div>
-                                    {!sharing && (
-                                        <button
-                                            className="mt-icon-btn"
-                                            onClick={toggleShare}
-                                            disabled={!meetingId}
-                                            style={{ marginTop: 18, padding: '8px 24px', fontSize: 13, fontWeight: 700, background: '#7c3aed', color: '#fff', borderRadius: 8, border: 'none' }}
-                                        >
-                                            Share Screen
-                                        </button>
-                                    )}
-                                    {sharing && (
-                                        <button
-                                            className="mt-icon-btn"
-                                            onClick={openWorkspaceWindow}
-                                            style={{ marginTop: 18, padding: '8px 24px', fontSize: 13, fontWeight: 700, background: 'rgba(124,58,237,0.15)', color: '#7c3aed', borderRadius: 8, border: '1px solid rgba(124,58,237,0.3)' }}
-                                        >
-                                            Open Workspace
-                                        </button>
-                                    )}
                                 </div>
                             </div>
                         )}
 
+                        {/* Inline Google Panel Overlay */}
+                        {activePanel === 'google' && (
+                            <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
+                                <div className="jm-google-bar">
+                                    <div className="jm-google-badge sm">G</div>
+                                    <div className="jm-google-bar-title" style={{ color: '#1e293b' }}>Google Search</div>
+                                    <button className="jm-google-close" onClick={() => setActivePanel(null)}>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                            <line x1="18" y1="6" x2="6" y2="18" />
+                                            <line x1="6" y1="6" x2="18" y2="18" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <iframe
+                                    className="jm-google-frame"
+                                    title="Google"
+                                    src="https://www.google.com/webhp?igu=1"
+                                />
+                            </div>
+                        )}
 
+                        {/* Inline File Explorer Panel Overlay */}
+                        {activePanel === 'files' && (
+                            <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 11 }}>
+                                <FileExplorer
+                                    onClose={() => setActivePanel(null)}
+                                    onOpenPDF={(src, name) => {
+                                        setPdfSrc(src);
+                                        setPdfName(name);
+                                        setActivePanel('pdf');
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Inline PDF Viewer Panel Overlay */}
+                        {activePanel === 'pdf' && (
+                            <div className="jm-google-shell" style={{ position: 'absolute', inset: 0, zIndex: 12 }}>
+                                <div className="jm-google-bar">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                    <div className="jm-google-bar-title" style={{ color: '#1e293b', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {pdfName}
+                                    </div>
+                                    <button
+                                        className="jm-google-close"
+                                        onClick={() => {
+                                            if (pdfSrc?.startsWith('blob:')) URL.revokeObjectURL(pdfSrc);
+                                            setActivePanel('files');
+                                        }}
+                                        title="Back to File Explorer"
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="15 18 9 12 15 6" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        className="jm-google-close"
+                                        onClick={() => {
+                                            if (pdfSrc?.startsWith('blob:')) URL.revokeObjectURL(pdfSrc);
+                                            setActivePanel(null);
+                                            setPdfSrc(null);
+                                        }}
+                                        title="Close"
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                            <line x1="18" y1="6" x2="6" y2="18" />
+                                            <line x1="6" y1="6" x2="18" y2="18" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <iframe
+                                    className="jm-google-frame"
+                                    title={pdfName}
+                                    src={pdfSrc}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -597,6 +607,29 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                         )}
                         <span className="mt-icon-label">{sharing ? "Stop" : "Share"}</span>
                     </button>
+
+                    {/* Google Search Panel */}
+                    <button
+                        className={`mt-icon-btn ${activePanel === 'google' ? "mt-icon-active" : ""}`}
+                        onClick={toggleGoogle}
+                        title={activePanel === 'google' ? "Close Google" : "Open Google Search"}
+                    >
+                        <div className="jm-google-badge sm" style={{ marginBottom: 4 }}>G</div>
+                        <span className="mt-icon-label">Google</span>
+                    </button>
+
+                    {/* File Explorer */}
+                    <button
+                        className={`mt-icon-btn ${activePanel === 'files' || activePanel === 'pdf' ? "mt-icon-active" : ""}`}
+                        onClick={toggleFiles}
+                        title={activePanel === 'files' ? "Close Files" : "Open File Explorer"}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span className="mt-icon-label">Files</span>
+                    </button>
+
                     {/* Chat */}
                     <button className={`mt-icon-btn ${chatOpen ? "mt-icon-active" : ""}`} onClick={toggleChatPanel} title="Chat" style={{ position: 'relative' }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

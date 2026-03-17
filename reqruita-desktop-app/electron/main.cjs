@@ -47,16 +47,14 @@ function setupDisplayMediaHandler() {
                     types: ["screen", "window"],
                 });
 
-                // Prioritize capturing "Reqruita Workspace" so the interviewer 
-                // sees only the professional content (Google/Files), not the video call.
+                // Share the main interviewee Electron window so the interviewer
+                // sees exactly what the interviewee sees (Google, Files, etc.)
                 console.log(`Available sources: ${sources.map((s) => s.name).join(", ")}`);
 
-                // Prioritize capturing the internal Workspace window source.
                 const source =
-                    sources.find((src) => src.name.includes("Reqruita-Workspace-Source")) ||
-                    sources.find((src) => src.name === "Reqruita Workspace") ||
-                    sources.find((src) => src.id?.toLowerCase().startsWith("window:")) ||
-                    sources.find((src) => src.name === "Reqruita") ||
+                    sources.find((src) => src.name === "reqruita-desktop-app") ||
+                    sources.find((src) => src.name?.toLowerCase().includes("reqruita")) ||
+                    sources.find((src) => src.id?.startsWith("screen:")) || // entire screen as fallback
                     sources[0];
 
                 if (!source) return callback({}); // deny cleanly
