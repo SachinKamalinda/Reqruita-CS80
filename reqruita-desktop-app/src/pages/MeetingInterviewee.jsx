@@ -411,7 +411,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 </div>
             )}
 
-            <div className="jm-row">
+            <div className={`jm-row ${chatOpen ? "jm-chat-open" : ""}`}>
                 {/* Main area */}
                 <div className="jm-main">
                     <div className="jm-share">

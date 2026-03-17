@@ -15,6 +15,7 @@ export default function MeetingWorkspace() {
     const [pdfName, setPdfName] = useState("");
 
     useEffect(() => {
+        document.title = "Reqruita-Workspace-Source";
         document.body.classList.add("rq-noscr");
         return () => document.body.classList.remove("rq-noscr");
     }, []);

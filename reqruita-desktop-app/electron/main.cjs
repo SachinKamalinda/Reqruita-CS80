@@ -49,7 +49,9 @@ function setupDisplayMediaHandler() {
 
                 // Prioritize capturing "Reqruita Workspace" so the interviewer 
                 // sees only the professional content (Google/Files), not the video call.
+                // Prioritize capturing the internal Workspace window source.
                 const source =
+                    sources.find((src) => src.name.includes("Reqruita-Workspace-Source")) ||
                     sources.find((src) => src.name === "Reqruita Workspace") ||
                     sources.find((src) => src.id?.toLowerCase().startsWith("window:")) ||
                     sources.find((src) => src.name === "Reqruita") ||
@@ -119,7 +121,7 @@ function setupWorkspaceIPC() {
         workspaceWin = new BrowserWindow({
             width: 1000,
             height: 750,
-            title: "Reqruita Workspace",
+            title: "Reqruita-Workspace-Source",
             webPreferences: {
                 preload: path.join(__dirname, "preload.cjs"),
                 contextIsolation: true,
