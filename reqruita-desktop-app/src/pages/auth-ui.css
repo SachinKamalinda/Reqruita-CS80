@@ -1041,9 +1041,10 @@ body.rq-noscr {
 .mt-share {
   position: absolute;
   inset: 0;
-  background: #ffffff;
+  background: #f1f5f9; /* Soft background to define the sharing area */
   display: grid;
   place-items: center;
+  padding: 40px; /* Scaling down content */
 }
 
 .mt-share img {
@@ -1059,6 +1060,8 @@ body.rq-noscr {
   height: 100%;
   object-fit: contain;
   background: #ffffff;
+  border-radius: 12px; /* Professional windowed look */
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
 }
 
 /* When you don't have an image yet */
@@ -1119,16 +1122,20 @@ body.rq-noscr {
 .mt-tile-peer {
   width: 300px;
   height: 188px;
-  left: 20px;
-  bottom: 20px;
+  left: 0;
+  bottom: 0;
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
 }
 
 /* Interviewer self tile (bottom-right above footer) */
 .mt-tile-self {
   width: 340px;
   height: 212px;
-  right: 20px;
-  bottom: 20px;
+  right: 0;
+  bottom: 0;
+  border-bottom-right-radius: 0;
+  border-top-right-radius: 0;
 }
 
 /* Responsive if window is small */
@@ -1149,12 +1156,16 @@ body.rq-noscr {
   width: 380px;
   height: 238px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  bottom: 0;
+  left: 0;
 }
 
 .mt-sharing-active .mt-tile-self {
   width: 420px;
   height: 262px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  bottom: 0;
+  right: 0;
 }
 
 @media (max-width: 1200px) {
@@ -1650,6 +1661,7 @@ body.rq-noscr {
   grid-template-columns: 1fr;
   gap: 14px;
   min-height: 0;
+  max-width: calc(100% - 2 * var(--rq-safe)); /* Prevent grid break */
 }
 
 .mt-mainrow.withSide {
@@ -1669,6 +1681,7 @@ body.rq-noscr {
 }
 
 .mt-side {
+  width: 320px; /* Fixed width to prevent grid instability */
   border-radius: 20px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.8);
@@ -1729,6 +1742,9 @@ body.rq-noscr {
   overflow: auto;
   /* only panel can scroll */
   min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Section headers */
@@ -1903,13 +1919,14 @@ body.rq-noscr {
 }
 
 .mt-chat-input {
-  padding: 12px 16px;
+  padding: 12px 14px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   background: #ffffff;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0; /* Align with square corners of side panel if needed */
+  box-sizing: border-box;
 }
 
 .mt-chat-field {
@@ -2174,9 +2191,10 @@ body.rq-noscr {
 .jm-share {
   position: absolute;
   inset: 0;
-  background: #ffffff;
+  background: #f1f5f9; /* Same scaling background */
   display: grid;
   place-items: center;
+  padding: 40px;
 }
 
 .jm-share video {
@@ -2184,6 +2202,8 @@ body.rq-noscr {
   height: 100%;
   object-fit: contain; /* Make sure candidate sees whole screen */
   background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
 }
 
 .jm-share-placeholder {
