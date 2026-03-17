@@ -27,6 +27,6 @@ contextBridge.exposeInMainWorld("reqruita", {
     },
 
     // Workspace window management
-    openWorkspace: () => ipcRenderer.invoke("rq:open-workspace"),
+    openWorkspace: (panel) => ipcRenderer.invoke("rq:open-workspace", panel),
     closeWorkspace: () => ipcRenderer.invoke("rq:close-workspace"),
 });

@@ -10,7 +10,9 @@ import FileExplorer from "../components/FileExplorer";
  */
 export default function MeetingWorkspace() {
     // activePanel: 'google' | 'files' | 'pdf'
-    const [activePanel, setActivePanel] = useState('google');
+    // Read initial panel from URL param (e.g. ?view=workspace&panel=files)
+    const initialPanel = new URLSearchParams(window.location.search).get('panel') || 'google';
+    const [activePanel, setActivePanel] = useState(initialPanel);
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
 
