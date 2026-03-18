@@ -281,12 +281,20 @@ export default function UserRolesPage() {
                 <tbody className="divide-y">
                   {users.filter(u => u.role === 'admin' || u.isMainAdmin).map((user: any) => (
                     <tr key={user._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4 font-medium">{user.fullName} {user.isMainAdmin && <span className="ml-2 text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">Main Admin</span>}</td>
+                      <td className="py-4 font-medium">{user.fullName || "Admin User"}</td>
                       <td className="py-4 text-gray-600">{user.email}</td>
                       <td className="py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getRoleColor(user.role)}`}>
-                          {user.role}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          {user.isMainAdmin ? (
+                            <span className="text-[10px] bg-purple-200 text-purple-900 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+                              Main Admin
+                            </span>
+                          ) : (
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getRoleColor(user.role)}`}>
+                              {user.role}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${user.status === 'inactive' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
@@ -420,9 +428,6 @@ export default function UserRolesPage() {
                 >
                   <option value="admin">Administrator</option>
                   <option value="interviewer">Interviewer</option>
-                  <option value="recruiter">Recruiter</option>
-                  <option value="hr manager">HR Manager</option>
-                  <option value="candidate">Candidate</option>
                 </select>
               </div>
 
@@ -465,8 +470,6 @@ export default function UserRolesPage() {
                 >
                   <option value="admin">Administrator</option>
                   <option value="interviewer">Interviewer</option>
-                  <option value="recruiter">Recruiter</option>
-                  <option value="hr manager">HR Manager</option>
                 </select>
               </div>
 
