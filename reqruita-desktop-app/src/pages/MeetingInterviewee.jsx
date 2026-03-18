@@ -46,6 +46,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [chatInput, setChatInput] = useState("");
     const [messages, setMessages] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const chatContainerRef = useRef(null);
     const chatEndRef = useRef(null);
     const seenIdsRef = useRef(new Set());
 

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("reqruita", {
 
     // Interview mode (fullscreen/kiosk lock)
     enterInterviewMode: () => ipcRenderer.invoke("rq:enter-interview-mode"),
+    enterInterviewerMode: () => ipcRenderer.invoke("rq:enter-interviewer-mode"),
     exitInterviewMode: () => ipcRenderer.invoke("rq:exit-interview-mode"),
 
     // File Explorer – browse local file system and open files
