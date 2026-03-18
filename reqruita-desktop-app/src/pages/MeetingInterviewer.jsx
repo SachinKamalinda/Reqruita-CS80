@@ -109,6 +109,22 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Handle Full Window for Interviewer (Electron)
+    useEffect(() => {
+        try {
+            window.reqruita?.enterInterviewerMode?.();
+        } catch (e) {
+            // ignore in browser
+        }
+        return () => {
+            try {
+                window.reqruita?.exitInterviewMode?.();
+            } catch (e) {
+                // ignore
+            }
+        };
+    }, []);
+
     // Keep meeting non-scroll
     useEffect(() => {
         document.body.classList.add("rq-noscr");
@@ -132,7 +148,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
             const clientId = msg.clientId;
 
             if ((clientId && seenIdsRef.current.has(clientId)) || seenIdsRef.current.has(msgId)) return;
-            
+
             if (clientId) seenIdsRef.current.add(clientId);
             seenIdsRef.current.add(msgId);
 
@@ -372,23 +388,37 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     const hasRemoteScreen = !!remoteScreenStream;
     const totalParticipants = participants.length;
 
+    // Auto-hide connection status after 3 seconds
+    const [showConnStatus, setShowConnStatus] = useState(true);
+    useEffect(() => {
+        if (hasRemoteCam) {
+            setShowConnStatus(true);
+            const timer = setTimeout(() => setShowConnStatus(false), 3000);
+            return () => clearTimeout(timer);
+        } else {
+            setShowConnStatus(true);
+        }
+    }, [hasRemoteCam]);
+
     return (
         <div className="mt-wrap">
             {error && <div className="mt-err">{error}</div>}
 
             {/* Connection status indicator */}
-            <div className="mt-conn-status">
-                <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                <span className="mt-conn-text">
-                    {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
-                </span>
-                <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
-            </div>
+            {showConnStatus && (
+                <div className="mt-conn-status">
+                    <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                    <span className="mt-conn-text">
+                        {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
+                    </span>
+                    <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                </div>
+            )}
 
             {/* Stage + Right Panel */}
             <div className={`mt-mainrow ${panel ? "withSide" : ""}`}>
                 {/* Main Stage */}
-                <div className="mt-stage">
+                <div className={`mt-stage ${hasRemoteScreen ? "mt-sharing-active" : ""}`}>
                     {/* Main shared screen (remote screen share) */}
                     <div className="mt-share">
                         {hasRemoteScreen ? (
@@ -396,7 +426,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                         ) : (
                             <div className="mt-share-placeholder">
                                 <div className="mt-ph-content">
-                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 drop-shadow-sm">
                                         <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
                                         <line x1="8" y1="21" x2="16" y2="21" />
                                         <line x1="12" y1="17" x2="12" y2="21" />
@@ -420,16 +450,16 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                         <circle cx="12" cy="7" r="4" />
                                     </svg>
                                 </div>
-                                <span className="mt-tile-ph-text">Connecting…</span>
+                                <span className="mt-tile-ph-text" style={{ color: '#94a3b8' }}>Connecting…</span>
                             </div>
                         )}
-                        <div className="mt-tile-label">Interviewee</div>
+                        <div className="mt-tile-label">Candidate</div>
                     </div>
 
                     {/* Interviewer tile (bottom-right) */}
                     <div className="mt-tile mt-tile-self">
                         <video ref={localVideoRef} autoPlay playsInline muted />
-                        <div className="mt-tile-label">You (Interviewer)</div>
+                        <div className="mt-tile-label">You</div>
                     </div>
                 </div>
 
