@@ -141,7 +141,42 @@ export default function DashboardLayout({
     },
   ];
 
-  const currentUser = typeof window !== "undefined" ? getStoredUser() : null;
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      // Check for token in URL (passed from landing page)
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get('token');
+        
+        if (urlToken) {
+          localStorage.setItem('reqruita_token', urlToken);
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        }
+      }
+
+      // Try to get stored user first
+      let storedUser = getStoredUser();
+      
+      // If we have a token but no user data, fetch it
+      if (!storedUser && getToken()) {
+        try {
+          const { fetchMe, saveUser } = await import("@/lib/api");
+          const user = await fetchMe();
+          saveUser(user);
+          storedUser = user;
+        } catch (err) {
+          console.error("Failed to fetch current user profile:", err);
+        }
+      }
+      
+      setCurrentUser(storedUser);
+    };
+
+    initAuth();
+  }, []);
 
   const isActive = (href: string) => {
     if (href === "/") {
@@ -309,12 +344,12 @@ export default function DashboardLayout({
               >
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center font-bold text-white shadow-md">
                   {currentUser
-                    ? currentUser.firstName.charAt(0).toUpperCase()
+                    ? (currentUser.firstName || currentUser.fullName || currentUser.email || "U").charAt(0).toUpperCase()
                     : "U"}
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-gray-800">
-                    {currentUser ? currentUser.fullName : "Admin User"}
+                    {currentUser ? (currentUser.fullName || currentUser.email) : "Admin User"}
                   </p>
                   <p className="text-xs text-gray-500 capitalize">
                     {currentUser?.role ?? "Administrator"}
@@ -338,7 +373,7 @@ export default function DashboardLayout({
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-40 overflow-hidden">
+                <div className="absolute right-0 top-full mt-3 w-56 bg-white/95 backdrop-blur-md border border-gray-200 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] z-50 overflow-hidden ring-1 ring-black/5">
                   <Link
                     href="/settings"
                     className="flex items-center gap-2 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"

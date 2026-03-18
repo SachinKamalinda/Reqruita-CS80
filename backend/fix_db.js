@@ -1,31 +1,57 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
-const dbPath = path.join(__dirname, 'reqruita.db');
-const db = new sqlite3.Database(dbPath);
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-console.log('Sanitizing database statuses...');
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/reqruita';
 
-db.serialize(() => {
-    // 1. Remove hidden characters from all statuses
-    db.run("UPDATE participants SET status = replace(replace(status, char(10), ''), char(13), '')", (err) => {
-        if (err) console.error('Error sanitizing newlines:', err);
-        else console.log('✅ Newlines removed from statuses.');
-    });
+mongoose.connect(MONGO_URI)
+  .then(async () => {
+    console.log('Connected to DB');
+    
+    // 1. Mark all existing users as verified if they are not
+    // 2. Set all existing users to 'active' status if they don't have it
+    // 3. Ensure all users have a firstName/lastName if missing (legacy data)
+    
+    const users = await mongoose.connection.db.collection('users').find({}).toArray();
+    console.log(`Found ${users.length} users. Checking and fixing data...`);
+    
+    for (let user of users) {
+      let updates = {};
+      
+      if (user.isEmailVerified === undefined || user.isEmailVerified === false) {
+        updates.isEmailVerified = true;
+      }
+      
+      if (!user.status) {
+        updates.status = 'active';
+      }
+      
+      if (!user.firstName || user.firstName === 'Undefined') {
+        const roleName = user.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'User';
+        updates.firstName = roleName;
+      }
+      
+      if (!user.lastName || user.lastName === 'Undefined') {
+        updates.lastName = 'Member';
+      }
 
-    db.run("UPDATE participants SET status = trim(status)", (err) => {
-        if (err) console.error('Error trimming statuses:', err);
-        else console.log('✅ Statuses trimmed.');
-    });
+      // Always update fullName if names exist or were just set
+      const fName = updates.firstName || user.firstName || 'User';
+      const lName = updates.lastName || user.lastName || 'Member';
+      updates.fullName = `${fName} ${lName}`;
 
-    // 2. Ensure specific candidate is set correctly if they were in the middle of an interview
-    db.run("UPDATE participants SET status = 'interviewing' WHERE status LIKE '%interviewing%'", (err) => {
-        if (err) console.error('Error fixing interviewing status:', err);
-        else console.log('✅ Interviewing statuses normalized.');
-    });
+      if (Object.keys(updates).length > 0) {
+        await mongoose.connection.db.collection('users').updateOne(
+          { _id: user._id },
+          { $set: updates }
+        );
+        console.log(`Updated user ${user.email || user._id}:`, updates);
+      }
+    }
 
-    // 3. Verify
-    db.all("SELECT id, name, status FROM participants WHERE status = 'interviewing'", (err, rows) => {
-        console.log('Current Interviewing Participants:', JSON.stringify(rows, null, 2));
-        db.close();
-    });
-});
+    console.log('Database fix complete!');
+    process.exit(0);
+  })
+  .catch(err => {
+    console.error('Connection error:', err);
+    process.exit(1);
+  });

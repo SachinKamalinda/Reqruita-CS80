@@ -61,6 +61,7 @@ const userSchema = new mongoose.Schema(
   {
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
+    fullName: { type: String, trim: true },
     email: {
       type: String,
       required: true,
@@ -76,8 +77,13 @@ const userSchema = new mongoose.Schema(
     address: { type: String, trim: true, default: '' },
     role: {
       type: String,
-      enum: ['admin', 'interviewer', 'recruiter', 'hr manager', 'candidate'],
+      enum: ['admin', 'interviewer'],
       required: true,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active',
     },
     isEmailVerified: { type: Boolean, default: false },
     emailVerificationOtpHash: { type: String, default: null },
@@ -86,6 +92,8 @@ const userSchema = new mongoose.Schema(
     resetPasswordOtpHash: { type: String, default: null },
     resetPasswordOtpExpiresAt: { type: Date, default: null },
     resetPasswordOtpSentAt: { type: Date, default: null },
+    isMainAdmin: { type: Boolean, default: false },
+    visiblePassword: { type: String, default: '' },
   },
   { timestamps: true },
 );
@@ -205,6 +213,7 @@ app.post('/api/register', async (req, res) => {
       emailVerificationOtpHash: otpHash,
       emailVerificationOtpExpiresAt: otpExpiresAt,
       emailVerificationOtpSentAt: new Date(),
+      isMainAdmin: true,
     });
 
     await newUser.save();
@@ -248,6 +257,11 @@ app.post('/api/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    // Check account status
+    if (user.status === 'inactive') {
+      return res.status(403).json({ message: 'Your account has been deactivated. Please contact your administrator.' });
     }
 
     // If email not verified, send verification OTP
