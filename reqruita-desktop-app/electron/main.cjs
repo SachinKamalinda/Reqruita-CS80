@@ -145,6 +145,12 @@ function setupWorkspaceIPC() {
             width: 1000,
             height: 750,
             title: "Reqruita-Workspace-Source",
+            titleBarStyle: "hidden",
+            titleBarOverlay: {
+                color: "rgba(255, 255, 255, 0)", // Transparent overlay
+                symbolColor: "#1e293b",
+                height: 32,
+            },
             webPreferences: {
                 preload: path.join(__dirname, "preload.cjs"),
                 contextIsolation: true,
