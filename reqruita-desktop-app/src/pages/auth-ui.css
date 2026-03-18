@@ -67,6 +67,23 @@ html, body, #root {
   stroke: #1e293b !important;
 }
 
+.rq-header-interviewer {
+  background: rgba(30, 41, 59, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: none !important;
+  color: #475569 !important;
+}
+
+.rq-header-interviewer .rq-header-title {
+  color: #475569 !important;
+}
+
+.rq-header-interviewer .rq-header-logo svg {
+  stroke: #475569 !important;
+}
+
 /* Hide header when sharing is active on interviewee side */
 .jm-sharing-active .rq-header {
   transform: translateY(-100%);

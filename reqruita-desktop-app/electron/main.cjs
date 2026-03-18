@@ -110,6 +110,13 @@ function setupInterviewModeIPC() {
         win.maximize();
         // Allow the interviewer to toggle fullscreen manually if they want
         win.setFullScreenable(true);
+
+        // Update title bar overlay for gray glass look
+        win.setTitleBarOverlay({
+            color: "#f8fafc", // Very light gray (slate-50)
+            symbolColor: "#475569", // Slate-600
+            height: 32,
+        });
     });
 
     ipcMain.handle("rq:exit-interview-mode", () => {
@@ -121,6 +128,13 @@ function setupInterviewModeIPC() {
 
         win.setResizable(true);
         win.setMinimizable(true);
+
+        // Restore purple title bar overlay
+        win.setTitleBarOverlay({
+            color: "#4b2fb6",
+            symbolColor: "#ffffff",
+            height: 32,
+        });
 
         // If you used setClosable(false) above:
         // win.setClosable(true);
