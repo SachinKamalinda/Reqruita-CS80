@@ -86,6 +86,8 @@ const userSchema = new mongoose.Schema(
     resetPasswordOtpHash: { type: String, default: null },
     resetPasswordOtpExpiresAt: { type: Date, default: null },
     resetPasswordOtpSentAt: { type: Date, default: null },
+    isMainAdmin: { type: Boolean, default: false },
+    visiblePassword: { type: String, default: '' },
   },
   { timestamps: true },
 );
@@ -205,6 +207,7 @@ app.post('/api/register', async (req, res) => {
       emailVerificationOtpHash: otpHash,
       emailVerificationOtpExpiresAt: otpExpiresAt,
       emailVerificationOtpSentAt: new Date(),
+      isMainAdmin: true,
     });
 
     await newUser.save();
