@@ -476,18 +476,6 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                     <div className="mt-share">
                         {hasRemoteScreen ? (
                             <video ref={remoteScreenRef} autoPlay playsInline muted={false} />
-                        ) : hasRemoteCam ? (
-                            <div className="mt-center-cam" style={{ width: '100%', height: '100%' }}>
-                                <video
-                                    ref={(node) => {
-                                        if (node && remoteCamStream) node.srcObject = remoteCamStream;
-                                    }}
-                                    autoPlay
-                                    playsInline
-                                    muted={false}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                            </div>
                         ) : (
                             <div className="mt-share-placeholder">
                                 <div className="mt-ph-content">
@@ -497,7 +485,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                         <line x1="12" y1="17" x2="12" y2="21" />
                                     </svg>
                                     <div className="mt-ph-title">Waiting for session</div>
-                                    <div className="mt-ph-sub">Candidate video or screen share will appear here.</div>
+                                    <div className="mt-ph-sub">Candidate screen share will appear here.</div>
                                 </div>
                             </div>
                         )}
