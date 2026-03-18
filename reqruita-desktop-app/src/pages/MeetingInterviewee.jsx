@@ -269,15 +269,18 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         });
     }, [localScreenStream, addToast]);
 
-    // 8) Auto-start screen share on join
+    // 8) Auto-start screen share on join (wait for camera stream as a readiness indicator)
     useEffect(() => {
-        if (!autoShareAttemptedRef.current && startScreenShare) {
+        if (!autoShareAttemptedRef.current && startScreenShare && localCamStream) {
             autoShareAttemptedRef.current = true;
-            startScreenShare().catch((err) => {
-                console.log("Auto screen share canceled/failed:", err);
-            });
+            // Add a small delay so UI settles before the screen picker pops up
+            setTimeout(() => {
+                startScreenShare().catch((err) => {
+                    console.log("Auto screen share canceled/failed:", err);
+                });
+            }, 500);
         }
-    }, [startScreenShare]);
+    }, [startScreenShare, localCamStream]);
 
     function toggleMic() {
         setMicMuted((v) => !v);
