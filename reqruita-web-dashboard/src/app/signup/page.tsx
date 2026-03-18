@@ -48,9 +48,8 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       const result = await signup(formData);
-      saveToken(result.token);
-      saveUser(result.user);
-      router.push('/payment');
+      // Redirect to email verification page instead of saving token
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (err: unknown) {
       setError(
         err instanceof Error
