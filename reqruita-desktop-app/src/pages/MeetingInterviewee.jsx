@@ -1,5 +1,5 @@
 // src/pages/MeetingInterviewee.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
@@ -77,7 +77,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     } = useWebRTC({ meetingId, role: "interviewee" });
 
     // ✅ External Display Detection Hook
-    const { displayInfo, hasExternalDisplay, displayCount } = useExternalDisplayDetection(
+    const handleExternalDisplayDetected = useCallback(
         (detected, displays) => {
             setExternalDisplayDetected(detected);
             setExternalDisplayCount(displays?.length || 1);
@@ -103,7 +103,12 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                     signalingSentRef.current = false;
                 }, 5000);
             }
-        }
+        },
+        [meetingId, candidateName]
+    );
+
+    const { displayInfo, hasExternalDisplay, displayCount } = useExternalDisplayDetection(
+        handleExternalDisplayDetected
     );
 
     //chat shocket connection

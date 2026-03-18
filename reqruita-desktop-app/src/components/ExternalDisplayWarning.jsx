@@ -33,7 +33,7 @@ export default function ExternalDisplayWarning({
             <div className="warning-container">
                 <div className="warning-header">
                     <h3 className="warning-title">{title}</h3>
-                    {onDismiss && variant === "candidates" && (
+                    {onDismiss && variant === "candidate" && (
                         <button
                             className="warning-close"
                             onClick={onDismiss}
