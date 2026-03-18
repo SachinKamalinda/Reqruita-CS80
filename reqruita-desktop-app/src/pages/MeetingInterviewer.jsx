@@ -14,10 +14,6 @@ import { useWebRTC } from "../webrtc/useWebRTC";
  * ✅ Keeps:
  *   - Right panel toggles: Participants / Chat / Notes
  *   - Participants list from backend (polling every 2s)
- *
- * Backend requirements:
- *   - REST: /api/participants endpoints (your existing ones)
- *   - Socket.IO signaling: join-meeting + webrtc-signal (from the updated server.js)
  */
 
 export default function MeetingInterviewer({ session, onEnd, addToast }) {
@@ -72,10 +68,63 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
     // Derived lists
     const interviewing = useMemo(() => participants.filter((p) => p.status === "interviewing"), [participants]);
+    const currentCandidate = interviewing[0];
     const waiting = useMemo(() => participants.filter((p) => p.status === "waiting"), [participants]);
     const completed = useMemo(() => participants.filter((p) => p.status === "completed"), [participants]);
 
     const API_URL = `${BACKEND_URL}/api/participants`;
+
+    // Load remarks for current candidate
+    useEffect(() => {
+        if (currentCandidate?.id) {
+            console.log("Fetching remarks for candidate:", currentCandidate.id);
+            fetch(`${BACKEND_URL}/api/remarks/${currentCandidate.id}`)
+                .then((res) => {
+                    if (!res.ok) throw new Error("Failed to fetch remarks");
+                    return res.json();
+                })
+                .then((data) => {
+                    console.log("Loaded remark data:", data);
+                    setRemarks(data.remark || "");
+                })
+                .catch((err) => {
+                    console.error("Load remark error:", err);
+                    setRemarks("");
+                });
+        } else {
+            setRemarks("");
+        }
+    }, [currentCandidate?.id]);
+
+    async function saveRemark() {
+        if (!currentCandidate) {
+            console.error("No candidate selected for saving remarks");
+            addToast?.("No candidate selected", "error");
+            return;
+        }
+        
+        const payload = {
+            interviewId: meetingId,
+            participantId: currentCandidate.id,
+            remark: remarks,
+        };
+        
+        console.log("Saving remark with payload:", payload);
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/remarks`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to save");
+            addToast?.("Remark saved", "success");
+        } catch (err) {
+            console.error("Error saving remark:", err);
+            addToast?.(`Failed to save remark: ${err.message}`, "error");
+        }
+    }
 
     // Normalize backend responses:
     // - array => array
@@ -317,6 +366,10 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                 body: JSON.stringify({ id }),
             });
             const data = await res.json();
+            if (!res.ok) {
+                addToast?.(data.error || "Failed to accept participant", "error");
+                return;
+            }
             setParticipants(normalizeParticipants(data));
             addToast?.("Participant accepted", "success");
         } catch (err) {
@@ -422,7 +475,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                     {/* Main shared screen (remote screen share) */}
                     <div className="mt-share">
                         {hasRemoteScreen ? (
-                            <video ref={remoteScreenRef} autoPlay playsInline />
+                            <video ref={remoteScreenRef} autoPlay playsInline muted={false} />
                         ) : (
                             <div className="mt-share-placeholder">
                                 <div className="mt-ph-content">
@@ -431,8 +484,8 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                         <line x1="8" y1="21" x2="16" y2="21" />
                                         <line x1="12" y1="17" x2="12" y2="21" />
                                     </svg>
-                                    <div className="mt-ph-title">Waiting for screen share</div>
-                                    <div className="mt-ph-sub">The candidate's screen will appear here once they start sharing</div>
+                                    <div className="mt-ph-title">Waiting for session</div>
+                                    <div className="mt-ph-sub">Candidate screen share will appear here.</div>
                                 </div>
                             </div>
                         )}
@@ -441,7 +494,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                     {/* Interviewee cam tile (bottom-left) */}
                     <div className="mt-tile mt-tile-peer">
                         {hasRemoteCam ? (
-                            <video ref={remoteCamRef} autoPlay playsInline />
+                            <video ref={remoteCamRef} autoPlay playsInline muted={false} />
                         ) : (
                             <div className="mt-tile-ph">
                                 <div className="mt-tile-ph-avatar mt-tile-ph-pulse">
@@ -591,7 +644,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
                             {/* Notes */}
                             {panel === "notes" && (
-                                <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+                                <div style={{ display: "flex", flexDirection: "column", minHeight: 0, height: "100%" }}>
                                     <div className="nt-topTabs">
                                         <button className={`nt-tab ${notesTab === "remarks" ? "active" : ""}`} onClick={() => setNotesTab("remarks")}>
                                             Remarks
@@ -603,26 +656,43 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
                                     <div className="nt-interviewerRow">
                                         <div className="nt-pillRow">
-                                            <div className="nt-namePill">
-                                                <div className="nt-avatarSm">R</div>
-                                                Robert Nachino
-                                            </div>
+                                            {currentCandidate ? (
+                                                <div className="nt-namePill">
+                                                    <div className="nt-avatarSm">{(currentCandidate.name || "?")[0]}</div>
+                                                    {currentCandidate.name}
+                                                </div>
+                                            ) : (
+                                                <div className="nt-namePill" style={{ opacity: 0.6 }}>
+                                                    No ongoing session
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
                                     <div className="nt-body">
                                         {notesTab === "remarks" && (
-                                            <textarea
-                                                className="nt-textarea"
-                                                value={remarks}
-                                                onChange={(e) => setRemarks(e.target.value)}
-                                                placeholder="Write remarks here… (Saved locally for now)"
-                                            />
+                                            <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                                                <textarea
+                                                    className="nt-textarea"
+                                                    value={remarks}
+                                                    onChange={(e) => setRemarks(e.target.value)}
+                                                    placeholder={currentCandidate ? `Write remarks for ${currentCandidate.name}…` : "Admit a candidate first…"}
+                                                    disabled={!currentCandidate}
+                                                />
+                                                <button 
+                                                    className="rq-btn-primary" 
+                                                    style={{ marginTop: 12, width: '100%', padding: '12px' }}
+                                                    onClick={saveRemark}
+                                                    disabled={!currentCandidate || !remarks.trim()}
+                                                >
+                                                    Save Remark
+                                                </button>
+                                            </div>
                                         )}
 
                                         {notesTab === "details" && (
                                             <div className="nt-profileCard">
-                                                <div className="nt-h1">Robert Nachino</div>
+                                                <div className="nt-h1">{currentCandidate?.name || "Robert Nachino"}</div>
                                                 <div className="nt-small">Software Engineer</div>
 
                                                 <div className="nt-h2">Contact</div>
@@ -772,7 +842,7 @@ function ParticipantRow({ name, status, actions }) {
     return (
         <div className="mt-p-row">
             <div className={`mt-avatar ${status === "interviewing" ? "mt-avatar-active" : ""}`}>{initial}</div>
-            <div>
+            <div style={{ minWidth: 0 }}>
                 <div className="mt-p-name">{name}</div>
                 <div className="mt-p-sub">{statusLabel}</div>
             </div>
@@ -780,3 +850,4 @@ function ParticipantRow({ name, status, actions }) {
         </div>
     );
 }
+

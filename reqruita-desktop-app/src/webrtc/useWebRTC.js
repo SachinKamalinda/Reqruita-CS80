@@ -88,9 +88,11 @@ export function useWebRTC({ meetingId, role }) {
         const hasAudioTrack = stream.getAudioTracks().length > 0;
         if (hasAudioTrack) {
             setRemoteCamStream((curCam) => (curCam?.id === stream.id ? curCam : stream));
+            setRemoteScreenStream((curScreen) => (curScreen?.id === stream.id ? null : curScreen));
             watchRemoteStream(stream, "cam");
         } else {
             setRemoteScreenStream((curScreen) => (curScreen?.id === stream.id ? curScreen : stream));
+            setRemoteCamStream((curCam) => (curCam?.id === stream.id ? null : curCam));
             watchRemoteStream(stream, "screen");
         }
     };
@@ -131,7 +133,10 @@ export function useWebRTC({ meetingId, role }) {
             // receive remote tracks
             pc.ontrack = (e) => {
                 const stream = e.streams?.[0];
-                if (stream) assignRemoteStream(stream);
+                if (!stream) return;
+                // Avoid race conditions by allowing all tracks to bundle into the stream
+                setTimeout(() => assignRemoteStream(stream), 200);
+                stream.onaddtrack = () => assignRemoteStream(stream);
             };
 
             // only the interviewer will initiate offers

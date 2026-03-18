@@ -11,6 +11,7 @@ const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
 const connectMongo = require("./chatBackend");
+const InterviewRemark = require("./InterviewRemark");
 
 const app = express();
 const PORT = 3001;
@@ -110,56 +111,59 @@ app.get("/api/participants", (req, res) => {
 });
 
 // POST /api/participants/allow
-// Logic: Move current 'interviewing' -> 'completed', and selected 'waiting' -> 'interviewing'
+// Logic: Ensure only ONE person is interviewing at a time.
 app.post("/api/participants/allow", (req, res) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "Participant ID is required" });
 
-    db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
+    // 1) Check if someone is already interviewing
+    console.log(`[ALLOW] Checking if someone is already interviewing for session...`);
+    db.get("SELECT id, name FROM participants WHERE status = 'interviewing'", (err, row) => {
+        if (err) return res.status(500).json({ error: "Database error checking session" });
+        if (row) {
+            console.log(`[ALLOW] Conflict: ${row.name} (${row.id}) is already interviewing.`);
+            return res.status(400).json({ error: "Someone is already in the session" });
+        }
 
-        db.run(
-            "UPDATE participants SET status = 'completed' WHERE status = 'interviewing'",
-            (err) => {
-                if (err) {
-                    db.run("ROLLBACK");
-                    return res
-                        .status(500)
-                        .json({ error: "Failed to update current interviewing status" });
-                }
+        console.log(`[ALLOW] Proceeding to admit participant ID: ${id}`);
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
 
-                // ✅ only allow if they are waiting
-                db.run(
-                    "UPDATE participants SET status = 'interviewing' WHERE id = ? AND status = 'waiting'",
-                    [id],
-                    function (err) {
+            // ✅ only allow if they are waiting
+            db.run(
+                "UPDATE participants SET status = 'interviewing' WHERE id = ? AND status = 'waiting'",
+                [id],
+                function (err) {
+                    if (err) {
+                        console.error(`[ALLOW] Update error for ${id}:`, err.message);
+                        db.run("ROLLBACK");
+                        return res
+                            .status(500)
+                            .json({ error: "Failed to update selected participant status" });
+                    }
+
+                    console.log(`[ALLOW] Update successful. Changes: ${this.changes}`);
+                    if (this.changes === 0) {
+                        db.run("ROLLBACK");
+                        return res.status(404).json({
+                            error: "Participant not found OR not in 'waiting' state",
+                        });
+                    }
+
+                    db.run("COMMIT", (err) => {
                         if (err) {
+                            console.error(`[ALLOW] Commit error:`, err.message);
                             db.run("ROLLBACK");
                             return res
                                 .status(500)
-                                .json({ error: "Failed to update selected participant status" });
+                                .json({ error: "Failed to commit transaction" });
                         }
-
-                        if (this.changes === 0) {
-                            db.run("ROLLBACK");
-                            return res.status(404).json({
-                                error: "Participant not found OR not in 'waiting' state",
-                            });
-                        }
-
-                        db.run("COMMIT", (err) => {
-                            if (err) {
-                                db.run("ROLLBACK");
-                                return res
-                                    .status(500)
-                                    .json({ error: "Failed to commit transaction" });
-                            }
-                            getAllParticipants(res, "Success");
-                        });
-                    }
-                );
-            }
-        );
+                        console.log(`[ALLOW] Participant ${id} is now interviewing.`);
+                        getAllParticipants(res, "Success");
+                    });
+                }
+            );
+        });
     });
 });
 
@@ -177,8 +181,7 @@ app.post("/api/participants/join", (req, res) => {
 });
 
 // POST /api/participants/reject
-// (Your old version deleted; keeping delete to match your current UI)
-// Upgrade later: mark status='rejected' instead of delete.
+// mark status='rejected' or just delete.
 app.post("/api/participants/reject", (req, res) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "Participant ID is required" });
@@ -209,6 +212,7 @@ app.post("/api/participants/complete", (req, res) => {
         }
     );
 });
+
 /* GET /api/chat/{interviewId} */
 const ChatMessage = require("./ChatMessage");
 app.get("/api/chat/:interviewId", async (req, res) => {
@@ -219,6 +223,43 @@ app.get("/api/chat/:interviewId", async (req, res) => {
         res.json(messages);
     } catch (err) {
         res.status(500).json({ error: "Failed to load chat" });
+    }
+});
+
+// -------------------- REMARKS API --------------------
+
+// POST /api/remarks
+app.post("/api/remarks", async (req, res) => {
+    const { interviewId, participantId, remark } = req.body;
+    if (!interviewId || !participantId || remark === undefined) {
+        return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    try {
+        // Find existing or create new
+        let entry = await InterviewRemark.findOne({ interviewId, participantId });
+        if (entry) {
+            entry.remark = remark;
+            await entry.save();
+        } else {
+            entry = await InterviewRemark.create({ interviewId, participantId, remark });
+        }
+        res.json({ message: "Remark saved successfully", remark: entry });
+    } catch (err) {
+        console.error("Failed to save remark:", err.message);
+        res.status(500).json({ error: "Failed to save remark" });
+    }
+});
+
+// GET /api/remarks/:participantId
+app.get("/api/remarks/:participantId", async (req, res) => {
+    try {
+        const entry = await InterviewRemark.findOne({ 
+            participantId: req.params.participantId 
+        }).sort({ updatedAt: -1 });
+        res.json(entry || { remark: "" });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to load remark" });
     }
 });
 
