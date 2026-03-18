@@ -273,17 +273,18 @@ export default function SigninPage() {
                 )}
               </button>
 
+              {/* Hiding social signin options temporarily */}
               {/* Divider */}
-              <div className="flex items-center gap-4 pt-1">
+              {/* <div className="flex items-center gap-4 pt-1">
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                 <span className="text-xs text-gray-400 font-medium tracking-wider uppercase">
                   or
                 </span>
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
-              </div>
+              </div> */}
 
               {/* Social Buttons */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
                   className="border border-gray-200 rounded-xl py-2.5 flex items-center justify-center gap-2.5 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 group"
@@ -333,7 +334,7 @@ export default function SigninPage() {
                     Sign in with Microsoft
                   </span>
                 </button>
-              </div>
+              </div> */}
 
               {/* Sign up link */}
               <p className="text-center text-sm text-gray-500 pt-1">
