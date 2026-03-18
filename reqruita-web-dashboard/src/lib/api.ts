@@ -165,3 +165,25 @@ export async function resetPasswordWithOtp(
 
   return data as MessageResponse;
 }
+
+export interface VerifyEmailPayload {
+  email: string;
+  otp: string;
+}
+
+export async function verifyEmail(
+  payload: VerifyEmailPayload,
+): Promise<AuthResponse> {
+  const res = await fetch(`${AUTH_API_BASE}/api/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error((data as ApiError).message || 'Failed to verify email');
+  }
+
+  return data as AuthResponse;
+}
