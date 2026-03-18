@@ -134,12 +134,7 @@ export default function SigninPage() {
                   <label className="block text-[13px] font-semibold text-gray-700 tracking-[0.01em]">
                     Password
                   </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-[13px] font-medium text-purple-600 hover:text-purple-700 transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
+                
                 </div>
                 <div className="relative">
                   <input
@@ -197,46 +192,13 @@ export default function SigninPage() {
                     )}
                   </button>
                 </div>
-              </div>
-
-              {/* Remember Me */}
-              <label className="flex items-center gap-2.5 cursor-pointer select-none group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div
-                    className={`w-4.5 h-4.5 rounded-[5px] border-[1.5px] flex items-center justify-center transition-all duration-150 ${
-                      rememberMe
-                        ? 'bg-purple-600 border-purple-600'
-                        : 'bg-white border-gray-300 group-hover:border-purple-400'
-                    }`}
-                    style={{ width: '18px', height: '18px' }}
+                  <Link
+                    href="/forgot-password"
+                    className="text-[13px] self-end mt-2 font-medium text-purple-600 hover:text-purple-700 transition-colors"
                   >
-                    {rememberMe && (
-                      <svg
-                        className="w-2.5 h-2.5 text-white"
-                        fill="none"
-                        viewBox="0 0 12 12"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2 6l3 3 5-5"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-                <span className="text-[13px] font-medium text-gray-600">
-                  Remember me for 30 days
-                </span>
-              </label>
+                    Forgot password?
+                  </Link>
+              </div>
 
               {/* Submit */}
               <button
