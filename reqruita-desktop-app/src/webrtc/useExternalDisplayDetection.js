@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /**
  * Custom hook to detect external displays via multiple methods
  * Detects:
- * - Multiple displays (external monitor, TV, etc.)
+ * - Multiple displays (external monitor, TV, connected via HDMI, etc.)
  * - Extended displays via screen mirroring or duplication
+ * - Cable plug-in events (HDMI, USB-C, DisplayPort, etc.)
  * 
  * Returns:
  * - displayInfo: Details about detected displays
@@ -16,7 +17,7 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
     const [hasExternalDisplay, setHasExternalDisplay] = useState(false);
     const [displayCount, setDisplayCount] = useState(1);
     const detectionIntervalRef = useRef(null);
-    const previousCountRef = useRef({ count: 1, lastResolution: null });
+    const previousCountRef = useRef({ count: 1, lastResolution: null, lastScreens: null });
     const lastDetectionTimeRef = useRef(0);
 
     const detectDisplays = useCallback(async () => {
@@ -30,8 +31,6 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                     if (screens.length > 0) {
                         console.log(`%c✅ Screen Details API: ${screens.length} display(s) found`, 'color: #16a34a; font-weight: bold;');
                         
-                        setDisplayCount(screens.length);
-                        
                         const displaysList = screens.map((screen) => ({
                             width: screen.width,
                             height: screen.height,
@@ -42,6 +41,7 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                         }));
                         
                         setDisplayInfo(displaysList);
+                        setDisplayCount(screens.length);
                         
                         // External display = 2+ screens
                         const externalDetected = screens.length > 1;
@@ -49,9 +49,11 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                         
                         if (externalDetected !== (previousCountRef.current.count > 1)) {
                             console.warn(`%c⚠️  EXTERNAL DISPLAY ${externalDetected ? 'DETECTED' : 'DISCONNECTED'}`, 'color: #dc2626; font-weight: bold; font-size: 14px;');
+                            console.log(`%c  Displays: ${screens.map(s => `${s.width}x${s.height}${s.isPrimary ? ' (primary)' : ''}`).join(', ')}`, 'color: #dc2626;');
                             onExternalDisplayDetected?.(externalDetected, displaysList);
                         }
                         previousCountRef.current.count = screens.length;
+                        previousCountRef.current.lastScreens = screens;
                         return;
                     }
                 } catch (err) {
@@ -59,7 +61,7 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                 }
             }
 
-            // **FALLBACK 1: Monitor for resolution changes** (Extended display mode often changes available width)
+            // **FALLBACK 1: Monitor for resolution & screen density changes** 
             const screenWidth = window.screen.width;
             const screenHeight = window.screen.height;
             const availWidth = window.screen.availWidth;
@@ -68,37 +70,50 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
 
             // Store resolution history to detect when displays are added/removed
             if (!previousCountRef.current.lastResolution) {
-                previousCountRef.current.lastResolution = { width: screenWidth, height: screenHeight };
+                previousCountRef.current.lastResolution = { 
+                    width: screenWidth, 
+                    height: screenHeight,
+                    dpr: devicePixelRatio
+                };
             }
 
             const resolutionChanged = 
                 screenWidth !== previousCountRef.current.lastResolution.width || 
-                screenHeight !== previousCountRef.current.lastResolution.height;
+                screenHeight !== previousCountRef.current.lastResolution.height ||
+                devicePixelRatio !== previousCountRef.current.lastResolution.dpr;
 
             if (resolutionChanged) {
-                console.log(`%c📊 Resolution change detected: ${previousCountRef.current.lastResolution.width}x${previousCountRef.current.lastResolution.height} → ${screenWidth}x${screenHeight}`, 'color: #f59e0b;');
-                previousCountRef.current.lastResolution = { width: screenWidth, height: screenHeight };
+                console.log(`%c📊 Resolution/DPR change: ${previousCountRef.current.lastResolution.width}x${previousCountRef.current.lastResolution.height}@${previousCountRef.current.lastResolution.dpr} → ${screenWidth}x${screenHeight}@${devicePixelRatio}`, 'color: #f59e0b;');
+                previousCountRef.current.lastResolution = { width: screenWidth, height: screenHeight, dpr: devicePixelRatio };
             }
 
-            // **FALLBACK 2: High-res display check** (TV/Monitor typically 1920x1080+)
+            // **FALLBACK 2: Multiple detection methods**
+            // Check if screen is high resolution (external monitor typically >= 1920x1080)
             const isHighRes = screenWidth >= 1920 || screenHeight >= 1080;
             
-            // **FALLBACK 3: Check availWidth/availHeight difference** (Indicates extended display with different taskbar positions)
+            // Check available vs screen size difference (taskbar or extended display)
             const taskbarDiff = Math.abs((screenWidth - availWidth) + (screenHeight - availHeight));
             const hasTaskbarDifference = taskbarDiff > 100;
 
-            // More lenient detection: Flag if high-res OR resolution changed
-            let externalDetected = isHighRes || resolutionChanged || hasTaskbarDifference;
+            // Check if using a high device pixel ratio (typical of external displays)
+            const isHighDPI = devicePixelRatio >= 1.5;
 
-            setDisplayCount(externalDetected ? 2 : 1);
+            // More intelligent detection: Flag external display if:
+            // 1. High resolution detected AND resolution recently changed (cable plugged in)
+            // 2. OR resolution just changed (display switched/plugged)
+            // 3. OR taskbar indicates extended display
+            let externalDetected = (isHighRes && resolutionChanged) || resolutionChanged || hasTaskbarDifference;
+
+            const displayCount = externalDetected ? 2 : 1;
+            setDisplayCount(displayCount);
             setDisplayInfo([{ width: screenWidth, height: screenHeight, availWidth, availHeight, devicePixelRatio }]);
             setHasExternalDisplay(externalDetected);
 
             // Trigger callback on state change
             if (externalDetected !== (previousCountRef.current.count > 1)) {
                 console.warn(`%c⚠️  EXTERNAL DISPLAY ${externalDetected ? 'DETECTED' : 'DISCONNECTED'}`, 'color: #dc2626; font-weight: bold; font-size: 14px;');
-                console.log(`%c  Screen: ${screenWidth}x${screenHeight}, Available: ${availWidth}x${availHeight}`, 'color: #dc2626;');
-                onExternalDisplayDetected?.(externalDetected, [{ width: screenWidth, height: screenHeight, availWidth, availHeight }]);
+                console.log(`%c  Screen: ${screenWidth}x${screenHeight}, Available: ${availWidth}x${availHeight}, DPR: ${devicePixelRatio}`, 'color: #dc2626;');
+                onExternalDisplayDetected?.(externalDetected, [{ width: screenWidth, height: screenHeight, availWidth, availHeight, dpr: devicePixelRatio }]);
             }
             previousCountRef.current.count = externalDetected ? 2 : 1;
 
@@ -124,7 +139,6 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                     });
                     console.log("[Display Detection] Screen Details permission:", permission.state);
                     
-                    // If denied, we'll fall back to other methods
                     if (permission.state === "denied") {
                         console.warn("[Display Detection] Screen Details permission denied, using fallback methods");
                     }
@@ -138,16 +152,45 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
             // Initial detection
             await detectDisplays();
 
-            // Poll for changes every 500ms (more frequent detection)
-            detectionIntervalRef.current = setInterval(detectDisplays, 500);
+            // Poll for changes every 300ms (faster detection for cable plug-in events)
+            detectionIntervalRef.current = setInterval(detectDisplays, 300);
         };
 
         initDetection();
+
+        // **Add event listeners for screen changes**
+        const handleScreenChange = () => {
+            console.log("[Display Detection] Screen change event detected via orientationchange");
+            detectDisplays();
+        };
+
+        const handleResizeChange = () => {
+            console.log("[Display Detection] Screen change event detected via resize");
+            detectDisplays();
+        };
+
+        window.addEventListener("orientationchange", handleScreenChange);
+        window.addEventListener("resize", handleResizeChange);
+
+        // Listen for screen details change if available
+        if (window.screenDetails && window.screenDetails.addEventListener) {
+            try {
+                window.screenDetails.addEventListener("screenschange", () => {
+                    console.log("[Display Detection] Screen details screenschange event detected");
+                    detectDisplays();
+                });
+            } catch (err) {
+                console.debug("[Display Detection] Could not set up screenschange listener:", err.message);
+            }
+        }
 
         return () => {
             if (detectionIntervalRef.current) {
                 clearInterval(detectionIntervalRef.current);
             }
+            window.removeEventListener("orientationchange", handleScreenChange);
+            window.removeEventListener("resize", handleResizeChange);
+        };
         };
     }, [detectDisplays]);
 
