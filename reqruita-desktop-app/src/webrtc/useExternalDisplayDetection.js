@@ -97,7 +97,7 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
         } catch (err) {
             console.error("Display detection error:", err);
         }
-    }, [onExternalDisplayDetection]);
+    }, [onExternalDisplayDetected]);
 
     // Request permission and start monitoring
     useEffect(() => {
