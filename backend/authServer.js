@@ -76,7 +76,7 @@ const userSchema = new mongoose.Schema(
     address: { type: String, trim: true, default: '' },
     role: {
       type: String,
-      enum: ['admin', 'interviewer', 'recruiter', 'hr manager', 'candidate'],
+      enum: ['admin', 'interviewer'],
       required: true,
     },
     status: {
