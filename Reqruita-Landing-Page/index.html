@@ -1646,11 +1646,8 @@
                     localStorage.setItem('user', JSON.stringify(data.user));
 
                     // Role-Based Redirection with token
-                    if (data.user.role === 'admin') {
-                        window.location.href = `http://172.20.10.4:3000/?token=${data.token}`;
-                    } else if (data.user.role === 'interviewer') {
-                        alert(`Login successful! Welcome ${data.user.fullName}`);
-                        window.location.href = `http://172.20.10.4:3000/?token=${data.token}`;
+                    if (data.user.role === 'admin' || data.user.role === 'interviewer') {
+                        window.location.href = `http://localhost:3000/?token=${data.token}`;
                     } else {
                         alert("Invalid role. Please contact support.");
                     }
