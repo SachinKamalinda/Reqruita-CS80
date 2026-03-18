@@ -269,7 +269,15 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         });
     }, [localScreenStream, addToast]);
 
-
+    // 8) Auto-start screen share on join
+    useEffect(() => {
+        if (!autoShareAttemptedRef.current && startScreenShare) {
+            autoShareAttemptedRef.current = true;
+            startScreenShare().catch((err) => {
+                console.log("Auto screen share canceled/failed:", err);
+            });
+        }
+    }, [startScreenShare]);
 
     function toggleMic() {
         setMicMuted((v) => !v);
