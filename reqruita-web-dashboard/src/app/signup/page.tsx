@@ -171,12 +171,6 @@ export default function SignupPage() {
                     onChange={handleInputChange}
                     className={`${inputBase} pr-20`}
                   />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-purple-600 hover:text-purple-700 transition-colors"
-                  >
-                    Verify
-                  </button>
                 </div>
               </div>
 
@@ -312,12 +306,6 @@ export default function SignupPage() {
                     onChange={handleInputChange}
                     className={`${inputBase} pr-20`}
                   />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-purple-600 hover:text-purple-700 transition-colors"
-                  >
-                    Verify
-                  </button>
                 </div>
               </div>
 
