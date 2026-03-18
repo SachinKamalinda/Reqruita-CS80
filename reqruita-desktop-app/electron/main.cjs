@@ -22,6 +22,13 @@ function createWindow() {
     win = new BrowserWindow({
         width: 1100,
         height: 700,
+        title: "Reqruita",
+        titleBarStyle: "hidden",
+        titleBarOverlay: {
+            color: "#4b2fb6",
+            symbolColor: "#ffffff",
+            height: 32,
+        },
         autoHideMenuBar: true,
         webPreferences: {
             preload: path.join(__dirname, "preload.cjs"),
@@ -91,6 +98,18 @@ function setupInterviewModeIPC() {
 
         // If you want to prevent closing the window via X (optional):
         // win.setClosable(false);
+    });
+
+    ipcMain.handle("rq:enter-interviewer-mode", () => {
+        if (!win) return;
+        win.setKiosk(false);
+        win.setFullScreen(false);
+        win.setResizable(true);
+        win.setMinimizable(true);
+        win.setMaximizable(true);
+        win.maximize();
+        // Allow the interviewer to toggle fullscreen manually if they want
+        win.setFullScreenable(true);
     });
 
     ipcMain.handle("rq:exit-interview-mode", () => {

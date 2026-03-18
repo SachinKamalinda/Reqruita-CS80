@@ -109,6 +109,22 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Handle Full Window for Interviewer (Electron)
+    useEffect(() => {
+        try {
+            window.reqruita?.enterInterviewerMode?.();
+        } catch (e) {
+            // ignore in browser
+        }
+        return () => {
+            try {
+                window.reqruita?.exitInterviewMode?.();
+            } catch (e) {
+                // ignore
+            }
+        };
+    }, []);
+
     // Keep meeting non-scroll
     useEffect(() => {
         document.body.classList.add("rq-noscr");

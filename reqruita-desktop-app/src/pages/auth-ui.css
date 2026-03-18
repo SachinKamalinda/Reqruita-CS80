@@ -1,5 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
 
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #111827;
+  color-scheme: light;
+  font-family: "Lexend", sans-serif;
+}
+
 :root {
   --rq-primary: #4b2fb6;
   --rq-primary-hover: #3f27a0;
@@ -9,6 +25,60 @@
 
   /* space between UI and window edges */
   --rq-safe: 20px;
+  --rq-header-height: 32px;
+}
+
+/* ── Custom Window Header (Electron) ── */
+.rq-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--rq-header-height);
+  background: var(--rq-primary);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  -webkit-app-region: drag;
+  z-index: 10000;
+  color: #ffffff;
+  font-family: "Lexend", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rq-header-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.rq-header-title {
+  letter-spacing: 0.02em;
+}
+
+/* ── Root Page Container ── */
+.rq-page {
+  height: 100%;
+  width: 100%;
+  padding-top: var(--rq-header-height);
+  transition: opacity 180ms ease, transform 180ms ease;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.rq-page-enter {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.rq-page-exit {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 /*  Toast Notifications  */
@@ -39,18 +109,6 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   max-width: 380px;
   min-width: 260px;
-}
-
-/*  Page Transitions  */
-.rq-page {
-  height: 100%;
-  width: 100%;
-  transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.rq-page-enter {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 .rq-page-exit {
@@ -1120,8 +1178,8 @@ body.rq-noscr {
 
 /* Interviewee cam tile (bottom-left) */
 .mt-tile-peer {
-  width: 300px;
-  height: 188px;
+  width: 240px; /* Reduced from 300px */
+  height: 150px; /* Reduced from 188px */
   left: 0;
   bottom: 0;
   border-bottom-left-radius: 0;
@@ -1130,8 +1188,8 @@ body.rq-noscr {
 
 /* Interviewer self tile (bottom-right above footer) */
 .mt-tile-self {
-  width: 340px;
-  height: 212px;
+  width: 280px; /* Reduced from 340px */
+  height: 175px; /* Reduced from 212px */
   right: 0;
   bottom: 0;
   border-bottom-right-radius: 0;
@@ -1153,17 +1211,17 @@ body.rq-noscr {
 
 /* Larger tiles when sharing is active for more professional feel */
 .mt-sharing-active .mt-tile-peer {
-  width: 380px;
-  height: 238px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  width: 300px; /* Reduced from 380px */
+  height: 188px; /* Reduced from 238px */
+  box-shadow: 0 20px 50px rgba(75, 47, 182, 0.3);
   bottom: 0;
   left: 0;
 }
 
 .mt-sharing-active .mt-tile-self {
-  width: 420px;
-  height: 262px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  width: 340px; /* Reduced from 420px */
+  height: 212px; /* Reduced from 262px */
+  box-shadow: 0 20px 50px rgba(75, 47, 182, 0.3);
   bottom: 0;
   right: 0;
 }
@@ -1326,12 +1384,12 @@ body.rq-noscr {
   bottom: calc(var(--rq-safe) + 72px);
   width: 320px;
   border-radius: 14px;
-  background: rgba(15, 23, 48, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1.5px solid rgba(75, 47, 182, 0.2);
+  box-shadow: 0 18px 40px rgba(75, 47, 182, 0.15);
   backdrop-filter: blur(14px);
   padding: 10px;
-  color: rgba(255, 255, 255, 0.92);
+  color: #1a1a2e;
 }
 
 .mt-menu h4 {
@@ -2383,7 +2441,7 @@ body.rq-noscr {
 .jm-side {
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1.5px solid rgba(75, 47, 182, 0.2);
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
   display: grid;
@@ -2391,7 +2449,9 @@ body.rq-noscr {
   gap: 12px;
   padding: 12px;
   min-height: 0;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  box-shadow: 
+    0 10px 30px rgba(75, 47, 182, 0.08),
+    0 0 15px rgba(75, 47, 182, 0.05);
 }
 
 .jm-tile {
