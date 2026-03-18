@@ -10,11 +10,14 @@ import FileExplorer from "../components/FileExplorer";
  */
 export default function MeetingWorkspace() {
     // activePanel: 'google' | 'files' | 'pdf'
-    const [activePanel, setActivePanel] = useState('google');
+    // Read initial panel from URL param (e.g. ?view=workspace&panel=files)
+    const initialPanel = new URLSearchParams(window.location.search).get('panel') || 'google';
+    const [activePanel, setActivePanel] = useState(initialPanel);
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
 
     useEffect(() => {
+        document.title = "Reqruita-Workspace-Source";
         document.body.classList.add("rq-noscr");
         return () => document.body.classList.remove("rq-noscr");
     }, []);
@@ -28,16 +31,12 @@ export default function MeetingWorkspace() {
                         <div className="jm-google-shell">
                             <div className="jm-google-bar">
                                 <div className="jm-google-badge sm">G</div>
-                                <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: 'rgba(255,255,255,0.92)' }}>Google Workspace</div>
-                                <button className="jm-google-btn sm" onClick={() => setActivePanel('files')} style={{ height: 28, fontSize: 11, padding: '0 12px' }}>
-                                    Open Files
-                                </button>
+                                <div style={{ flex: 1, fontWeight: 800, fontSize: 13, color: '#1e293b' }}>Google Search</div>
                             </div>
                             <iframe
                                 className="jm-google-frame"
                                 title="Google"
                                 src="https://www.google.com/webhp?igu=1"
-                                referrerPolicy="no-referrer"
                             />
                         </div>
                     )}
