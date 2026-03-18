@@ -11,6 +11,7 @@ const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
 const connectMongo = require("./chatBackend");
+const { logExternalDisplayIncident } = require("./ExternalDisplayLog");
 
 const app = express();
 const PORT = 3001;
@@ -222,6 +223,70 @@ app.get("/api/chat/:interviewId", async (req, res) => {
     }
 });
 
+// -------------------- EXTERNAL DISPLAY AUDIT ENDPOINTS --------------------
+
+/**
+ * GET /api/external-display/incidents/:interviewId
+ * Get all external display incidents for a specific interview
+ */
+app.get("/api/external-display/incidents/:interviewId", (req, res) => {
+    const { interviewId } = req.params;
+    const { getIncidentsForInterview } = require("./ExternalDisplayLog");
+
+    try {
+        const incidents = getIncidentsForInterview(interviewId);
+        res.json({
+            interviewId,
+            count: incidents.length,
+            incidents,
+        });
+    } catch (err) {
+        res.status(500).json({
+            error: "Failed to retrieve external display incidents",
+            details: err.message,
+        });
+    }
+});
+
+/**
+ * GET /api/external-display/high-severity
+ * Get all high-severity incidents (external display detected)
+ */
+app.get("/api/external-display/high-severity", (req, res) => {
+    const { getHighSeverityIncidents } = require("./ExternalDisplayLog");
+
+    try {
+        const incidents = getHighSeverityIncidents();
+        res.json({
+            severity: "HIGH",
+            count: incidents.length,
+            incidents,
+        });
+    } catch (err) {
+        res.status(500).json({
+            error: "Failed to retrieve high-severity incidents",
+            details: err.message,
+        });
+    }
+});
+
+/**
+ * GET /api/external-display/statistics
+ * Get external display detection statistics
+ */
+app.get("/api/external-display/statistics", (req, res) => {
+    const { getStatistics } = require("./ExternalDisplayLog");
+
+    try {
+        const stats = getStatistics();
+        res.json(stats);
+    } catch (err) {
+        res.status(500).json({
+            error: "Failed to retrieve statistics",
+            details: err.message,
+        });
+    }
+});
 
 // -------------------- SOCKET.IO (SIGNALING) --------------------
 // WebRTC needs signaling: offer/answer/ice messages.
@@ -302,6 +367,61 @@ io.on("connection", (socket) => {
         } catch (err) {
             console.error("Failed to save chat message to DB (message was still delivered):", err.message);
         }
+    });
+
+    // ✅ Handle external display alerts from candidates
+    socket.on("external-display-alert", (data) => {
+        const {
+            interviewId,
+            candidateName,
+            detected,
+            displayCount,
+            displays,
+            timestamp,
+        } = data;
+
+        if (!interviewId) return;
+
+        console.log(
+            `External Display Alert - Interview: ${interviewId}, Candidate: ${candidateName}, Detected: ${detected}, Count: ${displayCount}`
+        );
+
+        // Log the incident for audit/compliance
+        try {
+            logExternalDisplayIncident({
+                interviewId,
+                candidateName,
+                detected,
+                displayCount,
+                displays,
+                timestamp,
+            });
+        } catch (err) {
+            console.error("Failed to log external display incident:", err);
+        }
+
+        // Broadcast the alert to all users in the interview room
+        // This ensures the interviewer and any observers are notified
+        io.to(`chat:${interviewId}`).emit("external-display-alert", {
+            interviewId,
+            candidateName,
+            detected,
+            displayCount,
+            displays,
+            timestamp,
+            serverTimestamp: new Date().toISOString(),
+        });
+
+        // Also send a copy to the WebRTC room in case different socket connections
+        io.to(interviewId).emit("external-display-alert", {
+            interviewId,
+            candidateName,
+            detected,
+            displayCount,
+            displays,
+            timestamp,
+            serverTimestamp: new Date().toISOString(),
+        });
     });
 });
 

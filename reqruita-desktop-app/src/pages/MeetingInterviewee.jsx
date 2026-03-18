@@ -4,7 +4,9 @@ import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
+import { useExternalDisplayDetection } from "../webrtc/useExternalDisplayDetection";
 import FileExplorer from "../components/FileExplorer";
+import ExternalDisplayWarning from "../components/ExternalDisplayWarning";
 
 
 /**
@@ -40,6 +42,10 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
 
+    // External Display Detection
+    const [externalDisplayDetected, setExternalDisplayDetected] = useState(false);
+    const [externalDisplayCount, setExternalDisplayCount] = useState(1);
+    const signalingSentRef = useRef(false);
 
     // Chat UI
     const [chatOpen, setChatOpen] = useState(false);
@@ -69,6 +75,36 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         setMicEnabled,
         setCamEnabled,
     } = useWebRTC({ meetingId, role: "interviewee" });
+
+    // ✅ External Display Detection Hook
+    const { displayInfo, hasExternalDisplay, displayCount } = useExternalDisplayDetection(
+        (detected, displays) => {
+            setExternalDisplayDetected(detected);
+            setExternalDisplayCount(displays?.length || 1);
+
+            // Notify interviewer via socket when display detection changes
+            if (chatSocketRef.current && meetingId && !signalingSentRef.current) {
+                chatSocketRef.current.emit("external-display-alert", {
+                    interviewId: meetingId,
+                    candidateName,
+                    detected,
+                    displayCount: displays?.length || 1,
+                    displays: displays?.map((d) => ({
+                        width: d.width,
+                        height: d.height,
+                        isPrimary: d.isPrimary,
+                        isInternal: d.isInternal,
+                    })),
+                    timestamp: new Date().toISOString(),
+                });
+                signalingSentRef.current = true;
+                // Reset after 5 seconds to allow repeated notifications
+                setTimeout(() => {
+                    signalingSentRef.current = false;
+                }, 5000);
+            }
+        }
+    );
 
     //chat shocket connection
     useEffect(() => {
@@ -324,6 +360,13 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
     return (
         <div className={`jm-wrap ${sharing ? "jm-sharing-active" : ""}`}>
+            {/* ✅ External Display Warning */}
+            <ExternalDisplayWarning
+                visible={externalDisplayDetected}
+                variant="candidate"
+                displayCount={externalDisplayCount}
+            />
+
             {error && (
                 <div className="mt-err" style={{ background: "rgba(220,38,38,0.92)" }}>
                     {error}

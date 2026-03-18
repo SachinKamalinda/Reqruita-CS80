@@ -4,6 +4,7 @@ import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
+import ExternalDisplayWarning from "../components/ExternalDisplayWarning";
 
 /**
  * MeetingInterviewer.jsx (FINAL - WebRTC + Participants Panel)
@@ -60,6 +61,10 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
     // Participants state
     const [participants, setParticipants] = useState([]);
+
+    // External Display Detection - Candidate using external display
+    const [candidateExternalDisplay, setCandidateExternalDisplay] = useState(false);
+    const [candidateDisplayCount, setCandidateDisplayCount] = useState(1);
 
     // ✅ WebRTC hook (local cam+mic + remote cam + remote screen)
     const {
@@ -165,6 +170,21 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
             if (msg.senderRole !== "interviewer" && !panelOpenRef.current) {
                 setUnreadCount((n) => n + 1);
                 addToast?.(`${msg.senderName || "Candidate"}: ${msg.message}`, "info");
+            }
+        });
+
+        // ✅ Listen for external display alerts from candidate
+        socket.on("external-display-alert", (data) => {
+            console.log("External display alert from candidate:", data);
+            setCandidateExternalDisplay(data.detected);
+            setCandidateDisplayCount(data.displayCount || 1);
+            
+            // Show toast notification to interviewer
+            if (data.detected) {
+                addToast?.(
+                    `⚠️ ${data.candidateName || "Candidate"} is using ${data.displayCount} display(s)!`,
+                    "warning"
+                );
             }
         });
 
@@ -402,6 +422,13 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
     return (
         <div className="mt-wrap">
+            {/* ✅ External Display Warning - Candidate using external display */}
+            <ExternalDisplayWarning
+                visible={candidateExternalDisplay}
+                variant="interviewer"
+                displayCount={candidateDisplayCount}
+            />
+
             {error && <div className="mt-err">{error}</div>}
 
             {/* Connection status indicator */}
