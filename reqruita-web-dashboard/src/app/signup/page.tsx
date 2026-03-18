@@ -48,9 +48,8 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       const result = await signup(formData);
-      saveToken(result.token);
-      saveUser(result.user);
-      router.push('/payment');
+      // Redirect to email verification page instead of saving token
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -172,12 +171,6 @@ export default function SignupPage() {
                     onChange={handleInputChange}
                     className={`${inputBase} pr-20`}
                   />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-purple-600 hover:text-purple-700 transition-colors"
-                  >
-                    Verify
-                  </button>
                 </div>
               </div>
 
@@ -313,12 +306,6 @@ export default function SignupPage() {
                     onChange={handleInputChange}
                     className={`${inputBase} pr-20`}
                   />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-purple-600 hover:text-purple-700 transition-colors"
-                  >
-                    Verify
-                  </button>
                 </div>
               </div>
 
@@ -408,18 +395,18 @@ export default function SignupPage() {
                   'Create Account'
                 )}
               </button>
-
+              {/* Hiding social signups temporarily */}
               {/* Divider */}
-              <div className="flex items-center gap-4 pt-1">
+              {/* <div className="flex items-center gap-4 pt-1">
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                 <span className="text-xs text-gray-400 font-medium tracking-wider uppercase">
                   or
                 </span>
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
-              </div>
+              </div> */}
 
               {/* Social Buttons */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
                   className="border border-gray-200 rounded-xl py-2.5 flex items-center justify-center gap-2.5 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 group"
@@ -469,7 +456,7 @@ export default function SignupPage() {
                     Sign-up with Microsoft
                   </span>
                 </button>
-              </div>
+              </div> */}
             </form>
           </div>
         </div>

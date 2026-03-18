@@ -23,6 +23,10 @@ export interface ApiError {
   message: string;
 }
 
+export interface MessageResponse {
+  message: string;
+}
+
 // ── Token helpers ────────────────────────────────────────────────────────────
 
 export function saveToken(token: string): void {
@@ -115,4 +119,71 @@ export async function fetchMe(): Promise<AuthUser> {
     throw new Error((data as ApiError).message || 'Failed to fetch user');
   }
   return (data as { user: AuthUser }).user;
+}
+
+export interface ForgotPasswordRequestPayload {
+  email: string;
+}
+
+export async function requestPasswordReset(
+  payload: ForgotPasswordRequestPayload,
+): Promise<MessageResponse> {
+  const res = await fetch(`${AUTH_API_BASE}/api/forgot-password/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error((data as ApiError).message || 'Failed to send reset OTP');
+  }
+
+  return data as MessageResponse;
+}
+
+export interface ResetPasswordWithOtpPayload {
+  email: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export async function resetPasswordWithOtp(
+  payload: ResetPasswordWithOtpPayload,
+): Promise<MessageResponse> {
+  const res = await fetch(`${AUTH_API_BASE}/api/forgot-password/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error((data as ApiError).message || 'Failed to reset password');
+  }
+
+  return data as MessageResponse;
+}
+
+export interface VerifyEmailPayload {
+  email: string;
+  otp: string;
+}
+
+export async function verifyEmail(
+  payload: VerifyEmailPayload,
+): Promise<AuthResponse> {
+  const res = await fetch(`${AUTH_API_BASE}/api/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error((data as ApiError).message || 'Failed to verify email');
+  }
+
+  return data as AuthResponse;
 }

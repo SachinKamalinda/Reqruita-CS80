@@ -6,6 +6,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const crypto = require('crypto');
+const { Resend } = require('resend');
 
 const app = express();
 app.use(express.json());
@@ -17,6 +19,17 @@ require('dotenv').config();
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/reqruita';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key_here';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || '';
+const RESEND_FROM_NAME = process.env.RESEND_FROM_NAME || 'Reqruita';
+const RESET_OTP_EXPIRES_MINUTES = Number(
+  process.env.RESET_OTP_EXPIRES_MINUTES || 10,
+);
+const RESET_PASSWORD_WEB_URL =
+  process.env.RESET_PASSWORD_WEB_URL ||
+  'http://localhost:3000/forgot-password';
+
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 mongoose
   .connect(MONGO_URI)
@@ -36,6 +49,12 @@ mongoose
       );
     }
   });
+
+if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
+  console.warn(
+    'Resend is not fully configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL to send forgot-password emails.',
+  );
+}
 
 // --- User Model ---
 const userSchema = new mongoose.Schema(
@@ -60,15 +79,63 @@ const userSchema = new mongoose.Schema(
       enum: ['admin', 'interviewer', 'recruiter', 'hr manager', 'candidate'],
       required: true,
     },
+    isEmailVerified: { type: Boolean, default: false },
+    emailVerificationOtpHash: { type: String, default: null },
+    emailVerificationOtpExpiresAt: { type: Date, default: null },
+    emailVerificationOtpSentAt: { type: Date, default: null },
+    resetPasswordOtpHash: { type: String, default: null },
+    resetPasswordOtpExpiresAt: { type: Date, default: null },
+    resetPasswordOtpSentAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
 
 const User = mongoose.model('User', userSchema);
 
+const isValidEmail = (email) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+const sendEmail = async ({ to, firstName, otp, subject, type, resetUrl }) => {
+  if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
+    console.warn('[Email] Skipping email because Resend is not configured.');
+    return false;
+  }
+
+  const from = RESEND_FROM_NAME
+    ? `${RESEND_FROM_NAME} <${RESEND_FROM_EMAIL}>`
+    : RESEND_FROM_EMAIL;
+
+  let text = '';
+  if (type === 'verify-email') {
+    text = `Hi ${firstName || 'there'},\n\nWelcome to Reqruita! Please verify your email with this code:\n\n${otp}\n\nThis code expires in 15 minutes.\n\nIf you did not create this account, please ignore this email.`;
+  } else if (type === 'signin-verification') {
+    text = `Hi ${firstName || 'there'},\n\nVerify your sign-in with this code:\n\n${otp}\n\nThis code expires in 15 minutes.\n\nIf you did not attempt to sign in, please ignore this email.`;
+  } else if (type === 'reset-password') {
+    text = `Hi ${firstName || 'there'},\n\nReset your Reqruita password with this code:\n\n${otp}\n\nThis code expires in ${RESET_OTP_EXPIRES_MINUTES} minutes.\n\nReset here: ${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+  }
+
+  try {
+    const emailData = {
+      from,
+      to,
+      subject,
+      text,
+    };
+
+    console.log(`[Email] Sending ${type} email to:`, to);
+    const response = await resend.emails.send(emailData);
+    console.log(`[Email] ${type} email sent successfully`);
+    return true;
+  } catch (error) {
+    console.error(`[Email] Failed to send ${type} email:`, error);
+    return false;
+  }
+};
+
 // --- Routes ---
 
-// 1. Registration Route - Handles creating new Admin accounts from the web dashboard signup
+// 1. Registration Route - Creates account and sends email verification OTP
 app.post('/api/register', async (req, res) => {
   try {
     const {
@@ -84,11 +151,17 @@ app.post('/api/register', async (req, res) => {
       address,
     } = req.body;
 
+    const normalizedEmail = (email || '').trim().toLowerCase();
+
     // Basic field validation
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !normalizedEmail || !password) {
       return res.status(400).json({
         message: 'First name, last name, email, and password are required.',
       });
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email.' });
     }
 
     if (password !== confirmPassword) {
@@ -102,7 +175,7 @@ app.post('/api/register', async (req, res) => {
     }
 
     // Check for existing account
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res
         .status(400)
@@ -112,10 +185,15 @@ app.post('/api/register', async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Generate email verification OTP
+    const verificationOtp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = await bcrypt.hash(verificationOtp, 10);
+    const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
     const newUser = new User({
       firstName,
       lastName,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       phoneNumber: phoneNumber || '',
       companyName: companyName || '',
@@ -123,40 +201,45 @@ app.post('/api/register', async (req, res) => {
       country: country || '',
       address: address || '',
       role: 'admin',
+      isEmailVerified: false,
+      emailVerificationOtpHash: otpHash,
+      emailVerificationOtpExpiresAt: otpExpiresAt,
+      emailVerificationOtpSentAt: new Date(),
     });
 
     await newUser.save();
 
-    const token = jwt.sign(
-      { id: newUser._id, role: newUser.role },
-      JWT_SECRET,
-      { expiresIn: '24h' },
-    );
+    // Send verification email
+    await sendEmail({
+      to: normalizedEmail,
+      firstName,
+      otp: verificationOtp,
+      subject: 'Verify your Reqruita email',
+      type: 'verify-email',
+    });
 
     res.status(201).json({
-      message: 'Account created successfully!',
-      token,
-      user: {
-        id: newUser._id,
-        fullName: `${newUser.firstName} ${newUser.lastName}`,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        email: newUser.email,
-        role: newUser.role,
-      },
+      message: 'Account created! Please verify your email to complete signup.',
+      requiresEmailVerification: true,
+      email: normalizedEmail,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 2. Login Route - Verifies credentials and provides a secure session token
+// 2. Login Route - Verifies credentials and sends email verification OTP if not yet verified
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
 
     // Find the user in the database by their email
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
@@ -167,8 +250,33 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
+    // If email not verified, send verification OTP
+    if (!user.isEmailVerified) {
+      const verificationOtp = crypto.randomInt(100000, 1000000).toString();
+      const otpHash = await bcrypt.hash(verificationOtp, 10);
+      const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+      user.emailVerificationOtpHash = otpHash;
+      user.emailVerificationOtpExpiresAt = otpExpiresAt;
+      user.emailVerificationOtpSentAt = new Date();
+      await user.save();
+
+      await sendEmail({
+        to: normalizedEmail,
+        firstName: user.firstName,
+        otp: verificationOtp,
+        subject: 'Verify your Reqruita email',
+        type: 'signin-verification',
+      });
+
+      return res.json({
+        message: 'Please verify your email to complete sign-in.',
+        requiresEmailVerification: true,
+        email: normalizedEmail,
+      });
+    }
+
     // Create a JSON Web Token (JWT) containing the user's ID and role
-    // This token is used by the frontend to prove the user is authenticated
     const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
       expiresIn: '24h',
     });
@@ -187,6 +295,171 @@ app.post('/api/login', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 2.5 Email Verification - Verifies OTP and completes email verification
+app.post('/api/verify-email', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const normalizedOtp = (otp || '').trim();
+
+    if (!normalizedEmail || !normalizedOtp) {
+      return res.status(400).json({ message: 'Email and OTP are required.' });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user || !user.emailVerificationOtpHash || !user.emailVerificationOtpExpiresAt) {
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+
+    if (new Date() > new Date(user.emailVerificationOtpExpiresAt)) {
+      user.emailVerificationOtpHash = null;
+      user.emailVerificationOtpExpiresAt = null;
+      user.emailVerificationOtpSentAt = null;
+      await user.save();
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+
+    const isOtpValid = await bcrypt.compare(normalizedOtp, user.emailVerificationOtpHash);
+    if (!isOtpValid) {
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+
+    // Mark email as verified
+    user.isEmailVerified = true;
+    user.emailVerificationOtpHash = null;
+    user.emailVerificationOtpExpiresAt = null;
+    user.emailVerificationOtpSentAt = null;
+    await user.save();
+
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, {
+      expiresIn: '24h',
+    });
+
+    res.json({
+      message: 'Email verified successfully!',
+      token,
+      user: {
+        id: user._id,
+        fullName: `${user.firstName} ${user.lastName}`,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. Forgot Password Request - Sends OTP instructions to email if account exists
+app.post('/api/forgot-password/request', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
+
+    if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email.' });
+    }
+
+    const genericMessage =
+      'If an account exists with this email, reset instructions have been sent.';
+
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.json({ message: genericMessage });
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(
+      Date.now() + RESET_OTP_EXPIRES_MINUTES * 60 * 1000,
+    );
+
+    user.resetPasswordOtpHash = otpHash;
+    user.resetPasswordOtpExpiresAt = expiresAt;
+    user.resetPasswordOtpSentAt = new Date();
+    await user.save();
+
+    const resetUrl = `${RESET_PASSWORD_WEB_URL}?email=${encodeURIComponent(normalizedEmail)}`;
+
+    await sendEmail({
+      to: normalizedEmail,
+      firstName: user.firstName,
+      otp,
+      subject: 'Reset your Reqruita password',
+      type: 'reset-password',
+      resetUrl,
+    });
+
+    return res.json({ message: genericMessage });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 4. Forgot Password Reset - Verifies OTP and updates password
+app.post('/api/forgot-password/reset', async (req, res) => {
+  try {
+    const { email, otp, newPassword, confirmPassword } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
+    const normalizedOtp = (otp || '').trim();
+
+    if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email.' });
+    }
+
+    if (!normalizedOtp || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        message: 'Email, OTP, new password, and confirm password are required.',
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match.' });
+    }
+
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ message: 'Password must be at least 8 characters.' });
+    }
+
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user || !user.resetPasswordOtpHash || !user.resetPasswordOtpExpiresAt) {
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+
+    if (new Date() > new Date(user.resetPasswordOtpExpiresAt)) {
+      user.resetPasswordOtpHash = null;
+      user.resetPasswordOtpExpiresAt = null;
+      user.resetPasswordOtpSentAt = null;
+      await user.save();
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+
+    const isOtpValid = await bcrypt.compare(normalizedOtp, user.resetPasswordOtpHash);
+    if (!isOtpValid) {
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.resetPasswordOtpHash = null;
+    user.resetPasswordOtpExpiresAt = null;
+    user.resetPasswordOtpSentAt = null;
+    await user.save();
+
+    return res.json({ message: 'Password reset successful. Please sign in.' });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -213,7 +486,7 @@ const usersAndRolesRouter = require('./dashboard/usersAndRoles')(
 );
 app.use('/api/dashboard/users', usersAndRolesRouter);
 
-// 4. Get current user - Returns the authenticated user's profile
+// 5. Get current user - Returns the authenticated user's profile
 app.get('/api/me', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');

@@ -33,6 +33,14 @@ export default function SigninPage() {
         email: formData.email,
         password: formData.password,
       });
+
+      // Check if email verification is required
+      if ((result as any).requiresEmailVerification) {
+        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+        return;
+      }
+
+      // Email is verified, proceed with login
       saveToken(result.token);
       saveUser(result.user);
       router.push('/home');
@@ -134,12 +142,7 @@ export default function SigninPage() {
                   <label className="block text-[13px] font-semibold text-gray-700 tracking-[0.01em]">
                     Password
                   </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-[13px] font-medium text-purple-600 hover:text-purple-700 transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
+                
                 </div>
                 <div className="relative">
                   <input
@@ -197,46 +200,13 @@ export default function SigninPage() {
                     )}
                   </button>
                 </div>
-              </div>
-
-              {/* Remember Me */}
-              <label className="flex items-center gap-2.5 cursor-pointer select-none group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div
-                    className={`w-4.5 h-4.5 rounded-[5px] border-[1.5px] flex items-center justify-center transition-all duration-150 ${
-                      rememberMe
-                        ? 'bg-purple-600 border-purple-600'
-                        : 'bg-white border-gray-300 group-hover:border-purple-400'
-                    }`}
-                    style={{ width: '18px', height: '18px' }}
+                  <Link
+                    href="/forgot-password"
+                    className="text-[13px] self-end mt-2 font-medium text-purple-600 hover:text-purple-700 transition-colors"
                   >
-                    {rememberMe && (
-                      <svg
-                        className="w-2.5 h-2.5 text-white"
-                        fill="none"
-                        viewBox="0 0 12 12"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2 6l3 3 5-5"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-                <span className="text-[13px] font-medium text-gray-600">
-                  Remember me for 30 days
-                </span>
-              </label>
+                    Forgot password?
+                  </Link>
+              </div>
 
               {/* Submit */}
               <button
@@ -273,17 +243,18 @@ export default function SigninPage() {
                 )}
               </button>
 
+              {/* Hiding social signin options temporarily */}
               {/* Divider */}
-              <div className="flex items-center gap-4 pt-1">
+              {/* <div className="flex items-center gap-4 pt-1">
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
                 <span className="text-xs text-gray-400 font-medium tracking-wider uppercase">
                   or
                 </span>
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
-              </div>
+              </div> */}
 
               {/* Social Buttons */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
                   className="border border-gray-200 rounded-xl py-2.5 flex items-center justify-center gap-2.5 hover:bg-gray-50 hover:border-gray-300 transition-all duration-150 group"
@@ -333,7 +304,7 @@ export default function SigninPage() {
                     Sign in with Microsoft
                   </span>
                 </button>
-              </div>
+              </div> */}
 
               {/* Sign up link */}
               <p className="text-center text-sm text-gray-500 pt-1">
