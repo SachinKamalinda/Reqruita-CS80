@@ -42,19 +42,51 @@ module.exports = (User, authenticateToken) => {
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(password, salt);
 
-            // Create new user, optionally capitalising the default Full Name based on role
             const fullName = role.charAt(0).toUpperCase() + role.slice(1);
+            const firstName = fullName;
+            const lastName = "User";
 
             const newUser = new User({
-                fullName,
+                firstName,
+                lastName,
                 email,
                 password: hashedPassword,
                 visiblePassword: password, // For dashboard viewing as requested
-                role
+                role,
+                isMainAdmin: false
             });
 
             await newUser.save();
             res.status(201).json({ message: "User added successfully!", user: { id: newUser._id, email: newUser.email, role: newUser.role, visiblePassword: newUser.visiblePassword } });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Remove User Route - Admins only
+    router.delete('/:id', authenticateToken, async (req, res) => {
+        try {
+            if (req.user.role !== 'admin') {
+                return res.status(403).json({ message: "Access Denied: Requires Admin Role" });
+            }
+
+            const targetUserId = req.params.id;
+            const userToDelete = await User.findById(targetUserId);
+
+            if (!userToDelete) {
+                return res.status(404).json({ message: "User not found" });
+            }
+
+            if (userToDelete.isMainAdmin) {
+                return res.status(403).json({ message: "Cannot remove a Main Admin" });
+            }
+
+            if (targetUserId === req.user.id) {
+                return res.status(400).json({ message: "Cannot remove yourself" });
+            }
+
+            await User.findByIdAndDelete(targetUserId);
+            res.status(200).json({ message: "User successfully removed" });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
