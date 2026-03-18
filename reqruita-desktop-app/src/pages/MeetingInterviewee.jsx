@@ -83,7 +83,8 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             setExternalDisplayCount(displays?.length || 1);
 
             // Notify interviewer via socket when display detection changes
-            if (chatSocketRef.current && meetingId && !signalingSentRef.current) {
+            if (chatSocketRef.current?.connected && meetingId && !signalingSentRef.current) {
+                console.log("[External Display] Emitting alert to interviewer:", { detected, displayCount: displays?.length });
                 chatSocketRef.current.emit("external-display-alert", {
                     interviewId: meetingId,
                     candidateName,
@@ -102,6 +103,10 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 setTimeout(() => {
                     signalingSentRef.current = false;
                 }, 5000);
+            } else {
+                if (!chatSocketRef.current?.connected) {
+                    console.warn("[External Display] Socket not connected yet, queuing alert for retry");
+                }
             }
         },
         [meetingId, candidateName]
@@ -118,6 +123,15 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         // Create socket connection ONLY for chat
         const socket = io(BACKEND_URL);
         chatSocketRef.current = socket;
+
+        // When socket connects, retry sending external display alert if needed
+        socket.on("connect", () => {
+            console.log("[Socket] Chat socket connected");
+            // Reset flag to allow sending alert once socket is ready
+            if (hasExternalDisplay) {
+                signalingSentRef.current = false;
+            }
+        });
 
         // Join chat room (same interviewId as interviewer)
         socket.emit("join-chat", { interviewId: meetingId });
@@ -182,6 +196,30 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             })
             .catch(() => { });
     }, [meetingId]);
+
+    // Send external display alert once socket is ready
+    useEffect(() => {
+        if (externalDisplayDetected && chatSocketRef.current?.connected && !signalingSentRef.current) {
+            console.log("[External Display] Socket connected, sending delayed alert");
+            chatSocketRef.current.emit("external-display-alert", {
+                interviewId: meetingId,
+                candidateName,
+                detected: true,
+                displayCount: externalDisplayCount,
+                displays: displayInfo?.map((d) => ({
+                    width: d.width,
+                    height: d.height,
+                    isPrimary: d.isPrimary,
+                    isInternal: d.isInternal,
+                })),
+                timestamp: new Date().toISOString(),
+            });
+            signalingSentRef.current = true;
+            setTimeout(() => {
+                signalingSentRef.current = false;
+            }, 5000);
+        }
+    }, [externalDisplayDetected, meetingId, candidateName, externalDisplayCount, displayInfo]);
 
     // ── Auto-scroll chat ──
     useEffect(() => {

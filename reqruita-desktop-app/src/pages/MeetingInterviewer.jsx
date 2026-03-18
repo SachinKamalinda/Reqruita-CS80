@@ -144,6 +144,11 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         const socket = io(BACKEND_URL);
         chatSocketRef.current = socket;
 
+        // Log when socket connects
+        socket.on("connect", () => {
+            console.log("[Socket] Interviewer chat socket connected");
+        });
+
         // Join chat room
         socket.emit("join-chat", { interviewId: meetingId });
 
