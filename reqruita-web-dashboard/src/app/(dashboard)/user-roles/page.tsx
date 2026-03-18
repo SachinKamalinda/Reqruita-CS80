@@ -11,6 +11,9 @@ export default function UserRolesPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("interviewer");
 
+  // Current User State
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
   // Status State
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -25,7 +28,23 @@ export default function UserRolesPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      if (!token) return;
+      if (!token) {
+        window.location.href = "/signin";
+        return;
+      }
+
+      // decode token to get role
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUserRole(payload.role);
+        
+        if (payload.role !== 'admin') {
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.error("Error decoding token");
+      }
 
       const res = await fetch("http://localhost:3003/api/dashboard/users", {
         headers: { "Authorization": `Bearer ${token}` }
@@ -97,6 +116,31 @@ export default function UserRolesPage() {
     }
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to remove this user?")) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://localhost:3003/api/dashboard/users/${userId}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Failed to delete user");
+        setTimeout(() => setError(""), 3000);
+      } else {
+        setSuccess("User removed successfully");
+        fetchUsers();
+        setTimeout(() => setSuccess(""), 3000);
+      }
+    } catch (err) {
+      setError("Server error. Please try again.");
+      setTimeout(() => setError(""), 3000);
+    }
+  };
+
   const getRoleColor = (roleStr: string) => {
     switch (roleStr) {
       case 'admin': return 'bg-purple-100 text-purple-800';
@@ -128,47 +172,102 @@ export default function UserRolesPage() {
 
         {loading ? (
           <div className="text-center py-8 text-gray-500">Loading users...</div>
+        ) : currentUserRole !== 'admin' ? (
+          <div className="text-center py-8 text-red-500 font-medium">Access Denied. Only Administrators can view and manage users.</div>
         ) : users.length === 0 ? (
           <div className="text-center py-8 text-gray-500">No users found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="text-gray-400 border-b">
-                  <th className="py-3 font-medium">Name</th>
-                  <th className="py-3 font-medium">Email</th>
-                  <th className="py-3 font-medium">Assigned Passkey</th>
-                  <th className="py-3 font-medium">Role</th>
-                  <th className="py-3 font-medium">Status</th>
-                  <th className="py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {users.map((user: any) => (
-                  <tr key={user._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-4 font-medium">{user.fullName}</td>
-                    <td className="py-4 text-gray-600">{user.email}</td>
-                    <td className="py-4 text-gray-500 font-mono text-xs">
-                      {user.visiblePassword ? user.visiblePassword : '••••••••'}
-                    </td>
-                    <td className="py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getRoleColor(user.role)}`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="py-4">
-                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold">
-                        Active
-                      </span>
-                    </td>
-                    <td className="py-4 flex gap-3">
-                      <button className="text-[#5D20B3] text-sm hover:underline font-medium">Edit</button>
-                      <button className="text-red-600 text-sm hover:underline font-medium">Remove</button>
-                    </td>
+          <div className="space-y-8">
+            {/* Admins Table */}
+            <div className="overflow-x-auto">
+              <h3 className="text-lg font-semibold mb-4 text-[#5D20B3]">Administrators</h3>
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-gray-400 border-b">
+                    <th className="py-3 font-medium">Name</th>
+                    <th className="py-3 font-medium">Email</th>
+                    <th className="py-3 font-medium">Assigned Passkey</th>
+                    <th className="py-3 font-medium">Role</th>
+                    <th className="py-3 font-medium">Status</th>
+                    <th className="py-3 font-medium">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {users.filter(u => u.role === 'admin' || u.isMainAdmin).map((user: any) => (
+                    <tr key={user._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-4 font-medium">{user.fullName} {user.isMainAdmin && <span className="ml-2 text-xs bg-purple-200 text-purple-900 px-2 py-0.5 rounded-full">Main Admin</span>}</td>
+                      <td className="py-4 text-gray-600">{user.email}</td>
+                      <td className="py-4 text-gray-500 font-mono text-xs">
+                        {user.visiblePassword ? user.visiblePassword : '••••••••'}
+                      </td>
+                      <td className="py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getRoleColor(user.role)}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold">
+                          Active
+                        </span>
+                      </td>
+                      <td className="py-4 flex gap-3">
+                        <button className="text-[#5D20B3] text-sm hover:underline font-medium">Edit</button>
+                        {!user.isMainAdmin && (
+                          <button onClick={() => handleDeleteUser(user._id)} className="text-red-600 text-sm hover:underline font-medium">Remove</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Interviewers Table */}
+            <div className="overflow-x-auto pt-6 border-t">
+              <h3 className="text-lg font-semibold mb-4 text-blue-600">Interviewers</h3>
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-gray-400 border-b">
+                    <th className="py-3 font-medium">Name</th>
+                    <th className="py-3 font-medium">Email</th>
+                    <th className="py-3 font-medium">Assigned Passkey</th>
+                    <th className="py-3 font-medium">Role</th>
+                    <th className="py-3 font-medium">Status</th>
+                    <th className="py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {users.filter(u => u.role === 'interviewer').map((user: any) => (
+                    <tr key={user._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-4 font-medium">{user.fullName}</td>
+                      <td className="py-4 text-gray-600">{user.email}</td>
+                      <td className="py-4 text-gray-500 font-mono text-xs">
+                        {user.visiblePassword ? user.visiblePassword : '••••••••'}
+                      </td>
+                      <td className="py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getRoleColor(user.role)}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold">
+                          Active
+                        </span>
+                      </td>
+                      <td className="py-4 flex gap-3">
+                        <button className="text-[#5D20B3] text-sm hover:underline font-medium">Edit</button>
+                        <button onClick={() => handleDeleteUser(user._id)} className="text-red-600 text-sm hover:underline font-medium">Remove</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {users.filter(u => u.role === 'interviewer').length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-4 text-center text-gray-500 text-sm">No interviewers found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
