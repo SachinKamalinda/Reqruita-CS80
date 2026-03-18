@@ -204,7 +204,13 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         if (!meetingId) return;
 
         fetch(`${BACKEND_URL}/api/chat/${meetingId}`)
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) {
+                    console.warn(`[Chat] Failed to load history: ${res.status}`);
+                    return [];
+                }
+                return res.json();
+            })
             .then((data) => {
                 if (Array.isArray(data)) {
                     const uiMessages = data.map((msg) => {
@@ -221,7 +227,9 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                     setMessages(uiMessages);
                 }
             })
-            .catch(() => { });
+            .catch((err) => {
+                console.warn("[Chat] Error loading history:", err.message);
+            });
     }, [meetingId]);
 
     // Auto-scroll chat to bottom on new messages

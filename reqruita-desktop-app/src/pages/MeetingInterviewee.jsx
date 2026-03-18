@@ -46,6 +46,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [externalDisplayDetected, setExternalDisplayDetected] = useState(false);
     const [externalDisplayCount, setExternalDisplayCount] = useState(1);
     const signalingSentRef = useRef(false);
+    const socketConnectedRef = useRef(false);
 
     // Chat UI
     const [chatOpen, setChatOpen] = useState(false);
@@ -83,9 +84,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             setExternalDisplayCount(displays?.length || 1);
 
             // Notify interviewer via socket when display detection changes
-            if (chatSocketRef.current?.connected && meetingId && !signalingSentRef.current) {
+            if (socketConnectedRef.current && meetingId && !signalingSentRef.current) {
                 console.log("[External Display] Emitting alert to interviewer:", { detected, displayCount: displays?.length });
-                chatSocketRef.current.emit("external-display-alert", {
+                chatSocketRef.current?.emit("external-display-alert", {
                     interviewId: meetingId,
                     candidateName,
                     detected,
@@ -104,8 +105,8 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                     signalingSentRef.current = false;
                 }, 5000);
             } else {
-                if (!chatSocketRef.current?.connected) {
-                    console.warn("[External Display] Socket not connected yet, queuing alert for retry");
+                if (!socketConnectedRef.current) {
+                    console.warn("[External Display] Socket not connected yet, waiting for connection");
                 }
             }
         },
@@ -127,10 +128,16 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         // When socket connects, retry sending external display alert if needed
         socket.on("connect", () => {
             console.log("[Socket] Chat socket connected");
+            socketConnectedRef.current = true;
             // Reset flag to allow sending alert once socket is ready
             if (hasExternalDisplay) {
                 signalingSentRef.current = false;
             }
+        });
+
+        socket.on("disconnect", () => {
+            console.log("[Socket] Chat socket disconnected");
+            socketConnectedRef.current = false;
         });
 
         // Join chat room (same interviewId as interviewer)
@@ -177,7 +184,13 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         if (!meetingId) return;
 
         fetch(`${BACKEND_URL}/api/chat/${meetingId}`)
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) {
+                    console.warn(`[Chat] Failed to load history: ${res.status}`);
+                    return [];
+                }
+                return res.json();
+            })
             .then((data) => {
                 if (Array.isArray(data)) {
                     const uiMessages = data.map((msg) => {
@@ -194,14 +207,16 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                     setMessages(uiMessages);
                 }
             })
-            .catch(() => { });
+            .catch((err) => {
+                console.warn("[Chat] Error loading history:", err.message);
+            });
     }, [meetingId]);
 
     // Send external display alert once socket is ready
     useEffect(() => {
-        if (externalDisplayDetected && chatSocketRef.current?.connected && !signalingSentRef.current) {
+        if (externalDisplayDetected && socketConnectedRef.current && !signalingSentRef.current) {
             console.log("[External Display] Socket connected, sending delayed alert");
-            chatSocketRef.current.emit("external-display-alert", {
+            chatSocketRef.current?.emit("external-display-alert", {
                 interviewId: meetingId,
                 candidateName,
                 detected: true,

@@ -219,7 +219,9 @@ app.get("/api/chat/:interviewId", async (req, res) => {
         }).sort({ createdAt: 1 });
         res.json(messages);
     } catch (err) {
-        res.status(500).json({ error: "Failed to load chat" });
+        console.error("[Chat API Error]", err.message);
+        // Return empty array instead of error to allow app to continue
+        res.json([]);
     }
 });
 
