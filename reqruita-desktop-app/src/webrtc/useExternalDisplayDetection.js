@@ -43,15 +43,14 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                         
                         setDisplayInfo(displaysList);
                         
-                        // Detect external displays (non-primary or non-internal)
-                        const externalDetected = displaysList.some(
-                            (screen) => !screen.isPrimary || !screen.isInternal
-                        );
+                        // ✅ FIXED: Only detect external display if there are 2+ displays
+                        // A single screen is the primary display, no external display
+                        const externalDetected = displaysList.length > 1;
                         
                         setHasExternalDisplay(externalDetected);
                         
                         // Trigger callback if changed
-                        if (externalDetected !== previousCountRef.current > 1) {
+                        if (externalDetected !== (previousCountRef.current > 1)) {
                             onExternalDisplayDetected?.(externalDetected, displaysList);
                         }
                         previousCountRef.current = screens.length;
@@ -83,9 +82,11 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
 
             setDisplayInfo([screenData]);
 
-            // Check for multiple displays via WebGL renderer hint or display metrics
-            // Modern approach: check screen.availWidth vs screen.width (mirroring creates difference)
-            const isScreenMirrored = availWidth !== screenWidth || availHeight !== screenHeight;
+            // ✅ FIXED: Fallback method - very limited ability to detect multiple displays
+            // Only flag if there's strong evidence (screen width changes significantly over time)
+            // Without Screen Details API, we can't reliably detect multiple displays
+            // So we remain conservative and don't flag unless there's clear evidence
+            const isScreenMirrored = false; // Conservative: don't flag without Screen Details API
             
             setHasExternalDisplay(isScreenMirrored);
             
