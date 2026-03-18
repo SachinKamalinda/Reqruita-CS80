@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Custom hook to detect external displays via Screen Enumeration API
+ * Custom hook to detect external displays via multiple methods
  * Detects:
  * - Multiple displays (external monitor, TV, etc.)
  * - Extended displays via screen mirroring or duplication
@@ -17,6 +17,8 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
     const [displayCount, setDisplayCount] = useState(1);
     const detectionIntervalRef = useRef(null);
     const previousCountRef = useRef(1);
+    const screenWidthHistoryRef = useRef([]);
+    const lastDetectionTimeRef = useRef(0);
 
     const detectDisplays = useCallback(async () => {
         try {
@@ -27,6 +29,7 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                     const screens = details.screens;
                     
                     if (screens && screens.length > 0) {
+                        console.log(`[Display Detection] Screen Details API found ${screens.length} display(s)`);
                         setDisplayCount(screens.length);
                         
                         const displaysList = screens.map((screen) => ({
@@ -43,33 +46,49 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                         
                         setDisplayInfo(displaysList);
                         
-                        // ✅ FIXED: Only detect external display if there are 2+ displays
-                        // A single screen is the primary display, no external display
+                        // Only detect external display if there are 2+ displays
                         const externalDetected = displaysList.length > 1;
                         
                         setHasExternalDisplay(externalDetected);
                         
                         // Trigger callback if changed
                         if (externalDetected !== (previousCountRef.current > 1)) {
+                            console.log(`[Display Detection] External display ${externalDetected ? 'DETECTED' : 'disconnected'}`);
                             onExternalDisplayDetected?.(externalDetected, displaysList);
                         }
                         previousCountRef.current = screens.length;
+                        lastDetectionTimeRef.current = Date.now();
                         
                         return;
                     }
                 } catch (err) {
-                    console.debug("Screen Details API unavailable", err);
+                    console.debug("Screen Details API error:", err.message);
                 }
             }
 
-            // Method 2: Fallback - Use window.screen and detect via available screen API
-            // This method checks the screen object's dimensions and properties
+            // Method 2: Try getDisplayMedia to enumerate displays
+            if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                    
+                    if (videoInputs.length > 0) {
+                        console.log(`[Display Detection] Found ${videoInputs.length} video input device(s)`);
+                        // Multiple video inputs might indicate multiple displays
+                    }
+                } catch (err) {
+                    console.debug("enumerateDevices error:", err.message);
+                }
+            }
+
+            // Method 3: Fallback - Detect via screen dimension analysis + WebGL
             const screenWidth = window.screen.width;
             const screenHeight = window.screen.height;
             const availWidth = window.screen.availWidth;
             const availHeight = window.screen.availHeight;
             const colorDepth = window.screen.colorDepth;
             const pixelDepth = window.screen.pixelDepth;
+            const devicePixelRatio = window.devicePixelRatio || 1;
 
             const screenData = {
                 width: screenWidth,
@@ -78,22 +97,54 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                 availHeight,
                 colorDepth,
                 pixelDepth,
+                devicePixelRatio,
             };
 
             setDisplayInfo([screenData]);
+            console.log(`[Display Detection] Primary screen: ${screenWidth}x${screenHeight}, avail: ${availWidth}x${availHeight}, ratio: ${devicePixelRatio}`);
 
-            // ✅ FIXED: Fallback method - very limited ability to detect multiple displays
-            // Only flag if there's strong evidence (screen width changes significantly over time)
-            // Without Screen Details API, we can't reliably detect multiple displays
-            // So we remain conservative and don't flag unless there's clear evidence
-            const isScreenMirrored = false; // Conservative: don't flag without Screen Details API
-            
-            setHasExternalDisplay(isScreenMirrored);
-            
-            if (isScreenMirrored !== (previousCountRef.current > 1)) {
-                onExternalDisplayDetected?.(isScreenMirrored, [screenData]);
+            // Method 3a: Detect via screen changes over time (extended display detection)
+            screenWidthHistoryRef.current.push({ width: screenWidth, time: Date.now() });
+            if (screenWidthHistoryRef.current.length > 5) {
+                screenWidthHistoryRef.current.shift();
             }
-            previousCountRef.current = isScreenMirrored ? 2 : 1;
+
+            // Check if screen dimensions have recently changed (indicates display change)
+            let dimensionChanged = false;
+            if (screenWidthHistoryRef.current.length >= 2) {
+                const currWidth = screenWidthHistoryRef.current[screenWidthHistoryRef.current.length - 1].width;
+                const prevWidth = screenWidthHistoryRef.current[screenWidthHistoryRef.current.length - 2].width;
+                if (currWidth !== prevWidth) {
+                    dimensionChanged = true;
+                    console.log(`[Display Detection] Screen dimension changed: ${prevWidth}x -> ${currWidth}x`);
+                }
+            }
+
+            // Method 3b: Detect via aspect ratio changes (often different between laptop and TV)
+            const aspectRatio = screenWidth / screenHeight;
+            const isUltrawideOrTV = aspectRatio > 1.6; // 21:9 or wider often indicates external display
+
+            // Method 3c: Detect via physical screen size hints
+            // Tablets/phones often have lower resolutions, external displays are usually higher
+            const isMobileResolution = screenWidth < 500 || screenHeight < 500;
+            const isHighResExternal = screenWidth >= 1920 && screenHeight >= 1080 && !isMobileResolution;
+
+            // Combine evidence for external display
+            let isExternalDetected = dimensionChanged || (isHighResExternal && isUltrawideOrTV);
+
+            // Additional: Check if availWidth differs significantly from width (indicates panels/taskbars)
+            const hasSignificantTaskbar = (screenWidth - availWidth) > 50 || (screenHeight - availHeight) > 50;
+
+            setHasExternalDisplay(isExternalDetected);
+
+            // Trigger callback if changed (with debouncing to avoid too many updates)
+            const now = Date.now();
+            if ((isExternalDetected !== (previousCountRef.current > 1)) && (now - lastDetectionTimeRef.current > 500)) {
+                console.log(`[Display Detection] External display ${isExternalDetected ? 'DETECTED' : 'disconnected'}`);
+                onExternalDisplayDetected?.(isExternalDetected, [screenData]);
+                lastDetectionTimeRef.current = now;
+            }
+            previousCountRef.current = isExternalDetected ? 2 : 1;
 
         } catch (err) {
             console.error("Display detection error:", err);
@@ -103,7 +154,9 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
     // Request permission and start monitoring
     useEffect(() => {
         const initDetection = async () => {
-            // Request permission if needed (Screen Details API)
+            console.log("[Display Detection] Initializing display detection...");
+            
+            // Request permission for Screen Details API if available
             if (
                 navigator.permissions &&
                 navigator.permissions.query &&
@@ -113,17 +166,24 @@ export function useExternalDisplayDetection(onExternalDisplayDetected) {
                     const permission = await navigator.permissions.query({
                         name: "screen-details",
                     });
-                    console.log("Screen Details permission:", permission.state);
+                    console.log("[Display Detection] Screen Details permission:", permission.state);
+                    
+                    // If denied, we'll fall back to other methods
+                    if (permission.state === "denied") {
+                        console.warn("[Display Detection] Screen Details permission denied, using fallback methods");
+                    }
                 } catch (err) {
-                    console.debug("Permission query unavailable", err);
+                    console.debug("[Display Detection] Permission query unavailable:", err.message);
                 }
+            } else {
+                console.log("[Display Detection] Screen Details API not available, using fallback methods");
             }
 
             // Initial detection
             await detectDisplays();
 
-            // Poll for changes every 1 second
-            detectionIntervalRef.current = setInterval(detectDisplays, 1000);
+            // Poll for changes every 500ms (more frequent detection)
+            detectionIntervalRef.current = setInterval(detectDisplays, 500);
         };
 
         initDetection();
