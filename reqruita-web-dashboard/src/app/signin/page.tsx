@@ -33,6 +33,14 @@ export default function SigninPage() {
         email: formData.email,
         password: formData.password,
       });
+
+      // Check if email verification is required
+      if ((result as any).requiresEmailVerification) {
+        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+        return;
+      }
+
+      // Email is verified, proceed with login
       saveToken(result.token);
       saveUser(result.user);
       router.push('/home');
