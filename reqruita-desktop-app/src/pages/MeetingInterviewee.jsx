@@ -5,6 +5,7 @@ import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
 import FileExplorer from "../components/FileExplorer";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 
 /**
@@ -40,6 +41,10 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
     const [participantId, setParticipantId] = useState(null);
+
+    // Modal state
+    const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+    const [isClosingRequest, setIsClosingRequest] = useState(false);
 
 
     // Chat UI
@@ -185,6 +190,18 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         };
     }, []);
 
+    // Listen for Electron close request
+    useEffect(() => {
+        if (!window.reqruita?.onCloseRequest) return;
+
+        const cleanup = window.reqruita.onCloseRequest(() => {
+            setIsClosingRequest(true);
+            setShowLeaveConfirm(true);
+        });
+
+        return () => cleanup && cleanup();
+    }, []);
+
     // 2) Prevent body scroll
     useEffect(() => {
         document.body.classList.add("rq-noscr");
@@ -297,7 +314,11 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
 
     async function leave() {
-        if (!window.confirm("Are you sure you want to leave the interview?")) return;
+        setShowLeaveConfirm(true);
+    }
+
+    async function handleConfirmLeave() {
+        setShowLeaveConfirm(false);
         
         try {
             await fetch(`${BACKEND_URL}/api/participants/leave`, {
@@ -312,6 +333,11 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         try { window.reqruita?.exitInterviewMode?.(); } catch (e) { }
         try { stopScreenShare(); } catch (e) { }
         onLeave?.();
+        
+        // If window close was pending, tell Electron to actually close
+        if (isClosingRequest) {
+            window.reqruita?.confirmClose?.();
+        }
     }
 
     const hasRemote = !!remoteCamStream;
@@ -637,9 +663,16 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 </div>
             </div>
 
-
+            <ConfirmationModal
+                isOpen={showLeaveConfirm}
+                title="Leave Interview?"
+                message="Are you sure you want to leave the interview session? You will be disconnected from the meeting."
+                confirmText="Leave Now"
+                cancelText="Stay"
+                onConfirm={handleConfirmLeave}
+                onCancel={() => setShowLeaveConfirm(false)}
+                variant="danger"
+            />
         </div>
-
-
     );
 }
