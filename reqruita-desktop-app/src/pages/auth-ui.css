@@ -1329,17 +1329,13 @@ body.rq-noscr {
   left: var(--rq-safe);
   right: var(--rq-safe);
   bottom: var(--rq-safe);
-  height: 68px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1.5px solid rgba(75, 47, 182, 0.2);
-  /* Purple border for contrast */
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow:
-    0 10px 30px rgba(75, 47, 182, 0.08),
-    0 0 15px rgba(75, 47, 182, 0.15);
-  /* Purple glow */
+  height: 72px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.85); /* Slate 900 translucent */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   display: grid;
   grid-template-columns: 1fr 1.2fr 1fr;
   align-items: center;
@@ -1461,15 +1457,15 @@ body.rq-noscr {
 /* Dropdown menu */
 .mt-menu {
   position: absolute;
-  bottom: calc(var(--rq-safe) + 72px);
+  bottom: calc(var(--rq-safe) + 76px);
   width: 320px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1.5px solid rgba(75, 47, 182, 0.2);
-  box-shadow: 0 18px 40px rgba(75, 47, 182, 0.15);
-  backdrop-filter: blur(14px);
+  border-radius: 16px;
+  background: rgba(30, 41, 59, 0.95); /* Slate 800 */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(16px);
   padding: 10px;
-  color: #1a1a2e;
+  color: #f8fafc;
 }
 
 .mt-menu h4 {
@@ -1482,23 +1478,25 @@ body.rq-noscr {
 .mt-menu-item {
   width: 100%;
   text-align: left;
-  padding: 10px 10px;
+  padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   font-weight: 700;
+  transition: all 0.2s ease;
 }
 
 .mt-menu-item:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.10);
+  color: #ffffff;
 }
 
 .mt-menu-item-active {
-  background: rgba(75, 47, 182, 0.22);
-  border-color: rgba(75, 47, 182, 0.35);
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #ffffff;
 }
 
 /* Small error toast */
@@ -1525,9 +1523,9 @@ body.rq-noscr {
   min-width: 44px;
   padding: 0 16px;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #ffffff;
-  color: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
   font-weight: 700;
   cursor: pointer;
   display: inline-flex;
@@ -1535,16 +1533,15 @@ body.rq-noscr {
   justify-content: center;
   gap: 8px;
   transition: all 160ms cubic-bezier(0.23, 1, 0.32, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
   position: relative;
 }
 
 .mt-icon-btn:hover {
   transform: translateY(-2px);
-  background: #f8fafc;
-  border-color: rgba(75, 47, 182, 0.2);
-  color: var(--rq-primary);
-  box-shadow: 0 6px 16px rgba(75, 47, 182, 0.08);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
 .mt-icon-btn:active {
@@ -1563,25 +1560,25 @@ body.rq-noscr {
 
 /* Off state (mic muted / cam off) */
 .mt-icon-off {
-  background: #fef2f2;
-  color: #dc2626;
-  border-color: #fecaca;
+  background: rgba(220, 38, 38, 0.15) !important;
+  color: #f87171 !important;
+  border-color: rgba(220, 38, 38, 0.25) !important;
 }
 
 .mt-icon-off:hover {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.2) !important;
+  color: #ef4444 !important;
 }
 
 /* Active state (panel open, sharing active) */
 .mt-icon-active {
-  background: rgba(75, 47, 182, 0.08);
-  color: var(--rq-primary);
-  border-color: rgba(75, 47, 182, 0.2);
+  background: rgba(139, 92, 246, 0.2) !important;
+  color: #a78bfa !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
 }
 
 .mt-icon-active:hover {
-  background: rgba(75, 47, 182, 0.12);
+  background: rgba(139, 92, 246, 0.25) !important;
 }
 
 /* Badge on icon button (participant count) */
@@ -2607,24 +2604,19 @@ body.rq-noscr {
   left: var(--rq-safe);
   right: var(--rq-safe);
   bottom: var(--rq-safe);
-  height: 68px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1.5px solid rgba(75, 47, 182, 0.2);
-  /* Purple border for contrast */
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  height: 72px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.85); /* Slate 900 translucent */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 12px 20px;
   gap: 12px;
-  box-shadow:
-    0 10px 30px rgba(75, 47, 182, 0.08),
-    0 0 15px rgba(75, 47, 182, 0.15);
-  /* Purple glow */
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   z-index: 500;
-  /* Above overlay panels but below modal-likes */
 }
 
 .jm-left,

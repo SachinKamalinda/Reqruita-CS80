@@ -1,0 +1,210 @@
+.fb-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(2, 6, 23, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fb-fadein 0.3s ease-out;
+}
+
+@keyframes fb-fadein {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fb-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    width: 100%;
+    max-width: 440px;
+    border-radius: 24px;
+    padding: 32px;
+    position: relative;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    text-align: center;
+    animation: fb-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fb-pop {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.fb-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.05);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.fb-close-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    transform: rotate(90deg);
+}
+
+.fb-icon-wrap {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.fb-icon {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #a855f720, #6366f120);
+    color: #8b5cf6;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fb-title {
+    font-family: 'Lexend', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.fb-message {
+    font-family: 'Lexend', sans-serif;
+    font-size: 0.95rem;
+    color: #64748b;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+
+.fb-content {
+    margin-bottom: 24px;
+}
+
+.fb-rating-stars {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.fb-star {
+    background: none;
+    border: none;
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.fb-star:hover {
+    transform: scale(1.2);
+    color: #fbbf24;
+}
+
+.fb-star.active {
+    color: #fbbf24;
+}
+
+.fb-status-options {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.fb-opt-btn {
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 2px solid #f1f5f9;
+    background: #f8fafc;
+    font-family: 'Lexend', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.fb-opt-btn.active.positive { background: #dcfce7; border-color: #22c55e; color: #166534; }
+.fb-opt-btn.active.neutral { background: #fef9c3; border-color: #eab308; color: #854d0e; }
+.fb-opt-btn.active.negative { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+
+.fb-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    font-family: inherit;
+    font-size: 0.9rem;
+    color: #1e293b;
+    resize: none;
+    transition: all 0.2s;
+}
+
+.fb-textarea:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+}
+
+.fb-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.fb-btn-primary, .fb-btn-secondary {
+    flex: 1;
+    padding: 14px;
+    border-radius: 16px;
+    font-family: 'Lexend', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.fb-btn-primary {
+    background: #8b5cf6;
+    border: none;
+    color: #fff;
+    box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.3);
+}
+
+.fb-btn-primary:hover {
+    background: #7c3aed;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(139, 92, 246, 0.4);
+}
+
+.fb-btn-secondary {
+    background: #f1f5f9;
+    border: none;
+    color: #475569;
+}
+
+.fb-btn-secondary:hover {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.fb-btn-primary:active, .fb-btn-secondary:active {
+    transform: translateY(0);
+}

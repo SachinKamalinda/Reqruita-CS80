@@ -1,0 +1,120 @@
+/* src/components/ConfirmationModal.css */
+
+.cm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4); /* Slate-900 with transparency */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000; /* Above everything */
+  padding: 20px;
+}
+
+.cm-card {
+  width: 100%;
+  max-width: 400px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.cm-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.cm-icon-danger {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.cm-icon-primary {
+  background: rgba(75, 47, 182, 0.1);
+  color: var(--rq-primary);
+}
+
+.cm-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.5px;
+}
+
+.cm-message {
+  font-size: 15px;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0 0 32px 0;
+}
+
+.cm-actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.cm-btn {
+  flex: 1;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  border: none;
+  font-family: inherit;
+}
+
+.cm-btn-cancel {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.cm-btn-cancel:hover {
+  background: #e2e8f0;
+  color: #475569;
+  transform: translateY(-1px);
+}
+
+.cm-btn-confirm {
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.cm-btn-danger {
+  background: #ef4444;
+}
+
+.cm-btn-danger:hover {
+  background: #dc2626;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+  transform: translateY(-2px);
+}
+
+.cm-btn-primary {
+  background: var(--rq-primary);
+}
+
+.cm-btn-primary:hover {
+  background: var(--rq-primary-hover);
+  box-shadow: 0 8px 20px rgba(75, 47, 182, 0.3);
+  transform: translateY(-2px);
+}
+
+.cm-btn:active {
+  transform: translateY(0);
+}
