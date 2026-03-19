@@ -8,6 +8,7 @@ import DeviceCheck from "./pages/DeviceCheck.jsx";
 import MeetingInterviewer from "./pages/MeetingInterviewer.jsx";
 import MeetingInterviewee from "./pages/MeetingInterviewee.jsx";
 import MeetingWorkspace from "./pages/MeetingWorkspace.jsx";
+import FeedbackModal from "./components/FeedbackModal.jsx";
 
 import ToastContainer from "./components/Toast.jsx";
 import useToast from "./hooks/useToast.js";
@@ -29,12 +30,12 @@ const USERS = [
 ];
 
 function AppHeader({ isWorkspace, isInterviewer }) {
-  const headerClass = isWorkspace 
-    ? "rq-header-glass" 
-    : isInterviewer 
-      ? "rq-header-interviewer" 
+  const headerClass = isWorkspace
+    ? "rq-header-glass"
+    : isInterviewer
+      ? "rq-header-interviewer"
       : "";
-      
+
   return (
     <div className={`rq-header ${headerClass}`}>
       <div className="rq-header-logo">
@@ -61,12 +62,16 @@ export default function App() {
 
   useEffect(() => {
     // Check if we are in the workspace view via URL check
-    if (window.location.search.includes("view=workspace")) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "workspace") {
       setStep("workspace");
+    } else if (params.get("view") === "feedback") {
+      setStep("feedback");
+      setRole(params.get("role"));
     }
-    
-    document.documentElement.style.background = "#fff";
-    document.body.style.background = "#fff";
+
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
   }, []);
 
   /* ── Smooth page transition helper ── */
@@ -79,6 +84,10 @@ export default function App() {
   }, []);
 
   function resetAll() {
+    if (window.reqruita && step === "feedback") {
+      window.close();
+      return;
+    }
     setStep("role");
     setRole(null);
     setSession(null);
@@ -142,16 +151,47 @@ export default function App() {
 
   function onEnd() {
     addToast("You left the meeting.", "info");
-    resetAll();
+    // Open the dedicated feedback window and close this one
+    if (window.reqruita?.openFeedback) {
+      window.reqruita.openFeedback(role);
+    } else {
+      // Fallback for browser testing
+      goTo("feedback");
+    }
+  }
+
+  function onFeedbackSubmit(data) {
+    // Here you could send data to backend
+    console.log("Feedback submitted:", data);
+    if (window.reqruita) {
+      window.close(); // Close the feedback pop-up
+    } else {
+      resetAll();
+    }
   }
 
   return (
     <>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
-      <AppHeader 
-        isWorkspace={step === "workspace"} 
-        isInterviewer={step === "meeting" && role === "conduct"}
-      />
+      {step !== "feedback" && (
+        <AppHeader
+          isWorkspace={step === "workspace"}
+          isInterviewer={step === "meeting" && role === "conduct"}
+        />
+      )}
+
+      {step === "feedback" && (
+        <style>
+          {`
+            html, body, #root, .rq-page, .fb-overlay {
+              background: transparent !important;
+            }
+            .fb-card {
+              background: rgba(255, 255, 255, 0.98) !important;
+            }
+          `}
+        </style>
+      )}
 
       <div className={`rq-page ${transitioning ? "rq-page-exit" : "rq-page-enter"}`}>
         {step === "role" && <RoleSelect onPickRole={onPickRole} />}
@@ -183,6 +223,16 @@ export default function App() {
           ) : (
             <MeetingInterviewee session={session} onLeave={onEnd} addToast={addToast} />
           ))}
+
+        {step === "feedback" && (
+            <FeedbackModal 
+                isOpen={true} 
+                role={role} 
+                onSubmit={onFeedbackSubmit} 
+                onClose={resetAll}
+                addToast={addToast}
+            />
+        )}
 
         {step === "workspace" && <MeetingWorkspace />}
       </div>
