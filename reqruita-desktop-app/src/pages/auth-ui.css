@@ -2742,13 +2742,9 @@ body.rq-noscr {
   bottom: 4px;
 }
 
-/* Footer becomes more transparent in sharing mode */
+/* Footer remains premium during sharing mode */
 .jm-sharing-active .jm-footer {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(75, 47, 182, 0.4);
-  box-shadow: 0 10px 40px rgba(75, 47, 182, 0.2);
-  z-index: 1000;
-  /* Ensure it stays above EVERYTHING */
+  z-index: 1000; /* Maintain z-index */
 }
 
 /* ═══════════════════════════════════════════════════════
