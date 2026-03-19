@@ -98,6 +98,10 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
     const [camStream, setCamStream] = useState(null);
     const [screenStream, setScreenStream] = useState(null);
 
+    const micStreamRef = useRef(null);
+    const camStreamRef = useRef(null);
+    const screenStreamRef = useRef(null);
+
     const [error, setError] = useState("");
 
     const mustPassAll = role === "join";
@@ -112,9 +116,9 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
         document.body.classList.add("rq-noscr");
         return () => {
             document.body.classList.remove("rq-noscr");
-            stopStream(micStream);
-            stopStream(camStream);
-            stopStream(screenStream);
+            stopStream(micStreamRef.current);
+            stopStream(camStreamRef.current);
+            stopStream(screenStreamRef.current);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -122,7 +126,8 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
     const toggleMic = useCallback(async () => {
         setError("");
         if (micOn) {
-            stopStream(micStream);
+            stopStream(micStreamRef.current);
+            micStreamRef.current = null;
             setMicStream(null);
             setMicOn(false);
             addToast?.("Microphone disabled", "info");
@@ -130,6 +135,7 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
         }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            micStreamRef.current = stream;
             setMicStream(stream);
             setMicOn(true);
             addToast?.("Microphone enabled", "success");
@@ -142,7 +148,8 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
     const toggleCam = useCallback(async () => {
         setError("");
         if (camOn) {
-            stopStream(camStream);
+            stopStream(camStreamRef.current);
+            camStreamRef.current = null;
             setCamStream(null);
             setCamOn(false);
             if (camVideoRef.current) camVideoRef.current.srcObject = null;
@@ -151,6 +158,7 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
         }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            camStreamRef.current = stream;
             setCamStream(stream);
             setCamOn(true);
             if (camVideoRef.current) camVideoRef.current.srcObject = stream;
@@ -164,7 +172,8 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
     const toggleScreen = useCallback(async () => {
         setError("");
         if (screenOn) {
-            stopStream(screenStream);
+            stopStream(screenStreamRef.current);
+            screenStreamRef.current = null;
             setScreenStream(null);
             setScreenOn(false);
             if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
@@ -173,6 +182,7 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
         }
         try {
             const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            screenStreamRef.current = stream;
             setScreenStream(stream);
             setScreenOn(true);
             if (screenVideoRef.current) screenVideoRef.current.srcObject = stream;
@@ -181,7 +191,8 @@ export default function DeviceCheck({ role, onReady, onBack, addToast }) {
             const track = stream.getVideoTracks()[0];
             if (track) {
                 track.onended = () => {
-                    stopStream(stream);
+                    stopStream(screenStreamRef.current);
+                    screenStreamRef.current = null;
                     setScreenStream(null);
                     setScreenOn(false);
                     if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
