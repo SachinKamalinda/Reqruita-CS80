@@ -1,16 +1,13 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Unified dual-microservice package",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "concurrently \"node server.js\" \"node authServer.js\""
+    "start": "concurrently \"npm run start --prefix desktop-app\" \"npm run start --prefix dashboard\"",
+    "dev": "concurrently \"npm run dev --prefix desktop-app\" \"npm run dev --prefix dashboard\"",
+    "test": "node tests/test.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "body-parser": "^2.2.2",
@@ -25,6 +22,7 @@
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.9"
   }
 }
