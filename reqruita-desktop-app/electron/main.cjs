@@ -17,6 +17,9 @@ protocol.registerSchemesAsPrivileged([
 
 let win;
 let workspaceWin;
+let feedbackWin;
+let isMeetingActive = false;
+let isClosingConfirmed = false;
 
 function createWindow() {
     win = new BrowserWindow({
@@ -39,6 +42,12 @@ function createWindow() {
 
     win.loadURL("http://localhost:5173");
     
+    win.on("close", (e) => {
+        if (isMeetingActive && !isClosingConfirmed) {
+            e.preventDefault();
+            win.webContents.send("rq:request-close");
+        }
+    });
 }
 
 /**
@@ -85,6 +94,8 @@ function setupDisplayMediaHandler() {
 function setupInterviewModeIPC() {
     ipcMain.handle("rq:enter-interview-mode", () => {
         if (!win) return;
+        isMeetingActive = true;
+        isClosingConfirmed = false;
 
         // Most "locked" Electron can do:
         win.setKiosk(true);
@@ -103,6 +114,8 @@ function setupInterviewModeIPC() {
 
     ipcMain.handle("rq:enter-interviewer-mode", () => {
         if (!win) return;
+        isMeetingActive = true;
+        isClosingConfirmed = false;
         win.setKiosk(false);
         win.setFullScreen(false);
         win.setResizable(true);
@@ -122,6 +135,7 @@ function setupInterviewModeIPC() {
 
     ipcMain.handle("rq:exit-interview-mode", () => {
         if (!win) return;
+        isMeetingActive = false;
 
         win.setAlwaysOnTop(false);
         win.setKiosk(false);
@@ -137,8 +151,49 @@ function setupInterviewModeIPC() {
             height: 32,
         });
 
-        // If you used setClosable(false) above:
         // win.setClosable(true);
+    });
+
+    ipcMain.on("rq:confirm-close", () => {
+        isClosingConfirmed = true;
+        if (win) win.close();
+    });
+
+    ipcMain.handle("rq:open-feedback", (event, role) => {
+        // Mark as confirmed so main window can close without question
+        isClosingConfirmed = true;
+        isMeetingActive = false;
+
+        feedbackWin = new BrowserWindow({
+            width: 500,
+            height: 650,
+            title: "Interview Feedback",
+            resizable: false,
+            frame: false, // Frameless for "pop up" look
+            transparent: true,
+            webPreferences: {
+                preload: path.join(__dirname, "preload.cjs"),
+                contextIsolation: true,
+            },
+        });
+
+        // Load the feedback view
+        feedbackWin.loadURL(`http://localhost:5173/?view=feedback&role=${role}`);
+        
+        // Show when ready to avoid flicker
+        feedbackWin.once('ready-to-show', () => {
+            feedbackWin.show();
+            if (win) {
+                win.hide(); // Hide immediately
+                win.setSize(1, 1); // User's suggestion (shrink to 1px)
+                win.close(); 
+                win = null;
+            }
+        });
+
+        feedbackWin.on("closed", () => {
+            feedbackWin = null;
+        });
     });
 }
 

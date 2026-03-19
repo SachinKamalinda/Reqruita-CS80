@@ -30,4 +30,13 @@ contextBridge.exposeInMainWorld("reqruita", {
     // Workspace window management
     openWorkspace: (panel) => ipcRenderer.invoke("rq:open-workspace", panel),
     closeWorkspace: () => ipcRenderer.invoke("rq:close-workspace"),
+
+    // Window close interception
+    onCloseRequest: (callback) => {
+        const subscription = (_event) => callback();
+        ipcRenderer.on("rq:request-close", subscription);
+        return () => ipcRenderer.removeListener("rq:request-close", subscription);
+    },
+    confirmClose: () => ipcRenderer.send("rq:confirm-close"),
+    openFeedback: (role) => ipcRenderer.invoke("rq:open-feedback", role),
 });
