@@ -330,6 +330,19 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     async function endInterview() {
         if (!window.confirm("Are you sure you want to end the interview?")) return;
         
+        // Mark current candidate as complete so the session is freed
+        if (currentCandidate) {
+            try {
+                await fetch(`${API_URL}/complete`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: currentCandidate.id }),
+                });
+            } catch (e) {
+                console.error("Failed to mark candidate as complete:", e);
+            }
+        }
+
         // Clear chat history for this meeting
         try {
             await fetch(`${BACKEND_URL}/api/chat/${meetingId}`, { method: "DELETE" });

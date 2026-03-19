@@ -176,7 +176,15 @@ app.post("/api/participants/join", (req, res) => {
     
     db.run("INSERT INTO participants (id, name, status) VALUES (?, ?, ?)", [id, name, "waiting"], function (err) {
         if (err) return res.status(500).json({ error: err.message });
-        getAllParticipants(res, "Joined successfully");
+        
+        db.all("SELECT * FROM participants", [], (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({
+                message: "Joined successfully",
+                id: id,
+                participants: rows
+            });
+        });
     });
 });
 
@@ -209,6 +217,23 @@ app.post("/api/participants/complete", (req, res) => {
                 return res.status(404).json({ error: "Participant not found" });
 
             getAllParticipants(res, "Participant moved to completed");
+        }
+    );
+});
+
+// POST /api/participants/leave
+app.post("/api/participants/leave", (req, res) => {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Name is required" });
+
+    // Use name + interviewing status to find the one to move out of the session
+    // This frees up the 'interviewing' slot for others
+    db.run(
+        "UPDATE participants SET status = 'completed' WHERE name = ? AND status = 'interviewing'",
+        [name],
+        function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+            getAllParticipants(res, "Participant left session");
         }
     );
 });
@@ -284,12 +309,19 @@ const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
+const socketToParticipant = new Map();
+
 io.on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
-    socket.on("join-meeting", ({ meetingId, role }) => {
+    socket.on("join-meeting", ({ meetingId, role, participantId }) => {
         if (!meetingId) return;
         socket.join(meetingId);
+        
+        if (participantId) {
+            socketToParticipant.set(socket.id, participantId);
+        }
+
         socket.to(meetingId).emit("peer-joined", { peerId: socket.id, role });
     });
 
@@ -314,7 +346,16 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", () => {
         console.log("Socket disconnected:", socket.id);
-
+        const participantId = socketToParticipant.get(socket.id);
+        if (participantId) {
+            console.log(`[CLEANUP] Participant ${participantId} disconnected. Clearing interviewing status.`);
+            // If they were 'interviewing', set them back to 'waiting' or 'completed' so slot is freed
+            db.run(
+                "UPDATE participants SET status = 'waiting' WHERE id = ? AND status = 'interviewing'",
+                [participantId]
+            );
+            socketToParticipant.delete(socket.id);
+        }
     });
     
     /*-------------------- SOCKET.IO (CHAT) --------------------*/

@@ -39,6 +39,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [activePanel, setActivePanel] = useState(null); // 'google' | 'files' | 'pdf'
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
+    const [participantId, setParticipantId] = useState(null);
 
 
     // Chat UI
@@ -58,7 +59,6 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     // Candidate display name (later replace with real input)
     const candidateName = session?.candidateName || session?.name || "Candidate";
 
-    // ✅ WebRTC hook
     const {
         localCamStream,
         localScreenStream,
@@ -68,7 +68,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         stopScreenShare,
         setMicEnabled,
         setCamEnabled,
-    } = useWebRTC({ meetingId, role: "interviewee" });
+    } = useWebRTC({ meetingId, role: "interviewee", participantId });
 
     //chat shocket connection
     useEffect(() => {
@@ -199,12 +199,16 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
             try {
                 setError("");
 
-                await fetch(`${BACKEND_URL}/api/participants/join`, {
+                const res = await fetch(`${BACKEND_URL}/api/participants/join`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     signal: controller.signal,
                     body: JSON.stringify({ name: candidateName }),
                 });
+                const data = await res.json();
+                if (data.id) {
+                    setParticipantId(data.id);
+                }
             } catch (e) {
                 if (e.name === "AbortError") return; // normal cleanup
                 console.log("Join backend failed:", e);
@@ -292,8 +296,19 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     }
 
 
-    function leave() {
+    async function leave() {
         if (!window.confirm("Are you sure you want to leave the interview?")) return;
+        
+        try {
+            await fetch(`${BACKEND_URL}/api/participants/leave`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: candidateName }),
+            });
+        } catch (e) {
+            console.error("Failed to notify backend on leave:", e);
+        }
+
         try { window.reqruita?.exitInterviewMode?.(); } catch (e) { }
         try { stopScreenShare(); } catch (e) { }
         onLeave?.();
