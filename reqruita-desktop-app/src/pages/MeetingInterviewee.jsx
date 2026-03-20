@@ -79,19 +79,6 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     // Display detection hook
     const { count: displayCount, isMultiMonitor } = useDisplayInfo();
 
-    // Send display info to interviewer via socket
-    useEffect(() => {
-        if (!meetingId || !chatSocketRef.current) return;
-
-        // Send display count to interviewer so they can see if candidate has multiple monitors
-        chatSocketRef.current.emit("candidate-display-info", {
-            interviewId: meetingId,
-            displayCount: displayCount,
-            isMultiMonitor: isMultiMonitor,
-            candidateName: candidateName,
-        });
-    }, [displayCount, isMultiMonitor, meetingId, candidateName]);
-
     //chat shocket connection
     useEffect(() => {
         if (!meetingId) return;
@@ -102,6 +89,35 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
         // Clear local messages state on new session join
         setMessages([]);
+
+        // Send display info when socket connects (for different machines)
+        const sendDisplayInfo = () => {
+            console.log("🚀 [Display Info] Sending to interviewer:", { displayCount, isMultiMonitor, candidateName });
+            socket.emit("candidate-display-info", {
+                interviewId: meetingId,
+                displayCount: displayCount,
+                isMultiMonitor: isMultiMonitor,
+                candidateName: candidateName,
+            });
+        };
+
+        // Bind to connect event so we send immediately when socket connects
+        socket.on("connect", () => {
+            console.log("✅ [Socket] Connected, sending display info");
+            sendDisplayInfo();
+        });
+
+        // Also send immediately if already connected
+        if (socket.connected) {
+            sendDisplayInfo();
+        }
+
+        // Periodically resend display info every 3 seconds to ensure interviewer receives it
+        const displayInfoInterval = setInterval(() => {
+            if (socket.connected) {
+                sendDisplayInfo();
+            }
+        }, 3000);
 
         // Join chat room (same interviewId as interviewer)
         socket.emit("join-chat", { interviewId: meetingId });
@@ -138,9 +154,10 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
         // Cleanup on unmount
         return () => {
+            clearInterval(displayInfoInterval);
             socket.disconnect();
         };
-    }, [meetingId]);
+    }, [meetingId, displayCount, isMultiMonitor, candidateName]);
 
 
     // ── Auto-scroll chat ──

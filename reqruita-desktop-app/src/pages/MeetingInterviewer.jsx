@@ -242,9 +242,17 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
         // Listen for candidate display info (multi-monitor detection)
         socket.on("candidate-display-info", (data) => {
-            console.log("Received candidate display info:", data);
+            console.log("📩 [Interviewer] Received candidate display info:", data);
+            if (data?.isMultiMonitor) {
+                console.log("⚠️  [WARNING] Candidate has multiple monitors!");
+            }
             setCandidateDisplayInfo(data);
             setShowDisplayWarning(true);
+        });
+
+        // Log socket connection
+        socket.on("connect", () => {
+            console.log("✅ [Interviewer Socket] Connected, listening for display info...");
         });
 
         // Cleanup on unmount
