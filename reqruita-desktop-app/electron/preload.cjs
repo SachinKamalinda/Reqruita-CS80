@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld("reqruita", {
     openWorkspace: (panel) => ipcRenderer.invoke("rq:open-workspace", panel),
     closeWorkspace: () => ipcRenderer.invoke("rq:close-workspace"),
 
+    // Display/Monitor detection
+    getDisplayInfo: () => ipcRenderer.invoke("rq:get-display-info"),
+
     // Window close interception
     onCloseRequest: (callback) => {
         const subscription = (_event) => callback();

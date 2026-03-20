@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut, shell, protocol, net } = require("electron");
+const { app, BrowserWindow, session, desktopCapturer, ipcMain, globalShortcut, shell, protocol, net, screen } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -261,6 +261,36 @@ function setupEmergencyUnlockShortcut() {
 }
 
 /**
+ * Display Monitors IPC – detect and return information about all connected displays
+ */
+function setupDisplayMonitorsIPC() {
+    ipcMain.handle("rq:get-display-info", () => {
+        const displays = screen.getAllDisplays();
+        const primaryDisplay = screen.getPrimaryDisplay();
+        
+        return {
+            count: displays.length,
+            primary: {
+                id: primaryDisplay.id,
+                bounds: primaryDisplay.bounds,
+                workArea: primaryDisplay.workArea,
+                scaleFactor: primaryDisplay.scaleFactor,
+                label: `Display ${displays.indexOf(primaryDisplay) + 1}`,
+            },
+            all: displays.map((d, index) => ({
+                id: d.id,
+                label: `Display ${index + 1}`,
+                bounds: d.bounds,
+                workArea: d.workArea,
+                scaleFactor: d.scaleFactor,
+                isPrimary: (d.id === primaryDisplay.id),
+                colorSpace: d.colorSpace,
+            }))
+        };
+    });
+}
+
+/**
  * File Explorer IPC – lets the renderer browse the local file system
  * and open files with the default OS application.
  */
@@ -350,6 +380,7 @@ app.whenReady().then(() => {
     createWindow();
     setupInterviewModeIPC();
     setupFileExplorerIPC();
+    setupDisplayMonitorsIPC();
     setupEmergencyUnlockShortcut();
     setupWorkspaceIPC();
 

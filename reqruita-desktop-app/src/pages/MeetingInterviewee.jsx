@@ -4,6 +4,7 @@ import "./auth-ui.css";
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
+import { useDisplayInfo } from "../hooks/useDisplayInfo";
 import FileExplorer from "../components/FileExplorer";
 import ConfirmationModal from "../components/ConfirmationModal";
 
@@ -74,6 +75,22 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         setMicEnabled,
         setCamEnabled,
     } = useWebRTC({ meetingId, role: "interviewee", participantId });
+
+    // Display detection hook
+    const { count: displayCount, isMultiMonitor } = useDisplayInfo();
+
+    // Send display info to interviewer via socket
+    useEffect(() => {
+        if (!meetingId || !chatSocketRef.current) return;
+
+        // Send display count to interviewer so they can see if candidate has multiple monitors
+        chatSocketRef.current.emit("candidate-display-info", {
+            interviewId: meetingId,
+            displayCount: displayCount,
+            isMultiMonitor: isMultiMonitor,
+            candidateName: candidateName,
+        });
+    }, [displayCount, isMultiMonitor, meetingId, candidateName]);
 
     //chat shocket connection
     useEffect(() => {

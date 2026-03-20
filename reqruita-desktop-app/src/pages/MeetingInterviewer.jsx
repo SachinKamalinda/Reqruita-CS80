@@ -5,6 +5,7 @@ import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
 import ConfirmationModal from "../components/ConfirmationModal";
+import MultiMonitorWarning from "../components/MultiMonitorWarning";
 
 /**
  * MeetingInterviewer.jsx (FINAL - WebRTC + Participants Panel)
@@ -58,6 +59,10 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
 
     // Participants state
     const [participants, setParticipants] = useState([]);
+
+    // Candidate display info (for multi-monitor warning)
+    const [candidateDisplayInfo, setCandidateDisplayInfo] = useState(null);
+    const [showDisplayWarning, setShowDisplayWarning] = useState(true);
 
     // Modal state
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -233,6 +238,13 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                 setUnreadCount((n) => n + 1);
                 addToast?.(`${msg.senderName || "Candidate"}: ${msg.message}`, "info");
             }
+        });
+
+        // Listen for candidate display info (multi-monitor detection)
+        socket.on("candidate-display-info", (data) => {
+            console.log("Received candidate display info:", data);
+            setCandidateDisplayInfo(data);
+            setShowDisplayWarning(true);
         });
 
         // Cleanup on unmount
@@ -482,6 +494,15 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     return (
         <div className="mt-wrap">
             {error && <div className="mt-err">{error}</div>}
+
+            {/* Multi-monitor warning for candidate */}
+            {showDisplayWarning && candidateDisplayInfo?.isMultiMonitor && (
+                <MultiMonitorWarning
+                    displayCount={candidateDisplayInfo.displayCount}
+                    candidateName={candidateDisplayInfo.candidateName}
+                    onDismiss={() => setShowDisplayWarning(false)}
+                />
+            )}
 
             {/* Connection status indicator */}
             {showConnStatus && (
