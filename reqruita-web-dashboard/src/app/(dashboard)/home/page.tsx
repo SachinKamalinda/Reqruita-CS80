@@ -33,6 +33,9 @@ interface DashboardStats {
   assignedCandidates: number;
 }
 
+const DEFAULT_UNKNOWN_EMAIL = "unknown@example.com";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
 const formatDateLabel = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -49,6 +52,73 @@ const formatDateLabel = (value: string): string => {
 const toDateScore = (value: string): number => {
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+};
+
+const normalizePotentialEmail = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+};
+
+const getSubmissionEntries = (
+  submittedData: unknown,
+): Array<[string, unknown]> => {
+  if (submittedData instanceof Map) {
+    return Array.from(submittedData.entries());
+  }
+
+  if (submittedData && typeof submittedData === "object") {
+    return Object.entries(submittedData as Record<string, unknown>);
+  }
+
+  return [];
+};
+
+const resolveSubmissionEmail = (submission: {
+  submitterEmail?: string;
+  submittedData?: unknown;
+}): string => {
+  const directEmail = normalizePotentialEmail(submission.submitterEmail);
+  if (directEmail && directEmail !== DEFAULT_UNKNOWN_EMAIL) {
+    return directEmail;
+  }
+
+  const submittedEntries = getSubmissionEntries(submission.submittedData);
+
+  const fromNamedEmailField = submittedEntries
+    .map(([key, value]) => ({
+      key: key.toLowerCase(),
+      email: normalizePotentialEmail(value),
+    }))
+    .find(
+      (entry) =>
+        !!entry.email &&
+        entry.key.includes("email") &&
+        entry.email !== DEFAULT_UNKNOWN_EMAIL,
+    )?.email;
+
+  if (fromNamedEmailField) {
+    return fromNamedEmailField;
+  }
+
+  const inferredEmail = submittedEntries
+    .map(([, value]) => normalizePotentialEmail(value))
+    .find(
+      (email): email is string => !!email && email !== DEFAULT_UNKNOWN_EMAIL,
+    );
+
+  if (inferredEmail) {
+    return inferredEmail;
+  }
+
+  return directEmail || DEFAULT_UNKNOWN_EMAIL;
 };
 
 const getSessionStatusClasses = (status: string): string => {
@@ -191,8 +261,7 @@ export default function Dashboard() {
               return submissionsData.submissions.map((submission) => ({
                 id: submission._id,
                 formTitle: form.title,
-                submitterEmail:
-                  submission.submitterEmail || "unknown@example.com",
+                submitterEmail: resolveSubmissionEmail(submission),
                 status: submission.status || "submitted",
                 createdAt: submission.createdAt,
               }));
