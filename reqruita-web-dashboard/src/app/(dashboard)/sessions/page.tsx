@@ -40,6 +40,7 @@ interface Interviewer {
   id: string;
   name: string;
   email: string;
+  role: string;
   specialty: string;
 }
 
@@ -423,8 +424,13 @@ export default function SessionsPage() {
       setEmailLogs(data.emailLogs as EmailLog[]);
 
       const firstJobId = data.jobs[0]?.id ?? "";
+      const firstInterviewerId = data.interviewers[0]?.id ?? "";
       const jobExists = (jobId: string) =>
         data.jobs.some((job) => job.id === jobId);
+      const interviewerExists = (interviewerId: string) =>
+        data.interviewers.some(
+          (interviewer) => interviewer.id === interviewerId,
+        );
 
       setCreateForm((current) => ({
         ...current,
@@ -432,6 +438,10 @@ export default function SessionsPage() {
           current.jobId && jobExists(current.jobId)
             ? current.jobId
             : firstJobId,
+        interviewerId:
+          current.interviewerId && interviewerExists(current.interviewerId)
+            ? current.interviewerId
+            : firstInterviewerId,
       }));
       setCandidateJobFilter((current) =>
         current && jobExists(current) ? current : firstJobId,
@@ -1855,10 +1865,20 @@ export default function SessionsPage() {
                   <option value="">Select interviewer</option>
                   {interviewers.map((interviewer) => (
                     <option key={interviewer.id} value={interviewer.id}>
-                      {interviewer.name} ({interviewer.specialty})
+                      {interviewer.name} (
+                      {interviewer.role === "admin"
+                        ? "Admin"
+                        : interviewer.specialty}
+                      )
                     </option>
                   ))}
                 </select>
+                {interviewers.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    No active interviewer/admin found in User & Roles for your
+                    company.
+                  </p>
+                )}
               </div>
 
               <div>
