@@ -66,6 +66,8 @@ interface InterviewSession {
   sessionDate: string;
   startTime: string;
   durationMinutes: number;
+  meetingId: string;
+  meetingPassword: string;
   status: SessionStatus;
   candidates: SessionCandidate[];
   lastEmailAt: string | null;
@@ -345,6 +347,8 @@ export default function SessionsPage() {
   const [container3DetailNotes, setContainer3DetailNotes] =
     useState<string>("");
   const [showContainer3EmailModal, setShowContainer3EmailModal] =
+    useState<boolean>(false);
+  const [showContainer3SessionInfoModal, setShowContainer3SessionInfoModal] =
     useState<boolean>(false);
   const [container3EmailCandidateId, setContainer3EmailCandidateId] = useState<
     string | null
@@ -636,6 +640,11 @@ export default function SessionsPage() {
 
     return byId ?? sessionsForInterviewJob[0] ?? null;
   }, [sessionsForInterviewJob, resolvedInterviewSessionId]);
+
+  const activeInterviewInterviewer = useMemo(() => {
+    if (!activeInterviewSession) return null;
+    return interviewerLookup[activeInterviewSession.interviewerId] ?? null;
+  }, [activeInterviewSession, interviewerLookup]);
 
   const activeInterviewRows = useMemo(() => {
     if (!activeInterviewSession) return [];
@@ -1451,6 +1460,13 @@ export default function SessionsPage() {
             className="rounded-lg border border-[#5D20B3] px-4 py-2 text-xs font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
           >
             Manage Email Templates
+          </button>
+          <button
+            onClick={() => setShowContainer3SessionInfoModal(true)}
+            disabled={!activeInterviewSession}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+          >
+            See Session Info
           </button>
         </div>
 
@@ -2423,6 +2439,83 @@ export default function SessionsPage() {
                   setContainer3DetailsCandidateId(null);
                 }}
                 className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showContainer3SessionInfoModal && activeInterviewSession && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4"
+          onClick={() => setShowContainer3SessionInfoModal(false)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-xl bg-white p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-900">Session Info</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Use these credentials to join this interview session.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Meeting ID
+                </p>
+                <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+                  {activeInterviewSession.meetingId}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Meeting Password
+                </p>
+                <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+                  {activeInterviewSession.meetingPassword}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Session Name
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewSession.name}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Interviewer
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewInterviewer?.name ?? "Unassigned"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Session Date
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {formatHumanDate(activeInterviewSession.sessionDate)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Start Time
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewSession.startTime}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() => setShowContainer3SessionInfoModal(false)}
+                className="w-full rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
               >
                 Close
               </button>
