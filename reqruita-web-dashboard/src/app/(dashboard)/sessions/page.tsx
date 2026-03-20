@@ -19,10 +19,20 @@ type CandidateResult = "Pending" | "Passed" | "Failed" | "On Hold";
 
 type SessionStatus = "Draft" | "Scheduled" | "Completed";
 
+interface JobFormField {
+  label: string;
+  type: string;
+  required?: boolean;
+  order?: number;
+}
+
 interface JobForm {
   id: string;
   title: string;
+  description: string;
+  jobRole: string;
   position: string;
+  fields: JobFormField[];
   applicants: number;
 }
 
@@ -645,6 +655,11 @@ export default function SessionsPage() {
     if (!activeInterviewSession) return null;
     return interviewerLookup[activeInterviewSession.interviewerId] ?? null;
   }, [activeInterviewSession, interviewerLookup]);
+
+  const activeInterviewJob = useMemo(() => {
+    if (!activeInterviewSession) return null;
+    return jobLookup[activeInterviewSession.jobId] ?? null;
+  }, [activeInterviewSession, jobLookup]);
 
   const activeInterviewRows = useMemo(() => {
     if (!activeInterviewSession) return [];
@@ -2453,7 +2468,7 @@ export default function SessionsPage() {
           onClick={() => setShowContainer3SessionInfoModal(false)}
         >
           <div
-            className="w-full max-w-2xl rounded-xl bg-white p-6"
+            className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <h3 className="text-xl font-bold text-gray-900">Session Info</h3>
@@ -2488,6 +2503,14 @@ export default function SessionsPage() {
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Job Form
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewJob?.title ?? "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Interviewer
                 </p>
                 <p className="mt-1 text-sm text-gray-900">
@@ -2510,6 +2533,75 @@ export default function SessionsPage() {
                   {activeInterviewSession.startTime}
                 </p>
               </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Job Role
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewJob?.jobRole ||
+                    activeInterviewJob?.position ||
+                    "Not specified"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Duration
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewSession.durationMinutes} minutes
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Job Form Description
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                {activeInterviewJob?.description?.trim() ||
+                  "No job form description available."}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Session Requirements
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                {activeInterviewSession.requirements ||
+                  "No requirements recorded."}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Session Remarks
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                {activeInterviewSession.remarks || "No remarks recorded."}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Job Form Fields
+              </p>
+              {activeInterviewJob?.fields?.length ? (
+                <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                  {activeInterviewJob.fields
+                    .slice()
+                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                    .map((field, index) => (
+                      <li key={`${field.label}-${index}`}>
+                        {field.label} ({field.type}) {field.required ? "*" : ""}
+                      </li>
+                    ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-sm text-gray-700">
+                  No custom form fields found.
+                </p>
+              )}
             </div>
 
             <div className="mt-6">
