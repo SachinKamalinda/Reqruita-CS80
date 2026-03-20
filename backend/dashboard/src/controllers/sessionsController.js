@@ -227,6 +227,7 @@ const serializeInterviewer = (interviewer) => ({
   id: String(interviewer._id),
   name: buildUserFullName(interviewer),
   email: interviewer.email,
+  role: String(interviewer.role || "interviewer"),
   specialty: getInterviewerSpecialty(interviewer),
 });
 
