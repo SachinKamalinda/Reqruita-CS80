@@ -167,7 +167,9 @@ exports.getUsers = async (req, res) => {
         .status(403)
         .json({ message: "Access Denied: Requires Admin Role" });
     }
-    const users = await User.find({}, "-password").sort({ createdAt: -1 });
+
+    const filter = { companyId: req.user.companyId };
+    const users = await User.find(filter, "-password").sort({ createdAt: -1 });
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
