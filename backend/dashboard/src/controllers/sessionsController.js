@@ -196,6 +196,20 @@ const toTimeString = (baseTime, additionalMinutes) => {
   return `${hh}:${mm}`;
 };
 
+const sanitizeSessionToken = (value) =>
+  String(value || "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase();
+
+const generateSessionMeetingId = (sessionId) =>
+  `MEET-${String(sessionId || "").trim()}`;
+
+const generateSessionMeetingPassword = (sessionId) => {
+  const token = sanitizeSessionToken(sessionId);
+  const suffix = token.slice(-6).padStart(6, "0");
+  return `RQ${suffix}`;
+};
+
 const buildCandidatesForJob = (jobId, total) =>
   Array.from({ length: total }, (_, index) => {
     const first = FIRST_NAMES[index % FIRST_NAMES.length];
@@ -260,6 +274,10 @@ const serializeSession = (session) => ({
   sessionDate: formatDateInput(session.sessionDate),
   startTime: session.startTime,
   durationMinutes: session.durationMinutes,
+  meetingId: session.meetingId || generateSessionMeetingId(session.sessionId),
+  meetingPassword:
+    session.meetingPassword ||
+    generateSessionMeetingPassword(session.sessionId),
   status: session.status,
   candidates: (session.candidates || []).map((candidate) => ({
     candidateId: candidate.candidateId,
@@ -433,9 +451,12 @@ const ensureSessionSeedData = async () => {
       }));
 
       const now = new Date();
+      const sessionOneId = "JOB-SE-2026-S01";
+      const sessionTwoId = "JOB-SE-2026-S02";
+      const sessionThreeId = "JOB-FE-2026-S01";
       await InterviewSession.insertMany([
         {
-          sessionId: "JOB-SE-2026-S01",
+          sessionId: sessionOneId,
           jobId: "JOB-SE-2026",
           name: "Session 1",
           interviewerId: "INT-001",
@@ -447,12 +468,14 @@ const ensureSessionSeedData = async () => {
           sessionDate: addDays(now, 6),
           startTime: "09:00",
           durationMinutes: 30,
+          meetingId: generateSessionMeetingId(sessionOneId),
+          meetingPassword: generateSessionMeetingPassword(sessionOneId),
           status: "Scheduled",
           candidates: sessionOneCandidates,
           lastEmailAt: now,
         },
         {
-          sessionId: "JOB-SE-2026-S02",
+          sessionId: sessionTwoId,
           jobId: "JOB-SE-2026",
           name: "Session 2",
           interviewerId: "INT-003",
@@ -463,12 +486,14 @@ const ensureSessionSeedData = async () => {
           sessionDate: addDays(now, 7),
           startTime: "13:00",
           durationMinutes: 30,
+          meetingId: generateSessionMeetingId(sessionTwoId),
+          meetingPassword: generateSessionMeetingPassword(sessionTwoId),
           status: "Draft",
           candidates: sessionTwoCandidates,
           lastEmailAt: null,
         },
         {
-          sessionId: "JOB-FE-2026-S01",
+          sessionId: sessionThreeId,
           jobId: "JOB-FE-2026",
           name: "Frontend Session 1",
           interviewerId: "INT-002",
@@ -479,6 +504,8 @@ const ensureSessionSeedData = async () => {
           sessionDate: addDays(now, 5),
           startTime: "10:00",
           durationMinutes: 35,
+          meetingId: generateSessionMeetingId(sessionThreeId),
+          meetingPassword: generateSessionMeetingPassword(sessionThreeId),
           status: "Scheduled",
           candidates: sessionThreeCandidates,
           lastEmailAt: now,
@@ -785,6 +812,8 @@ exports.createSession = async (req, res) => {
       sessionDate: sessionDateValue,
       startTime: normalizedStartTime,
       durationMinutes: duration,
+      meetingId: generateSessionMeetingId(generatedSessionId),
+      meetingPassword: generateSessionMeetingPassword(generatedSessionId),
       status: "Draft",
       candidates: [],
       lastEmailAt: new Date(),
@@ -1412,6 +1441,11 @@ exports.getCandidatePacket = async (req, res) => {
         jobTitle: job ? job.title : session.jobId,
         interviewer: interviewer ? interviewer.name : "Unassigned",
         interviewerEmail: interviewer ? interviewer.email : "",
+        meetingId:
+          session.meetingId || generateSessionMeetingId(session.sessionId),
+        meetingPassword:
+          session.meetingPassword ||
+          generateSessionMeetingPassword(session.sessionId),
         deadline: formatDateInput(session.deadline),
         sessionDate: formatDateInput(session.sessionDate),
         defaultStartTime: session.startTime,
