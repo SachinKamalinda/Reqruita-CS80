@@ -88,6 +88,25 @@ const interviewSessionSchema = new mongoose.Schema(
       min: 10,
       max: 120,
     },
+    meetingId: {
+      type: String,
+      trim: true,
+      default: function () {
+        return this.sessionId ? `MEET-${this.sessionId}` : "";
+      },
+    },
+    meetingPassword: {
+      type: String,
+      trim: true,
+      default: function () {
+        const source = String(this.sessionId || "REQRUITA").replace(
+          /[^A-Za-z0-9]/g,
+          "",
+        );
+        const suffix = source.slice(-6).toUpperCase().padStart(6, "0");
+        return `RQ${suffix}`;
+      },
+    },
     status: {
       type: String,
       enum: ["Draft", "Scheduled", "Completed"],
