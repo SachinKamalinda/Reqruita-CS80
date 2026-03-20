@@ -7,6 +7,7 @@ const connectMongo = require("./config/mongo");
 
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const sessionsRoutes = require("./routes/sessionsRoutes");
 
 const app = express();
 const PORT = 3003;
@@ -28,6 +29,7 @@ connectMongo();
 // Routes
 app.use("/api", authRoutes); // /api/register, /api/login, etc.
 app.use("/api", dashboardRoutes); // /api/me, /api/dashboard/users...
+app.use("/api", sessionsRoutes); // /api/sessions/...
 
 // Start
 app.listen(PORT, "0.0.0.0", () => {
