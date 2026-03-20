@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const User = require("../models/User");
+const Company = require("../models/Company");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
@@ -32,15 +34,24 @@ exports.register = async (req, res) => {
         const otpHash = await bcrypt.hash(verificationOtp, 10);
         const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 
+        // 0) Create Company first
+        const newCompany = new Company({
+            name: companyName || "My New Company",
+            mainAdminId: new mongoose.Types.ObjectId() // temp ID
+        });
+
         const newUser = new User({
             firstName, lastName, email: normalizedEmail, password: hashedPassword,
             phoneNumber: phoneNumber || "", companyName: companyName || "", 
             industry: industry || "", country: country || "", address: address || "",
             role: "admin", isEmailVerified: false,
             emailVerificationOtpHash: otpHash, emailVerificationOtpExpiresAt: otpExpiresAt,
-            emailVerificationOtpSentAt: new Date(), isMainAdmin: true
+            emailVerificationOtpSentAt: new Date(), isMainAdmin: true,
+            companyId: newCompany._id
         });
 
+        newCompany.mainAdminId = newUser._id;
+        await newCompany.save();
         await newUser.save();
 
         await sendEmail({
@@ -93,11 +104,11 @@ exports.login = async (req, res) => {
             });
         }
 
-        const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId }, JWT_SECRET, { expiresIn: "24h" });
 
         res.json({
             message: "Login successful", token,
-            user: { id: user._id, fullName: `${user.firstName} ${user.lastName}`, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }
+            user: { id: user._id, fullName: `${user.firstName} ${user.lastName}`, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, companyId: user.companyId }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -130,11 +141,11 @@ exports.verifyEmail = async (req, res) => {
         user.emailVerificationOtpHash = null; user.emailVerificationOtpExpiresAt = null; user.emailVerificationOtpSentAt = null;
         await user.save();
 
-        const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId }, JWT_SECRET, { expiresIn: "24h" });
 
         res.json({
             message: "Email verified successfully!", token,
-            user: { id: user._id, fullName: `${user.firstName} ${user.lastName}`, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role }
+            user: { id: user._id, fullName: `${user.firstName} ${user.lastName}`, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, companyId: user.companyId }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -204,5 +215,32 @@ exports.forgotPasswordReset = async (req, res) => {
         return res.json({ message: "Password reset successful. Please sign in." });
     } catch (error) {
         return res.status(500).json({ error: error.message });
+    }
+};
+
+exports.setPasswordFromInvite = async (req, res) => {
+    try {
+        const { token, password } = req.body;
+        if (!token || !password) return res.status(400).json({ message: "Token and password are required." });
+        if (password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters." });
+
+        const user = await User.findOne({ 
+            inviteToken: token,
+            inviteExpires: { $gt: Date.now() }
+        });
+
+        if (!user) return res.status(400).json({ message: "Invalid or expired invitation token." });
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+        user.inviteToken = null;
+        user.inviteExpires = null;
+        user.isInvited = false;
+        user.isEmailVerified = true; // Setting password from invite also verifies email
+        
+        await user.save();
+        res.json({ message: "Password set successfully! You can now sign in." });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };
