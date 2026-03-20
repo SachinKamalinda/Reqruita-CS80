@@ -2570,7 +2570,7 @@ export default function SessionsPage() {
 
               <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 Clicking assign will place the candidate into the selected
-                session and send the container 2 predefined assignment email.
+                session.
               </p>
             </div>
 
