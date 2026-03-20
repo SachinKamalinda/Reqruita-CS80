@@ -1,69 +1,302 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  fetchSettings,
+  fetchSessionsBootstrap,
+  getAllJobForms,
+  getFormSubmissions,
+} from "@/lib/api";
+
+interface SessionOverview {
+  id: string;
+  name: string;
+  jobTitle: string;
+  date: string;
+  candidateCount: number;
+  status: string;
+}
+
+interface SubmissionOverview {
+  id: string;
+  formTitle: string;
+  submitterEmail: string;
+  status: string;
+  createdAt: string;
+}
+
+interface DashboardStats {
+  activeForms: number;
+  totalSubmissions: number;
+  totalSessions: number;
+  assignedCandidates: number;
+}
+
+const formatDateLabel = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Not scheduled";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const toDateScore = (value: string): number => {
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+};
+
+const getSessionStatusClasses = (status: string): string => {
+  const normalized = status.toLowerCase();
+
+  if (normalized === "scheduled") {
+    return "bg-blue-100 text-blue-800";
+  }
+
+  if (normalized === "completed") {
+    return "bg-green-100 text-green-800";
+  }
+
+  return "bg-yellow-100 text-yellow-800";
+};
+
+const getSubmissionStatusClasses = (status: string): string => {
+  const normalized = status.toLowerCase();
+
+  if (normalized === "accepted") {
+    return "bg-green-100 text-green-800";
+  }
+
+  if (normalized === "rejected") {
+    return "bg-red-100 text-red-800";
+  }
+
+  if (normalized === "reviewed") {
+    return "bg-blue-100 text-blue-800";
+  }
+
+  return "bg-yellow-100 text-yellow-800";
+};
 
 export default function Dashboard() {
   const router = useRouter();
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // March 2026
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDescription, setTaskDescription] = useState("");
+  const [sessions, setSessions] = useState<SessionOverview[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionOverview[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
+    activeForms: 0,
+    totalSubmissions: 0,
+    totalSessions: 0,
+    assignedCandidates: 0,
+  });
+  const [userName, setUserName] = useState("User");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Sessions data
-  const sessions = [
-    {
-      id: "session-1",
-      name: "Frontend Engineers - Round 1",
-      jobTitle: "Senior Frontend Engineer",
-      date: "July 25, 2025",
-      candidates: 5,
-      status: "Scheduled",
-    },
-    {
-      id: "session-2",
-      name: "Backend Engineers - Round 1",
-      jobTitle: "Backend Engineer",
-      date: "July 26, 2025",
-      candidates: 3,
-      status: "Scheduled",
-    },
-  ];
+  const todayLabel = useMemo(
+    () =>
+      new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+    [],
+  );
 
-  const handleCreateTask = () => {
-    if (taskTitle.trim()) {
-      alert(`Task created: ${taskTitle}`);
-      setTaskTitle("");
-      setTaskDescription("");
-      setShowTaskModal(false);
-    }
-  };
+  useEffect(() => {
+    let isMounted = true;
 
-  const handlePrevMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1),
-    );
-  };
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-  const handleNextMonth = () => {
-    setCurrentDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1),
-    );
-  };
+        const [settingsResult, sessionsResult, formsResult] =
+          await Promise.allSettled([
+            fetchSettings(),
+            fetchSessionsBootstrap(),
+            getAllJobForms(),
+          ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (settingsResult.status === "fulfilled") {
+          setUserName(settingsResult.value.firstName || "User");
+        }
+
+        if (sessionsResult.status === "fulfilled") {
+          const sessionsData = sessionsResult.value;
+          const jobsById = new Map(
+            sessionsData.jobs.map((job) => [
+              job.id,
+              job.title || job.jobRole || "Interview Session",
+            ]),
+          );
+
+          const upcomingSessions = sessionsData.sessions
+            .filter((session) => session.status !== "Completed")
+            .sort(
+              (a, b) => toDateScore(a.sessionDate) - toDateScore(b.sessionDate),
+            )
+            .slice(0, 5)
+            .map((session) => ({
+              id: session.id,
+              name: session.name,
+              jobTitle: jobsById.get(session.jobId) || "Interview Session",
+              date: formatDateLabel(session.sessionDate),
+              candidateCount: session.candidates?.length || 0,
+              status: session.status,
+            }));
+
+          setSessions(upcomingSessions);
+          setStats((prev) => ({
+            ...prev,
+            totalSessions: sessionsData.sessions.length,
+            assignedCandidates: sessionsData.sessions.reduce(
+              (count, session) => count + (session.candidates?.length || 0),
+              0,
+            ),
+          }));
+        } else {
+          setSessions([]);
+        }
+
+        if (formsResult.status === "fulfilled") {
+          const formsData = formsResult.value;
+
+          setStats((prev) => ({
+            ...prev,
+            activeForms: formsData.forms.filter((form) => form.isActive).length,
+            totalSubmissions: formsData.forms.reduce(
+              (count, form) => count + (form.submissionCount || 0),
+              0,
+            ),
+          }));
+
+          const submissionsByForm = await Promise.allSettled(
+            formsData.forms.map(async (form) => {
+              const submissionsData = await getFormSubmissions(form._id, {
+                sortBy: "latest",
+                page: 1,
+                limit: 5,
+              });
+
+              return submissionsData.submissions.map((submission) => ({
+                id: submission._id,
+                formTitle: form.title,
+                submitterEmail:
+                  submission.submitterEmail || "unknown@example.com",
+                status: submission.status || "submitted",
+                createdAt: submission.createdAt,
+              }));
+            }),
+          );
+
+          if (!isMounted) {
+            return;
+          }
+
+          const mergedSubmissions = submissionsByForm
+            .flatMap((result) =>
+              result.status === "fulfilled" ? result.value : [],
+            )
+            .sort((a, b) => toDateScore(b.createdAt) - toDateScore(a.createdAt))
+            .slice(0, 5);
+
+          setSubmissions(mergedSubmissions);
+        } else {
+          setSubmissions([]);
+        }
+
+        if (
+          settingsResult.status === "rejected" ||
+          sessionsResult.status === "rejected" ||
+          formsResult.status === "rejected"
+        ) {
+          setError("Some dashboard data could not be loaded.");
+        }
+      } catch (loadError) {
+        console.error("Error loading dashboard:", loadError);
+        if (isMounted) {
+          setError("Failed to load dashboard data.");
+          setSessions([]);
+          setSubmissions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    const intervalId = setInterval(loadData, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
 
   return (
     <div className="grid gap-8">
-      {/* Left Column: Stats & Tables */}
       <div className="space-y-8">
         <div>
-          <p className="text-gray-500">Friday, March 2, 2026</p>
-          <h1 className="text-3xl font-bold">Good day, Bob!</h1>
+          <p className="text-gray-500">{todayLabel}</p>
+          <h1 className="text-3xl font-bold">Good day, {userName}!</h1>
+          {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
         </div>
 
-        {/* Sessions Card */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Active Job Forms
+            </p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {stats.activeForms}
+            </p>
+          </div>
+          <div className="rounded-2xl border bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Total Submissions
+            </p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {stats.totalSubmissions}
+            </p>
+          </div>
+          <div className="rounded-2xl border bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Interview Sessions
+            </p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {stats.totalSessions}
+            </p>
+          </div>
+          <div className="rounded-2xl border bg-white p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Assigned Candidates
+            </p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {stats.assignedCandidates}
+            </p>
+          </div>
+        </div>
+
         <div className="bg-white rounded-2xl border p-6 min-h-[200px]">
           <h2 className="text-xl font-bold mb-6">Upcoming Sessions</h2>
-          {sessions.length > 0 ? (
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
+            </div>
+          ) : sessions.length > 0 ? (
             <div className="space-y-4">
               {sessions.map((session) => (
                 <div
@@ -77,7 +310,7 @@ export default function Dashboard() {
                         {session.jobTitle}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {session.date} • {session.candidates} candidates
+                        {session.date} - {session.candidateCount} candidates
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -87,7 +320,9 @@ export default function Dashboard() {
                       >
                         View Session
                       </button>
-                      <span className="text-sm font-medium text-[#5D20B3] bg-purple-100 px-3 py-1 rounded-full">
+                      <span
+                        className={`rounded-full px-3 py-1 text-sm font-medium ${getSessionStatusClasses(session.status)}`}
+                      >
                         {session.status}
                       </span>
                     </div>
@@ -97,16 +332,15 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="text-center py-10 text-gray-400">
-              No upcoming sessions
+              No upcoming sessions. Create one in the Sessions page.
             </div>
           )}
         </div>
 
-        {/* Submissions Table */}
         <div className="bg-white rounded-2xl border p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold">
-              Job Application Form Submissions
+              Recent Job Application Submissions
             </h2>
             <button
               onClick={() => router.push("/job-forms")}
@@ -115,32 +349,60 @@ export default function Dashboard() {
               View All &gt;
             </button>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-gray-400 border-b">
-                <th className="py-3 font-medium">Date</th>
-                <th className="py-3 font-medium">Job Role</th>
-                <th className="py-3 font-medium">Name</th>
-                <th className="py-3 font-medium">Email</th>
-                <th className="py-3 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  <td className="py-4">July 16, 2025</td>
-                  <td className="py-4">Software Engineer</td>
-                  <td className="py-4">John</td>
-                  <td className="py-4">john@email.com</td>
-                  <td className="py-4">
-                    <button className="bg-[#5D20B3] text-white px-3 py-1 rounded text-xs hover:bg-[#4a1a8a]">
-                      View
-                    </button>
-                  </td>
+
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
+            </div>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="text-gray-400 border-b">
+                  <th className="py-3 font-medium">Form</th>
+                  <th className="py-3 font-medium">Email</th>
+                  <th className="py-3 font-medium">Status</th>
+                  <th className="py-3 font-medium">Submitted</th>
+                  <th className="py-3 font-medium">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y">
+                {submissions.length > 0 ? (
+                  submissions.map((submission) => (
+                    <tr key={submission.id} className="hover:bg-gray-50">
+                      <td className="py-4">{submission.formTitle}</td>
+                      <td className="py-4 text-purple-600">
+                        {submission.submitterEmail}
+                      </td>
+                      <td className="py-4">
+                        <span
+                          className={`rounded px-2 py-1 text-xs font-medium ${getSubmissionStatusClasses(submission.status)}`}
+                        >
+                          {submission.status}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        {formatDateLabel(submission.createdAt)}
+                      </td>
+                      <td className="py-4">
+                        <button
+                          onClick={() => router.push("/job-forms")}
+                          className="bg-[#5D20B3] text-white px-3 py-1 rounded text-xs hover:bg-[#4a1a8a]"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-500">
+                      No submissions yet
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
