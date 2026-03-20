@@ -1,16 +1,24 @@
 const mongoose = require("mongoose");
 
-const userSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema(
+  {
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     fullName: { type: String, trim: true },
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
-    password: { type: String },
+    password: { type: String,},
     phoneNumber: { type: String, trim: true, default: "" },
     companyName: { type: String, trim: true, default: "" },
+    jobTitle: { type: String, trim: true, default: "" },
     industry: { type: String, trim: true, default: "" },
     country: { type: String, trim: true, default: "" },
     address: { type: String, trim: true, default: "" },
+    notificationPreferences: {
+      weeklyDigest: { type: Boolean, default: true },
+      interviewReminders: { type: Boolean, default: true },
+      candidateAlerts: { type: Boolean, default: true },
+      securityAlerts: { type: Boolean, default: true },
+    },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
     role: { type: String, enum: ["admin", "interviewer", "recruiter", "hr manager", "candidate"], required: true },
     status: { type: String, enum: ["active", "inactive"], default: "active" },

@@ -3,7 +3,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { getToken, removeToken, getStoredUser } from "@/lib/api";
+import {
+  getToken,
+  removeToken,
+  getStoredUser,
+  USER_UPDATED_EVENT,
+  type AuthUser,
+} from "@/lib/api";
 
 type NotificationItem = {
   id: number;
@@ -139,27 +145,52 @@ export default function DashboardLayout({
         </svg>
       ),
     },
+    {
+      label: "Settings",
+      href: "/settings",
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.314 2.314 1.724 1.724 0 001.066 2.573 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.066 2.573 1.724 1.724 0 01-2.314 2.314 1.724 1.724 0 00-2.573 1.066 1.724 1.724 0 01-3.35 0 1.724 1.724 0 00-2.573-1.066 1.724 1.724 0 01-2.314-2.314 1.724 1.724 0 00-1.066-2.573 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 012.314-2.314 1.724 1.724 0 002.573-1.066z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+        </svg>
+      ),
+    },
   ];
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     const initAuth = async () => {
       // Check for token in URL (passed from landing page)
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
-        const urlToken = params.get('token');
-        
+        const urlToken = params.get("token");
+
         if (urlToken) {
-          localStorage.setItem('reqruita_token', urlToken);
+          localStorage.setItem("reqruita_token", urlToken);
           const newUrl = window.location.pathname;
-          window.history.replaceState({}, '', newUrl);
+          window.history.replaceState({}, "", newUrl);
         }
       }
 
       // Try to get stored user first
       let storedUser = getStoredUser();
-      
+
       // If we have a token but no user data, fetch it
       if (!storedUser && getToken()) {
         try {
@@ -171,11 +202,35 @@ export default function DashboardLayout({
           console.error("Failed to fetch current user profile:", err);
         }
       }
-      
+
       setCurrentUser(storedUser);
     };
 
     initAuth();
+  }, []);
+
+  useEffect(() => {
+    const syncCurrentUser = () => {
+      setCurrentUser(getStoredUser());
+    };
+
+    const handleUserUpdated = () => {
+      syncCurrentUser();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "reqruita_user") {
+        syncCurrentUser();
+      }
+    };
+
+    window.addEventListener(USER_UPDATED_EVENT, handleUserUpdated);
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(USER_UPDATED_EVENT, handleUserUpdated);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const isActive = (href: string) => {
@@ -344,7 +399,14 @@ export default function DashboardLayout({
               >
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center font-bold text-white shadow-md">
                   {currentUser
-                    ? (currentUser.firstName || currentUser.fullName || currentUser.email || "U").charAt(0).toUpperCase()
+                    ? (
+                        currentUser.firstName ||
+                        currentUser.fullName ||
+                        currentUser.email ||
+                        "U"
+                      )
+                        .charAt(0)
+                        .toUpperCase()
                     : "U"}
                 </div>
                 <div className="text-left">
