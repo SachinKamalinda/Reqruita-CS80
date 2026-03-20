@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getToken } from "@/lib/api";
+import { getToken, AUTH_API_BASE } from "@/lib/api";
 
 export default function UserRolesPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -9,7 +9,6 @@ export default function UserRolesPage() {
 
   // Form State
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("interviewer");
@@ -59,16 +58,19 @@ export default function UserRolesPage() {
         console.error("Error decoding token");
       }
 
-      const res = await fetch("http://localhost:3003/api/dashboard/users", {
+      const res = await fetch(`${AUTH_API_BASE}/api/dashboard/users`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
 
       const data = await res.json();
       if (res.ok) {
         setUsers(data);
+      } else {
+        setError(data.message || "Failed to load users. Your session might have expired.");
       }
     } catch (err) {
       console.error("Failed to fetch users", err);
+      setError("Network error: Could not reach the backend dashboard.");
     } finally {
       setLoading(false);
     }
@@ -79,8 +81,8 @@ export default function UserRolesPage() {
     setError("");
     setSuccess("");
 
-    if (!email || !password || !role) {
-      setError("Please fill all fields");
+    if (!email || !role) {
+      setError("Please fill all required fields");
       return;
     }
 
@@ -98,23 +100,22 @@ export default function UserRolesPage() {
         return;
       }
 
-      console.log("Sending Add User data:", { email, password, role, firstName, lastName });
-      const res = await fetch("http://localhost:3003/api/dashboard/users/add-user", {
+      console.log("Sending Add User data:", { email, role, firstName, lastName });
+      const res = await fetch(`${AUTH_API_BASE}/api/dashboard/users/add-user`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ email, password, role, firstName, lastName })
+        body: JSON.stringify({ email, role, firstName, lastName })
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.message || "Failed to add user");
+        setError(data.message || "Failed to invite user");
       } else {
-        setSuccess(data.message || "User added successfully!");
+        setSuccess(data.message || "Invitation sent successfully!");
         setEmail("");
-        setPassword("");
         setFirstName("");
         setLastName("");
         setRole("interviewer");
@@ -150,7 +151,7 @@ export default function UserRolesPage() {
       const token = getToken();
       if (!token) return;
 
-      const res = await fetch(`http://localhost:3003/api/dashboard/users/${userToEdit._id}`, {
+      const res = await fetch(`${AUTH_API_BASE}/api/dashboard/users/${userToEdit._id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -192,7 +193,7 @@ export default function UserRolesPage() {
         return;
       }
 
-      const res = await fetch(`http://localhost:3003/api/dashboard/users/${userToDelete}`, {
+      const res = await fetch(`${AUTH_API_BASE}/api/dashboard/users/${userToDelete}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -242,9 +243,16 @@ export default function UserRolesPage() {
           <button
             onClick={() => setIsModalOpen(true)}
             className="bg-[#5D20B3] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#4a1a8a] transition-colors shadow-sm">
-            Add New User
+            Invite New User
           </button>
         </div>
+
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3">
+             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path></svg>
+             <p className="text-sm font-medium">{error}</p>
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-8 text-gray-500">Loading users...</div>
@@ -367,8 +375,8 @@ export default function UserRolesPage() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <h2 className="text-2xl font-bold mb-1 text-slate-800">Add New User</h2>
-            <p className="text-sm text-slate-500 mb-6">Create a new account and assign a role.</p>
+            <h2 className="text-2xl font-bold mb-1 text-slate-800">Invite New User</h2>
+            <p className="text-sm text-slate-500 mb-6">Send an invitation link to join the dashboard.</p>
 
             {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200 flex items-center gap-2"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>{error}</div>}
             {success && <div className="mb-4 text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200 flex items-center gap-2"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>{success}</div>}
@@ -409,18 +417,6 @@ export default function UserRolesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Assigned Passkey</label>
-                <input
-                  type="text"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#5D20B3]/20 focus:border-[#5D20B3] outline-none transition-all"
-                  placeholder="Enter a secure passkey for them"
-                />
-                <p className="text-xs text-slate-500 mt-1">This passkey will be visible on the dashboard.</p>
-              </div>
-
-              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Select Role</label>
                 <select
                   value={role}
@@ -429,6 +425,8 @@ export default function UserRolesPage() {
                 >
                   <option value="admin">Administrator</option>
                   <option value="interviewer">Interviewer</option>
+                  <option value="recruiter">Recruiter</option>
+                  <option value="hr manager">HR Manager</option>
                 </select>
               </div>
 
@@ -444,7 +442,7 @@ export default function UserRolesPage() {
                   type="submit"
                   className="px-5 py-2 bg-[#5D20B3] text-white font-medium hover:bg-[#4a1a8a] rounded-lg transition-all shadow-sm flex items-center gap-2"
                 >
-                  Confirm
+                  Send Invitation
                 </button>
               </div>
             </form>

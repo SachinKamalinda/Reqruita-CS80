@@ -29,6 +29,8 @@ const sendEmail = async ({ to, firstName, otp, subject, type, resetUrl }) => {
         text = `Hi ${firstName || "there"},\n\nVerify your sign-in with this code:\n\n${otp}\n\nThis code expires in 15 minutes.\n\nIf you did not attempt to sign in, please ignore this email.`;
     } else if (type === "reset-password") {
         text = `Hi ${firstName || "there"},\n\nReset your Reqruita password with this code:\n\n${otp}\n\nThis code expires in ${RESET_OTP_EXPIRES_MINUTES} minutes.\n\nReset here: ${resetUrl}\n\nIf you did not request this, please ignore this email.`;
+    } else if (type === "invite-user") {
+        text = `Hi ${firstName || "there"},\n\nYou have been invited to join the Reqruita dashboard.\n\nPlease set up your account password by clicking the link below:\n\n${resetUrl || ""}\n\nThis link expires in 24 hours.\n\nWelcome aboard!`;
     }
 
     try {

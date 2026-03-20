@@ -7,5 +7,6 @@ router.post("/login", authController.login);
 router.post("/verify-email", authController.verifyEmail);
 router.post("/forgot-password/request", authController.forgotPasswordRequest);
 router.post("/forgot-password/reset", authController.forgotPasswordReset);
+router.post("/set-password", authController.setPasswordFromInvite);
 
 module.exports = router;
