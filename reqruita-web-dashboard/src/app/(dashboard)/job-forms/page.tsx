@@ -32,6 +32,72 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   link: "Link",
 };
 
+const DEFAULT_UNKNOWN_EMAIL = "unknown@example.com";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+const getSubmissionEntries = (submittedData: unknown): Array<[string, unknown]> => {
+  if (submittedData instanceof Map) {
+    return Array.from(submittedData.entries());
+  }
+
+  if (submittedData && typeof submittedData === "object") {
+    return Object.entries(submittedData as Record<string, unknown>);
+  }
+
+  return [];
+};
+
+const normalizePotentialEmail = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+};
+
+const resolveSubmissionEmail = (submission: FormSubmission): string => {
+  const directEmail = normalizePotentialEmail(submission.submitterEmail);
+  if (directEmail && directEmail !== DEFAULT_UNKNOWN_EMAIL) {
+    return directEmail;
+  }
+
+  const submittedEntries = getSubmissionEntries(submission.submittedData);
+
+  const fromNamedEmailField = submittedEntries
+    .map(([key, value]) => ({
+      key: key.toLowerCase(),
+      email: normalizePotentialEmail(value),
+    }))
+    .find(
+      (entry) =>
+        !!entry.email &&
+        entry.key.includes("email") &&
+        entry.email !== DEFAULT_UNKNOWN_EMAIL,
+    )?.email;
+
+  if (fromNamedEmailField) {
+    return fromNamedEmailField;
+  }
+
+  const inferredEmail = submittedEntries
+    .map(([, value]) => normalizePotentialEmail(value))
+    .find(
+      (email): email is string =>
+        !!email && email !== DEFAULT_UNKNOWN_EMAIL,
+    );
+
+  if (inferredEmail) {
+    return inferredEmail;
+  }
+
+  return directEmail || DEFAULT_UNKNOWN_EMAIL;
+};
+
 export default function JobFormsPage() {
   const [templates, setTemplates] = useState<JobForm[]>([]);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
@@ -119,6 +185,7 @@ export default function JobFormsPage() {
 
           return formSubmissions.map((submission) => ({
             ...submission,
+            submitterEmail: resolveSubmissionEmail(submission),
             formTitle: form.title,
           }));
         }),
@@ -146,7 +213,12 @@ export default function JobFormsPage() {
         sortBy,
         status: filterStatus === "all" ? undefined : filterStatus,
       });
-      setSubmissions(data);
+      setSubmissions(
+        data.map((submission) => ({
+          ...submission,
+          submitterEmail: resolveSubmissionEmail(submission),
+        })),
+      );
       setSelectedFormId(formId);
     } catch (error) {
       console.error("Failed to load submissions:", error);
