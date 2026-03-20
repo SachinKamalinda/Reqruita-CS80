@@ -61,6 +61,7 @@ export interface SessionInterviewer {
   id: string;
   name: string;
   email: string;
+  role: string;
   specialty: string;
 }
 
