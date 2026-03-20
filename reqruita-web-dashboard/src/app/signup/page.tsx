@@ -1,24 +1,127 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { signup, saveToken, saveUser } from '@/lib/api';
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { signup } from "@/lib/api";
+import countries from "world-countries";
+
+type PasswordStrength = {
+  score: number;
+  label: "Too weak" | "Weak" | "Fair" | "Good" | "Strong";
+  barClass: string;
+  textClass: string;
+};
+
+const getPasswordStrength = (password: string): PasswordStrength => {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+  if (password.length === 0) {
+    return {
+      score: 0,
+      label: "Too weak",
+      barClass: "bg-gray-200",
+      textClass: "text-gray-500",
+    };
+  }
+
+  if (score <= 1) {
+    return {
+      score,
+      label: "Weak",
+      barClass: "bg-red-500",
+      textClass: "text-red-600",
+    };
+  }
+
+  if (score === 2) {
+    return {
+      score,
+      label: "Fair",
+      barClass: "bg-orange-500",
+      textClass: "text-orange-600",
+    };
+  }
+
+  if (score === 3) {
+    return {
+      score,
+      label: "Good",
+      barClass: "bg-yellow-500",
+      textClass: "text-yellow-700",
+    };
+  }
+
+  return {
+    score,
+    label: "Strong",
+    barClass: "bg-green-500",
+    textClass: "text-green-600",
+  };
+};
+
+type CountryPhoneOption = {
+  code: string;
+  name: string;
+  flag: string;
+  dialCode: string;
+};
+
+const getDialCode = (country: (typeof countries)[number]): string => {
+  const root = country.idd?.root || "";
+
+  if (!root) return "";
+
+  // Remove asterisk (placeholder for variable suffixes)
+  const cleanRoot = root.replace(/-\*$/, "");
+
+  // NANP countries share +1; suffixes in the dataset are area-code variants.
+  if (cleanRoot === "+1") {
+    return "+1";
+  }
+
+  // For other countries, append first suffix if exists
+  const firstSuffix = country.idd?.suffixes?.[0] || "";
+  return `${cleanRoot}${firstSuffix}`.trim();
+};
 
 export default function SignupPage() {
   const router = useRouter();
 
+  const countryOptions = useMemo<CountryPhoneOption[]>(() => {
+    return countries
+      .map((country) => {
+        const dialCode = getDialCode(country);
+
+        return {
+          code: country.cca2,
+          name: country.name.common,
+          flag: country.flag || "",
+          dialCode,
+        };
+      })
+      .filter((country) => country.dialCode)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
+  const [phoneCountryCode, setPhoneCountryCode] = useState("US");
+  const [localPhoneNumber, setLocalPhoneNumber] = useState("");
+
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phoneNumber: '',
-    companyName: '',
-    industry: '',
-    country: '',
-    address: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phoneNumber: "",
+    companyName: "",
+    industry: "",
+    country: "",
+    address: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -26,7 +129,25 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const selectedPhoneCountry =
+    countryOptions.find((country) => country.code === phoneCountryCode) ||
+    countryOptions[0];
+
+  useEffect(() => {
+    const sanitized = localPhoneNumber.replace(/[^\d]/g, "");
+    const fullPhoneNumber = sanitized
+      ? `${selectedPhoneCountry?.dialCode || ""}${sanitized}`
+      : "";
+
+    setFormData((prev) => ({
+      ...prev,
+      phoneNumber: fullPhoneNumber,
+    }));
+  }, [localPhoneNumber, selectedPhoneCountry?.dialCode]);
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (error) setError(null);
@@ -37,24 +158,24 @@ export default function SignupPage() {
     setError(null);
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match.');
+      setError("Passwords do not match.");
       return;
     }
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError("Password must be at least 8 characters.");
       return;
     }
 
     setIsLoading(true);
     try {
-      const result = await signup(formData);
+      await signup(formData);
       // Redirect to email verification page instead of saving token
       router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (err: unknown) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Registration failed. Please try again.',
+          : "Registration failed. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -63,7 +184,12 @@ export default function SignupPage() {
 
   // Tailwind class constants for reuse
   const inputBase =
-    'w-full py-2.5 px-3.5 border-[1.5px] border-gray-200 rounded-xl bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 placeholder:text-gray-400 placeholder:font-normal hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)]';
+    "w-full py-2.5 px-3.5 border-[1.5px] border-gray-200 rounded-xl bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 placeholder:text-gray-400 placeholder:font-normal hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)]";
+
+  const passwordStrength = getPasswordStrength(formData.password);
+  const isConfirmMismatch =
+    formData.confirmPassword.length > 0 &&
+    formData.confirmPassword !== formData.password;
 
   return (
     <div
@@ -101,7 +227,7 @@ export default function SignupPage() {
               Create your Reqruita account
             </h2>
             <p className="text-sm text-gray-400 text-center mb-6">
-              Already have an account?{' '}
+              Already have an account?{" "}
               <Link
                 href="/signin"
                 className="text-purple-600 font-semibold hover:text-purple-700 transition-colors"
@@ -182,7 +308,7 @@ export default function SignupPage() {
                   </label>
                   <div className="relative">
                     <input
-                      type={showPassword ? 'text' : 'password'}
+                      type={showPassword ? "text" : "password"}
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
@@ -232,6 +358,23 @@ export default function SignupPage() {
                       )}
                     </button>
                   </div>
+                  {formData.password.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${passwordStrength.barClass}`}
+                          style={{
+                            width: `${(passwordStrength.score / 4) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <p
+                        className={`text-xs font-medium ${passwordStrength.textClass}`}
+                      >
+                        Password strength: {passwordStrength.label}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="block text-[13px] font-semibold text-gray-700 tracking-[0.01em]">
@@ -239,12 +382,16 @@ export default function SignupPage() {
                   </label>
                   <div className="relative">
                     <input
-                      type={showConfirmPassword ? 'text' : 'password'}
+                      type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
                       placeholder="••••••••"
-                      className={`${inputBase} pr-10`}
+                      className={`${inputBase} pr-10 ${
+                        isConfirmMismatch
+                          ? "border-red-300 bg-red-50 focus:border-red-500 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.12)]"
+                          : ""
+                      }`}
                     />
                     <button
                       type="button"
@@ -291,6 +438,11 @@ export default function SignupPage() {
                       )}
                     </button>
                   </div>
+                  {isConfirmMismatch && (
+                    <p className="mt-1 text-xs font-medium text-red-600">
+                      Confirm password does not match.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -299,12 +451,30 @@ export default function SignupPage() {
                 <label className="block text-[13px] font-semibold text-gray-700 tracking-[0.01em]">
                   Phone Number
                 </label>
-                <div className="relative">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={phoneCountryCode}
+                    onChange={(event) =>
+                      setPhoneCountryCode(event.target.value)
+                    }
+                    className="py-2.5 px-2 border-[1.5px] border-gray-200 rounded-lg bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white min-w-fit"
+                  >
+                    {countryOptions.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.flag} {country.dialCode}
+                      </option>
+                    ))}
+                  </select>
                   <input
-                    name="phoneNumber"
-                    value={formData.phoneNumber}
-                    onChange={handleInputChange}
-                    className={`${inputBase} pr-20`}
+                    type="tel"
+                    value={localPhoneNumber}
+                    onChange={(event) =>
+                      setLocalPhoneNumber(
+                        event.target.value.replace(/[^\d]/g, ""),
+                      )
+                    }
+                    placeholder="Phone number"
+                    className="flex-1 py-2.5 px-3.5 border-[1.5px] border-gray-200 rounded-lg bg-gray-50 outline-none text-sm text-gray-900 transition-all duration-150 placeholder:text-gray-400 placeholder:font-normal hover:border-gray-300 hover:bg-gray-100 focus:border-purple-600 focus:bg-white focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)]"
                   />
                 </div>
               </div>
@@ -339,12 +509,19 @@ export default function SignupPage() {
                   <label className="block text-[13px] font-semibold text-gray-700 tracking-[0.01em]">
                     Country
                   </label>
-                  <input
+                  <select
                     name="country"
                     value={formData.country}
                     onChange={handleInputChange}
                     className={inputBase}
-                  />
+                  >
+                    <option value="">Select country</option>
+                    {countryOptions.map((country) => (
+                      <option key={country.code} value={country.name}>
+                        {country.flag} {country.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -392,7 +569,7 @@ export default function SignupPage() {
                     Creating account…
                   </>
                 ) : (
-                  'Create Account'
+                  "Create Account"
                 )}
               </button>
               {/* Hiding social signups temporarily */}

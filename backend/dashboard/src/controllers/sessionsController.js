@@ -1,6 +1,7 @@
-const SessionJobForm = require("../models/SessionJobForm");
+const { Types } = require("mongoose");
+const JobForm = require("../models/JobForm");
+const FormSubmission = require("../models/FormSubmission");
 const SessionInterviewer = require("../models/SessionInterviewer");
-const SessionCandidate = require("../models/SessionCandidate");
 const InterviewSession = require("../models/InterviewSession");
 const SessionEmailTemplate = require("../models/SessionEmailTemplate");
 const SessionEmailLog = require("../models/SessionEmailLog");
@@ -11,27 +12,6 @@ const SESSION_ACCESS_ROLES = new Set([
   "hr manager",
   "interviewer",
 ]);
-
-const DEFAULT_JOB_FORMS = [
-  {
-    jobId: "JOB-SE-2026",
-    title: "Senior Software Engineer",
-    position: "Software Engineer",
-    applicants: 120,
-  },
-  {
-    jobId: "JOB-FE-2026",
-    title: "Frontend Engineer",
-    position: "Frontend Engineer",
-    applicants: 90,
-  },
-  {
-    jobId: "JOB-QA-2026",
-    title: "QA Automation Engineer",
-    position: "QA Engineer",
-    applicants: 70,
-  },
-];
 
 const DEFAULT_INTERVIEWERS = [
   {
@@ -87,60 +67,92 @@ const EMAIL_OPTION_TO_CATEGORY = {
 
 const RESULT_VALUES = new Set(["Pending", "Passed", "Failed", "On Hold"]);
 
-const FIRST_NAMES = [
-  "Alex",
-  "Jordan",
-  "Taylor",
-  "Sam",
-  "Riley",
-  "Casey",
-  "Avery",
-  "Morgan",
-  "Drew",
-  "Skyler",
-  "Parker",
-  "Jamie",
-  "Elliot",
-  "Kris",
-  "Quinn",
-];
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
-const LAST_NAMES = [
-  "Perera",
-  "Silva",
-  "Fernando",
-  "Jayasuriya",
-  "Gunasekara",
-  "Wijesinghe",
-  "Dias",
-  "Ramanayake",
-  "Abeysekera",
-  "Ilangakoon",
-  "Mendis",
-  "Samarasinghe",
-  "Seneviratne",
-  "Karunaratne",
-  "Bandara",
-];
+const isValidObjectId = (value) => Types.ObjectId.isValid(String(value || ""));
 
-const LOCATIONS = [
-  "Colombo",
-  "Kandy",
-  "Galle",
-  "Jaffna",
-  "Negombo",
-  "Kurunegala",
-  "Matara",
-  "Nugegoda",
-];
+const normalizeKey = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 
-const addDays = (date, days) => {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
-  return copy;
+const toSafeString = (value) => {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value.trim();
+  return String(value).trim();
 };
 
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const normalizeSubmissionData = (submittedData) => {
+  if (!submittedData || typeof submittedData !== "object") {
+    return {};
+  }
+
+  if (submittedData instanceof Map) {
+    return Object.fromEntries(submittedData.entries());
+  }
+
+  return submittedData;
+};
+
+const buildSubmissionEntries = (submission) => {
+  const data = normalizeSubmissionData(submission.submittedData);
+
+  return Object.entries(data).map(([key, value]) => ({
+    normalizedKey: normalizeKey(key),
+    value: toSafeString(value),
+  }));
+};
+
+const pickEntryByExactKey = (entries, keys) => {
+  for (const key of keys) {
+    const normalizedKey = normalizeKey(key);
+    const match = entries.find((entry) => entry.normalizedKey === normalizedKey);
+    if (match && match.value) {
+      return match.value;
+    }
+  }
+
+  return "";
+};
+
+const pickEntryByPartialKey = (entries, hints) => {
+  for (const hint of hints) {
+    const normalizedHint = normalizeKey(hint);
+    const match = entries.find(
+      (entry) => entry.normalizedKey.includes(normalizedHint) && entry.value,
+    );
+    if (match) {
+      return match.value;
+    }
+  }
+
+  return "";
+};
+
+const parseExperienceYears = (value) => {
+  const numericValue = Number.parseInt(String(value || "").replace(/[^0-9]/g, ""), 10);
+  if (Number.isNaN(numericValue)) {
+    return 0;
+  }
+  return clamp(numericValue, 0, 50);
+};
+
+const buildFallbackNameFromEmail = (email) => {
+  const normalizedEmail = toSafeString(email).toLowerCase();
+  if (!normalizedEmail.includes("@")) {
+    return "Applicant";
+  }
+
+  const localPart = normalizedEmail.split("@")[0] || "";
+  const words = localPart
+    .split(/[._-]/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1));
+
+  return words.length > 0 ? words.join(" ") : "Applicant";
+};
 
 const isValidTime = (value) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(value || "");
 
@@ -180,22 +192,6 @@ const applyEmailTemplate = (template, values) =>
     return value === undefined || value === null ? "" : String(value);
   });
 
-const toTimeString = (baseTime, additionalMinutes) => {
-  const [hoursPart, minutesPart] = String(baseTime || "09:00").split(":");
-  const hours = Number.parseInt(hoursPart, 10);
-  const minutes = Number.parseInt(minutesPart, 10);
-
-  const total = (Number.isNaN(hours) ? 9 : hours) * 60 +
-    (Number.isNaN(minutes) ? 0 : minutes) +
-    additionalMinutes;
-
-  const safeTotal = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
-  const hh = String(Math.floor(safeTotal / 60)).padStart(2, "0");
-  const mm = String(safeTotal % 60).padStart(2, "0");
-
-  return `${hh}:${mm}`;
-};
-
 const sanitizeSessionToken = (value) =>
   String(value || "")
     .replace(/[^A-Za-z0-9]/g, "")
@@ -210,36 +206,11 @@ const generateSessionMeetingPassword = (sessionId) => {
   return `RQ${suffix}`;
 };
 
-const buildCandidatesForJob = (jobId, total) =>
-  Array.from({ length: total }, (_, index) => {
-    const first = FIRST_NAMES[index % FIRST_NAMES.length];
-    const last = LAST_NAMES[Math.floor(index / FIRST_NAMES.length) % LAST_NAMES.length];
-    const sequence = index + 1;
-    const emailFirst = first.toLowerCase();
-    const emailLast = last.toLowerCase();
-    const location = LOCATIONS[index % LOCATIONS.length];
-    const experienceYears = (index % 8) + 1;
-
-    return {
-      candidateId: `${jobId}-C${sequence.toString().padStart(3, "0")}`,
-      jobId,
-      name: `${first} ${last}`,
-      email: `${emailFirst}.${emailLast}${sequence}@mail.reqruita.com`,
-      phone: `+94 77 ${String(1000000 + sequence).slice(-7)}`,
-      location,
-      experienceYears,
-      portfolioUrl: `https://portfolio.reqruita.dev/${emailFirst}-${emailLast}-${sequence}`,
-      resumeFile: `${first}_${last}_${sequence}.pdf`,
-      appliedDate: addDays(new Date(), -((index % 24) + 1)),
-      summary: `${experienceYears} years in engineering with emphasis on clean architecture, communication, and production delivery.`,
-    };
-  });
-
 const serializeJob = (job) => ({
-  id: job.jobId,
+  id: String(job._id),
   title: job.title,
-  position: job.position,
-  applicants: job.applicants,
+  position: job.jobRole || job.title,
+  applicants: Number.isFinite(job.submissionCount) ? job.submissionCount : 0,
 });
 
 const serializeInterviewer = (interviewer) => ({
@@ -249,19 +220,66 @@ const serializeInterviewer = (interviewer) => ({
   specialty: interviewer.specialty,
 });
 
-const serializeCandidate = (candidate) => ({
-  id: candidate.candidateId,
-  jobId: candidate.jobId,
-  name: candidate.name,
-  email: candidate.email,
-  phone: candidate.phone,
-  location: candidate.location,
-  experienceYears: candidate.experienceYears,
-  portfolioUrl: candidate.portfolioUrl,
-  resumeFile: candidate.resumeFile,
-  appliedDate: formatDateInput(candidate.appliedDate),
-  summary: candidate.summary,
-});
+const serializeCandidate = (submission) => {
+  const entries = buildSubmissionEntries(submission);
+
+  const firstName = pickEntryByExactKey(entries, ["firstName", "fname"]);
+  const lastName = pickEntryByExactKey(entries, ["lastName", "lname"]);
+  const fullName =
+    pickEntryByExactKey(entries, ["fullName", "name", "candidateName", "applicantName"]) ||
+    pickEntryByPartialKey(entries, ["fullname", "candidatename", "applicantname"]);
+
+  const fallbackEmail = toSafeString(submission.submitterEmail).toLowerCase();
+  const email =
+    (
+      pickEntryByExactKey(entries, ["email", "emailAddress"]) ||
+      pickEntryByPartialKey(entries, ["email", "mail"]) ||
+      fallbackEmail ||
+      "unknown@example.com"
+    ).toLowerCase();
+
+  const derivedName = `${firstName} ${lastName}`.trim();
+  const name = fullName || derivedName || buildFallbackNameFromEmail(email);
+
+  const phone =
+    pickEntryByExactKey(entries, ["phone", "phoneNumber", "mobile"]) ||
+    pickEntryByPartialKey(entries, ["phone", "mobile", "contact"]);
+
+  const location =
+    pickEntryByExactKey(entries, ["location", "city", "country", "address"]) ||
+    pickEntryByPartialKey(entries, ["location", "city", "country", "address"]);
+
+  const portfolioUrl =
+    pickEntryByExactKey(entries, ["portfolio", "portfolioUrl", "linkedin", "github", "website"]) ||
+    pickEntryByPartialKey(entries, ["portfolio", "linkedin", "github", "website", "profile"]);
+
+  const resumeFile =
+    pickEntryByExactKey(entries, ["resume", "resumeFile", "cv", "attachment"]) ||
+    pickEntryByPartialKey(entries, ["resume", "cv", "attachment", "file"]);
+
+  const summary =
+    pickEntryByExactKey(entries, ["summary", "coverLetter", "about", "notes", "bio"]) ||
+    pickEntryByPartialKey(entries, ["summary", "cover", "about", "notes", "bio"]);
+
+  const experienceYears = parseExperienceYears(
+    pickEntryByExactKey(entries, ["experienceYears", "yearsOfExperience", "experience"]) ||
+      pickEntryByPartialKey(entries, ["experienceyears", "yearsofexperience", "experience"]),
+  );
+
+  return {
+    id: String(submission._id),
+    jobId: String(submission.formId),
+    name,
+    email,
+    phone,
+    location,
+    experienceYears,
+    portfolioUrl,
+    resumeFile,
+    appliedDate: formatDateInput(submission.createdAt),
+    summary: summary || `Application status: ${submission.status || "submitted"}`,
+  };
+};
 
 const serializeSession = (session) => ({
   id: session.sessionId,
@@ -373,22 +391,9 @@ const ensureSessionSeedData = async () => {
   }
 
   seedInFlight = (async () => {
-    const jobsCount = await SessionJobForm.countDocuments();
-    if (jobsCount === 0) {
-      await SessionJobForm.insertMany(DEFAULT_JOB_FORMS);
-    }
-
     const interviewerCount = await SessionInterviewer.countDocuments();
     if (interviewerCount === 0) {
       await SessionInterviewer.insertMany(DEFAULT_INTERVIEWERS);
-    }
-
-    const candidateCount = await SessionCandidate.countDocuments();
-    if (candidateCount === 0) {
-      const generatedCandidates = DEFAULT_JOB_FORMS.flatMap((job) =>
-        buildCandidatesForJob(job.jobId, job.applicants),
-      );
-      await SessionCandidate.insertMany(generatedCandidates);
     }
 
     const templateCount = await SessionEmailTemplate.countDocuments();
@@ -402,117 +407,6 @@ const ensureSessionSeedData = async () => {
       await SessionEmailTemplate.insertMany(templateRows);
     }
 
-    const sessionCount = await InterviewSession.countDocuments();
-    if (sessionCount === 0) {
-      const [seCandidates, feCandidates] = await Promise.all([
-        SessionCandidate.find({ jobId: "JOB-SE-2026" })
-          .sort({ candidateId: 1 })
-          .select("candidateId")
-          .lean(),
-        SessionCandidate.find({ jobId: "JOB-FE-2026" })
-          .sort({ candidateId: 1 })
-          .select("candidateId")
-          .lean(),
-      ]);
-
-      const seIds = seCandidates.map((candidate) => candidate.candidateId);
-      const feIds = feCandidates.map((candidate) => candidate.candidateId);
-
-      const firstSessionResults = ["Passed", "Pending", "On Hold", "Failed"];
-      const firstSessionNotes = [
-        "Strong architecture explanation.",
-        "Needs deeper API design discussion.",
-        "Waiting for panel confirmation.",
-        "Limited backend depth.",
-      ];
-
-      const sessionOneCandidates = seIds.slice(0, 4).map((candidateId, index) => ({
-        candidateId,
-        slotTime: toTimeString("09:00", index * 30),
-        durationMinutes: 30,
-        result: firstSessionResults[index],
-        notes: firstSessionNotes[index],
-      }));
-
-      const sessionTwoCandidates = seIds.slice(4, 8).map((candidateId, index) => ({
-        candidateId,
-        slotTime: toTimeString("13:00", index * 30),
-        durationMinutes: 30,
-        result: "Pending",
-        notes: "Initial assessment pending.",
-      }));
-
-      const sessionThreeCandidates = feIds.slice(0, 3).map((candidateId, index) => ({
-        candidateId,
-        slotTime: toTimeString("10:00", index * 35),
-        durationMinutes: 35,
-        result: index === 0 ? "Passed" : "Pending",
-        notes: index === 0 ? "Good React system thinking." : "Awaiting interview.",
-      }));
-
-      const now = new Date();
-      const sessionOneId = "JOB-SE-2026-S01";
-      const sessionTwoId = "JOB-SE-2026-S02";
-      const sessionThreeId = "JOB-FE-2026-S01";
-      await InterviewSession.insertMany([
-        {
-          sessionId: sessionOneId,
-          jobId: "JOB-SE-2026",
-          name: "Session 1",
-          interviewerId: "INT-001",
-          deadline: addDays(now, 4),
-          requirements:
-            "Assess backend architecture, performance trade-offs, and debugging approach.",
-          remarks:
-            "Focus on practical scalability decisions and communication under pressure.",
-          sessionDate: addDays(now, 6),
-          startTime: "09:00",
-          durationMinutes: 30,
-          meetingId: generateSessionMeetingId(sessionOneId),
-          meetingPassword: generateSessionMeetingPassword(sessionOneId),
-          status: "Scheduled",
-          candidates: sessionOneCandidates,
-          lastEmailAt: now,
-        },
-        {
-          sessionId: sessionTwoId,
-          jobId: "JOB-SE-2026",
-          name: "Session 2",
-          interviewerId: "INT-003",
-          deadline: addDays(now, 5),
-          requirements:
-            "Evaluate cloud-native deployment awareness and incident response thinking.",
-          remarks: "Probe CI/CD reliability and ownership mindset.",
-          sessionDate: addDays(now, 7),
-          startTime: "13:00",
-          durationMinutes: 30,
-          meetingId: generateSessionMeetingId(sessionTwoId),
-          meetingPassword: generateSessionMeetingPassword(sessionTwoId),
-          status: "Draft",
-          candidates: sessionTwoCandidates,
-          lastEmailAt: null,
-        },
-        {
-          sessionId: sessionThreeId,
-          jobId: "JOB-FE-2026",
-          name: "Frontend Session 1",
-          interviewerId: "INT-002",
-          deadline: addDays(now, 3),
-          requirements:
-            "Check component architecture, state management, and accessibility basics.",
-          remarks: "Request one production issue troubleshooting example.",
-          sessionDate: addDays(now, 5),
-          startTime: "10:00",
-          durationMinutes: 35,
-          meetingId: generateSessionMeetingId(sessionThreeId),
-          meetingPassword: generateSessionMeetingPassword(sessionThreeId),
-          status: "Scheduled",
-          candidates: sessionThreeCandidates,
-          lastEmailAt: now,
-        },
-      ]);
-    }
-
     hasSeededSessionData = true;
   })();
 
@@ -521,6 +415,58 @@ const ensureSessionSeedData = async () => {
   } finally {
     seedInFlight = null;
   }
+};
+
+const fetchScopedJobForms = async (userId, requestedJobId = "") => {
+  const filter = { createdBy: userId };
+
+  if (requestedJobId) {
+    if (!isValidObjectId(requestedJobId)) {
+      return [];
+    }
+    filter._id = requestedJobId;
+  }
+
+  return JobForm.find(filter).sort({ createdAt: -1 }).lean();
+};
+
+const fetchScopedSubmissions = async (formIds) => {
+  if (!formIds || formIds.length === 0) {
+    return [];
+  }
+
+  return FormSubmission.find({ formId: { $in: formIds } })
+    .sort({ createdAt: 1, _id: 1 })
+    .lean();
+};
+
+const fetchScopedSessions = async (formIds) => {
+  if (!formIds || formIds.length === 0) {
+    return [];
+  }
+
+  return InterviewSession.find({ jobId: { $in: formIds } })
+    .sort({ sessionDate: 1, sessionId: 1 })
+    .lean();
+};
+
+const fetchOwnedJobForSession = async (userId, session) => {
+  if (!session || !isValidObjectId(session.jobId)) {
+    return null;
+  }
+
+  return JobForm.findOne({
+    _id: session.jobId,
+    createdBy: userId,
+  }).lean();
+};
+
+const fetchCandidateSubmission = async (candidateId) => {
+  if (!isValidObjectId(candidateId)) {
+    return null;
+  }
+
+  return FormSubmission.findById(candidateId).lean();
 };
 
 const fetchSessionById = async (sessionId) =>
@@ -533,14 +479,15 @@ exports.getBootstrap = async (req, res) => {
     await ensureSessionSeedData();
 
     const requestedJobId = String(req.query.jobId || "").trim();
-    const sessionFilter = requestedJobId ? { jobId: requestedJobId } : {};
-    const candidateFilter = requestedJobId ? { jobId: requestedJobId } : {};
+    const userId = req.user.id;
 
-    const [jobs, interviewers, sessions, candidates, templates, emailLogs] = await Promise.all([
-      SessionJobForm.find({}).sort({ jobId: 1 }).lean(),
+    const jobs = await fetchScopedJobForms(userId, requestedJobId);
+    const jobIds = jobs.map((job) => String(job._id));
+
+    const [interviewers, sessions, candidates, templates, emailLogs] = await Promise.all([
       SessionInterviewer.find({}).sort({ interviewerId: 1 }).lean(),
-      InterviewSession.find(sessionFilter).sort({ sessionDate: 1, sessionId: 1 }).lean(),
-      SessionCandidate.find(candidateFilter).sort({ candidateId: 1 }).lean(),
+      fetchScopedSessions(jobIds),
+      fetchScopedSubmissions(jobIds),
       buildTemplateMap(),
       SessionEmailLog.find({}).sort({ sentAt: -1 }).limit(250).lean(),
     ]);
@@ -563,7 +510,7 @@ exports.getJobs = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
-    const jobs = await SessionJobForm.find({}).sort({ jobId: 1 }).lean();
+    const jobs = await fetchScopedJobForms(req.user.id);
     res.json(jobs.map(serializeJob));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -589,9 +536,10 @@ exports.getCandidates = async (req, res) => {
     await ensureSessionSeedData();
 
     const requestedJobId = String(req.query.jobId || "").trim();
-    const filter = requestedJobId ? { jobId: requestedJobId } : {};
+    const jobs = await fetchScopedJobForms(req.user.id, requestedJobId);
+    const jobIds = jobs.map((job) => String(job._id));
 
-    const candidates = await SessionCandidate.find(filter).sort({ candidateId: 1 }).lean();
+    const candidates = await fetchScopedSubmissions(jobIds);
     res.json(candidates.map(serializeCandidate));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -605,11 +553,9 @@ exports.listSessions = async (req, res) => {
     await ensureSessionSeedData();
 
     const requestedJobId = String(req.query.jobId || "").trim();
-    const filter = requestedJobId ? { jobId: requestedJobId } : {};
-
-    const sessions = await InterviewSession.find(filter)
-      .sort({ sessionDate: 1, sessionId: 1 })
-      .lean();
+    const jobs = await fetchScopedJobForms(req.user.id, requestedJobId);
+    const jobIds = jobs.map((job) => String(job._id));
+    const sessions = await fetchScopedSessions(jobIds);
 
     res.json(sessions.map(serializeSession));
   } catch (error) {
@@ -627,6 +573,11 @@ exports.getSessionById = async (req, res) => {
     const session = await InterviewSession.findOne({ sessionId }).lean();
 
     if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
       return res.status(404).json({ message: "Session not found" });
     }
 
@@ -743,6 +694,11 @@ exports.createSession = async (req, res) => {
       });
     }
 
+    const normalizedJobId = String(jobId).trim();
+    if (!isValidObjectId(normalizedJobId)) {
+      return res.status(400).json({ message: "jobId is invalid" });
+    }
+
     if (!requirements || !String(requirements).trim()) {
       return res.status(400).json({
         message: "Requirements are required for session creation",
@@ -772,9 +728,9 @@ exports.createSession = async (req, res) => {
     const duration = clamp(Number.parseInt(String(durationMinutes || "30"), 10) || 30, 10, 120);
 
     const [job, interviewer, existingSessions] = await Promise.all([
-      SessionJobForm.findOne({ jobId: String(jobId).trim() }).lean(),
+      JobForm.findOne({ _id: normalizedJobId, createdBy: req.user.id }).lean(),
       SessionInterviewer.findOne({ interviewerId: String(interviewerId).trim() }).lean(),
-      InterviewSession.find({ jobId: String(jobId).trim() }).select("sessionId").lean(),
+      InterviewSession.find({ jobId: normalizedJobId }).select("sessionId").lean(),
     ]);
 
     if (!job) {
@@ -797,13 +753,14 @@ exports.createSession = async (req, res) => {
     });
 
     const nextSessionNumber = maxSessionNumber + 1;
-    const generatedSessionId = `${job.jobId}-S${String(nextSessionNumber).padStart(2, "0")}`;
+    const generatedSessionId =
+      `JOB-${String(job._id).slice(-6).toUpperCase()}-S${String(nextSessionNumber).padStart(2, "0")}`;
     const generatedSessionName =
       String(sessionName || "").trim() || `Session ${nextSessionNumber}`;
 
     const createdSession = await InterviewSession.create({
       sessionId: generatedSessionId,
-      jobId: job.jobId,
+      jobId: String(job._id),
       name: generatedSessionName,
       interviewerId: interviewer.interviewerId,
       deadline: deadlineDate,
@@ -838,7 +795,7 @@ exports.createSession = async (req, res) => {
         details: sessionEmailMessage,
         metadata: {
           sessionId: generatedSessionId,
-          jobId: job.jobId,
+          jobId: String(job._id),
         },
       },
     ]);
@@ -867,10 +824,12 @@ exports.assignCandidate = async (req, res) => {
         .json({ message: "candidateId and targetSessionId are required" });
     }
 
-    const [candidate, targetSession] = await Promise.all([
-      SessionCandidate.findOne({ candidateId }).lean(),
+    const [candidateSubmission, targetSession] = await Promise.all([
+      fetchCandidateSubmission(candidateId),
       InterviewSession.findOne({ sessionId: targetSessionId }),
     ]);
+
+    const candidate = candidateSubmission ? serializeCandidate(candidateSubmission) : null;
 
     if (!candidate) {
       return res.status(404).json({ message: "Candidate not found" });
@@ -880,21 +839,26 @@ exports.assignCandidate = async (req, res) => {
       return res.status(404).json({ message: "Target session not found" });
     }
 
-    if (targetSession.jobId !== candidate.jobId) {
+    const targetJob = await fetchOwnedJobForSession(req.user.id, targetSession);
+    if (!targetJob) {
+      return res.status(404).json({ message: "Target session job form was not found" });
+    }
+
+    if (String(targetSession.jobId) !== String(candidateSubmission.formId)) {
       return res.status(400).json({
         message: "Candidate can only be assigned to sessions under the same job form",
       });
     }
 
     const previouslyAssignedSession = await InterviewSession.findOne({
-      jobId: candidate.jobId,
+      jobId: String(candidateSubmission.formId),
       "candidates.candidateId": candidateId,
     })
       .select("sessionId name")
       .lean();
 
     await InterviewSession.updateMany(
-      { jobId: candidate.jobId },
+      { jobId: String(candidateSubmission.formId) },
       { $pull: { candidates: { candidateId } } },
     );
 
@@ -915,14 +879,14 @@ exports.assignCandidate = async (req, res) => {
 
     const [interviewer, job, emailTemplates] = await Promise.all([
       SessionInterviewer.findOne({ interviewerId: refreshedTargetSession.interviewerId }).lean(),
-      SessionJobForm.findOne({ jobId: refreshedTargetSession.jobId }).lean(),
+      JobForm.findById(refreshedTargetSession.jobId).lean(),
       buildTemplateMap(),
     ]);
 
     const assignmentMessage = applyEmailTemplate(emailTemplates.container2, {
       candidateName: candidate.name,
       sessionName: refreshedTargetSession.name,
-      jobTitle: job ? job.title : refreshedTargetSession.jobId,
+      jobTitle: job ? job.title : targetJob.title,
       interviewerName: interviewer ? interviewer.name : "Interviewer",
       sessionDate: formatHumanDate(refreshedTargetSession.sessionDate),
       durationMinutes: refreshedTargetSession.durationMinutes,
@@ -965,10 +929,12 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
       return res.status(400).json({ message: "candidateId is required" });
     }
 
-    const [candidate, session] = await Promise.all([
-      SessionCandidate.findOne({ candidateId }).lean(),
+    const [candidateSubmission, session] = await Promise.all([
+      fetchCandidateSubmission(candidateId),
       InterviewSession.findOne({ "candidates.candidateId": candidateId }),
     ]);
+
+    const candidate = candidateSubmission ? serializeCandidate(candidateSubmission) : null;
 
     if (!candidate) {
       return res.status(404).json({ message: "Candidate not found" });
@@ -982,14 +948,24 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
 
     const [interviewer, job, emailTemplates] = await Promise.all([
       SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
-      SessionJobForm.findOne({ jobId: session.jobId }).lean(),
+      fetchOwnedJobForSession(req.user.id, session),
       buildTemplateMap(),
     ]);
+
+    if (!job) {
+      return res.status(404).json({ message: "Session job form was not found" });
+    }
+
+    if (String(candidate.jobId) !== String(session.jobId)) {
+      return res.status(400).json({
+        message: "Candidate does not belong to this session's job form",
+      });
+    }
 
     const assignmentMessage = applyEmailTemplate(emailTemplates.container2, {
       candidateName: candidate.name,
       sessionName: session.name,
-      jobTitle: job ? job.title : session.jobId,
+      jobTitle: job.title,
       interviewerName: interviewer ? interviewer.name : "Interviewer",
       sessionDate: formatHumanDate(session.sessionDate),
       durationMinutes: session.durationMinutes,
@@ -1044,6 +1020,11 @@ exports.updateSessionCandidateDetails = async (req, res) => {
 
     const session = await fetchSessionById(sessionId);
     if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
       return res.status(404).json({ message: "Session not found" });
     }
 
@@ -1107,6 +1088,11 @@ exports.conductSession = async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
     }
 
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
     if (session.status !== "Completed") {
       session.status = "Scheduled";
     }
@@ -1136,15 +1122,19 @@ exports.sendScheduleEmails = async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
     }
 
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
     if (!session.candidates || session.candidates.length === 0) {
       return res.status(400).json({
         message: "No candidates in this session yet. Assign candidates before sending schedule emails.",
       });
     }
 
-    const [interviewer, job, emailTemplates] = await Promise.all([
+    const [interviewer, emailTemplates] = await Promise.all([
       SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
-      SessionJobForm.findOne({ jobId: session.jobId }).lean(),
       buildTemplateMap(),
     ]);
 
@@ -1153,7 +1143,7 @@ exports.sendScheduleEmails = async (req, res) => {
       {
         recipientName: interviewer ? interviewer.name : "Interviewer",
         sessionName: session.name,
-        jobTitle: job ? job.title : session.jobId,
+        jobTitle: ownedJob.title,
         action: "Schedule confirmed",
         slotTime: session.startTime,
         durationMinutes: session.durationMinutes,
@@ -1166,7 +1156,7 @@ exports.sendScheduleEmails = async (req, res) => {
       {
         recipientName: "Candidate",
         sessionName: session.name,
-        jobTitle: job ? job.title : session.jobId,
+        jobTitle: ownedJob.title,
         action: "Interview schedule",
         slotTime: session.startTime,
         durationMinutes: session.durationMinutes,
@@ -1224,6 +1214,11 @@ exports.sendResultEmails = async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
     }
 
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
     const breakdown = getSessionBreakdown(session);
     const reviewed = breakdown.passed + breakdown.failed + breakdown.onHold;
 
@@ -1233,9 +1228,8 @@ exports.sendResultEmails = async (req, res) => {
       });
     }
 
-    const [interviewer, job, emailTemplates] = await Promise.all([
+    const [interviewer, emailTemplates] = await Promise.all([
       SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
-      SessionJobForm.findOne({ jobId: session.jobId }).lean(),
       buildTemplateMap(),
     ]);
 
@@ -1246,7 +1240,7 @@ exports.sendResultEmails = async (req, res) => {
       {
         recipientName: interviewer ? interviewer.name : "Interviewer",
         sessionName: session.name,
-        jobTitle: job ? job.title : session.jobId,
+        jobTitle: ownedJob.title,
         action: "Result publication",
         slotTime: session.startTime,
         durationMinutes: session.durationMinutes,
@@ -1259,7 +1253,7 @@ exports.sendResultEmails = async (req, res) => {
       {
         recipientName: "Candidate",
         sessionName: session.name,
-        jobTitle: job ? job.title : session.jobId,
+        jobTitle: ownedJob.title,
         action: "Result notification",
         slotTime: "Refer to your slot",
         durationMinutes: session.durationMinutes,
@@ -1333,6 +1327,11 @@ exports.sendCandidateEmail = async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
     }
 
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
     const slot = (session.candidates || []).find(
       (candidate) => candidate.candidateId === candidateId,
     );
@@ -1340,14 +1339,21 @@ exports.sendCandidateEmail = async (req, res) => {
       return res.status(404).json({ message: "Candidate is not assigned to this session" });
     }
 
-    const [candidate, job, emailTemplates] = await Promise.all([
-      SessionCandidate.findOne({ candidateId }).lean(),
-      SessionJobForm.findOne({ jobId: session.jobId }).lean(),
+    const [candidateSubmission, emailTemplates] = await Promise.all([
+      fetchCandidateSubmission(candidateId),
       buildTemplateMap(),
     ]);
 
+    const candidate = candidateSubmission ? serializeCandidate(candidateSubmission) : null;
+
     if (!candidate) {
       return res.status(404).json({ message: "Candidate not found" });
+    }
+
+    if (String(candidate.jobId) !== String(session.jobId)) {
+      return res.status(400).json({
+        message: "Candidate does not belong to this session's job form",
+      });
     }
 
     const templateKey = CONTAINER3_TEMPLATE_KEYS[emailOption];
@@ -1367,7 +1373,7 @@ exports.sendCandidateEmail = async (req, res) => {
     const details = applyEmailTemplate(template, {
       recipientName: candidate.name,
       sessionName: session.name,
-      jobTitle: job ? job.title : session.jobId,
+      jobTitle: ownedJob.title,
       action,
       slotTime: slot.slotTime || session.startTime,
       durationMinutes: slot.durationMinutes,
@@ -1414,6 +1420,11 @@ exports.getCandidatePacket = async (req, res) => {
       return res.status(404).json({ message: "Session not found" });
     }
 
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
     const candidateSlot = (session.candidates || []).find(
       (candidate) => candidate.candidateId === candidateId,
     );
@@ -1422,23 +1433,30 @@ exports.getCandidatePacket = async (req, res) => {
       return res.status(404).json({ message: "Candidate is not assigned to this session" });
     }
 
-    const [candidate, job, interviewer] = await Promise.all([
-      SessionCandidate.findOne({ candidateId }).lean(),
-      SessionJobForm.findOne({ jobId: session.jobId }).lean(),
+    const [candidateSubmission, interviewer] = await Promise.all([
+      fetchCandidateSubmission(candidateId),
       SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
     ]);
+
+    const candidate = candidateSubmission ? serializeCandidate(candidateSubmission) : null;
 
     if (!candidate) {
       return res.status(404).json({ message: "Candidate not found" });
     }
 
+    if (String(candidate.jobId) !== String(session.jobId)) {
+      return res.status(400).json({
+        message: "Candidate does not belong to this session's job form",
+      });
+    }
+
     return res.json({
       generatedAt: new Date().toISOString(),
-      candidate: serializeCandidate(candidate),
+      candidate,
       session: {
         id: session.sessionId,
         name: session.name,
-        jobTitle: job ? job.title : session.jobId,
+        jobTitle: ownedJob.title,
         interviewer: interviewer ? interviewer.name : "Unassigned",
         interviewerEmail: interviewer ? interviewer.email : "",
         meetingId:

@@ -1,20 +1,28 @@
 "use client";
 
-import { DragEvent, useState } from "react";
+import { DragEvent, useEffect, useState } from "react";
+import {
+  createJobForm,
+  getAllJobForms,
+  getFormSubmissions,
+  updateFormSubmissionStatus,
+  updateJobForm,
+  deleteJobForm,
+  JobForm,
+  FormSubmission,
+  FieldType,
+} from "@/lib/api";
 
-interface Submission {
-  id: number;
-  date: string;
-  jobRole: string;
-  name: string;
-  email: string;
-  status: string;
-  phone?: string;
-  resume?: string;
-  coverLetter?: string;
+interface FormField {
+  label: string;
+  type: FieldType;
+  required?: boolean;
+  order?: number;
 }
 
-type FieldType = "text" | "phone" | "email" | "file" | "link";
+interface SubmissionWithForm extends FormSubmission {
+  formTitle: string;
+}
 
 const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   text: "Text",
@@ -24,957 +32,979 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   link: "Link",
 };
 
-interface FormField {
-  label: string;
-  type: FieldType;
-}
-
-interface Template {
-  id: number;
-  title: string;
-  description: string;
-  fields: FormField[];
-}
-
-const DEFAULT_FORM_FIELDS: FormField[] = [
-  { label: "Name", type: "text" },
-  { label: "Email", type: "email" },
-  { label: "Phone", type: "phone" },
-  { label: "Resume", type: "file" },
-];
-
 export default function JobFormsPage() {
-  const MAX_VISIBLE_SUBMISSION_ROWS = 10;
-  const SUBMISSION_ROW_HEIGHT_PX = 56;
-  const SUBMISSION_HEADER_HEIGHT_PX = 48;
-
+  const [templates, setTemplates] = useState<JobForm[]>([]);
+  const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
+  const [allSubmissions, setAllSubmissions] = useState<SubmissionWithForm[]>(
+    [],
+  );
+  const [loadingForms, setLoadingForms] = useState(true);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [loadingAllSubmissions, setLoadingAllSubmissions] = useState(false);
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [showEditTemplateModal, setShowEditTemplateModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
+  const [showViewSubmissionModal, setShowViewSubmissionModal] = useState(false);
   const [selectedSubmission, setSelectedSubmission] =
-    useState<Submission | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
+    useState<FormSubmission | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<JobForm | null>(
     null,
   );
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"latest" | "oldest">("latest");
+  const [filterStatus, setFilterStatus] = useState("all");
+
+  // Form creation state
   const [newFormTitle, setNewFormTitle] = useState("");
   const [newFormDescription, setNewFormDescription] = useState("");
-  const [editTemplateName, setEditTemplateName] = useState("");
-  const [editTemplateDescription, setEditTemplateDescription] = useState("");
-  const [editTemplateFields, setEditTemplateFields] = useState<FormField[]>([]);
-  const [newFormFields, setNewFormFields] = useState<FormField[]>([...DEFAULT_FORM_FIELDS]);
-  const [copySuccess, setCopySuccess] = useState<number | null>(null);
-  const [sortBy, setSortBy] = useState<"latest" | "oldest">("latest");
-  const [filterJobRole, setFilterJobRole] = useState<string>("all");
+  const [newFormJobRole, setNewFormJobRole] = useState("");
+  const [newFormFields, setNewFormFields] = useState<FormField[]>([]);
 
-  const [submissions] = useState<Submission[]>([
-    {
-      id: 1,
-      date: "July 17, 2025",
-      jobRole: "Software Engineer",
-      name: "John Doe",
-      email: "john@email.com",
-      status: "Submitted",
-      phone: "+1234567890",
-      resume: "john_doe_resume.pdf",
-      coverLetter: "Experienced software engineer...",
-    },
-    {
-      id: 2,
-      date: "July 18, 2025",
-      jobRole: "Product Manager",
-      name: "Jane Smith",
-      email: "jane@email.com",
-      status: "Submitted",
-      phone: "+1234567891",
-      resume: "jane_smith_resume.pdf",
-    },
-    {
-      id: 3,
-      date: "July 19, 2025",
-      jobRole: "Data Analyst",
-      name: "Bob Wilson",
-      email: "bob@email.com",
-      status: "Submitted",
-      phone: "+1234567892",
-    },
-    {
-      id: 4,
-      date: "July 20, 2025",
-      jobRole: "UI Designer",
-      name: "Alice Brown",
-      email: "alice@email.com",
-      status: "Submitted",
-      phone: "+1234567893",
-    },
-    {
-      id: 5,
-      date: "July 21, 2025",
-      jobRole: "DevOps Engineer",
-      name: "Charlie Davis",
-      email: "charlie@email.com",
-      status: "Submitted",
-      phone: "+1234567894",
-    },
-    {
-      id: 6,
-      date: "July 22, 2025",
-      jobRole: "Software Engineer",
-      name: "Diana Miller",
-      email: "diana@email.com",
-      status: "Submitted",
-      phone: "+1234567895",
-    },
-    {
-      id: 7,
-      date: "July 23, 2025",
-      jobRole: "Product Manager",
-      name: "Evan Taylor",
-      email: "evan@email.com",
-      status: "Submitted",
-      phone: "+1234567896",
-    },
-    {
-      id: 8,
-      date: "July 24, 2025",
-      jobRole: "Data Analyst",
-      name: "Fiona Anderson",
-      email: "fiona@email.com",
-      status: "Submitted",
-      phone: "+1234567897",
-    },
-  ]);
+  // Form editing state
+  const [editFormTitle, setEditFormTitle] = useState("");
+  const [editFormDescription, setEditFormDescription] = useState("");
+  const [editFormJobRole, setEditFormJobRole] = useState("");
+  const [editFormFields, setEditFormFields] = useState<FormField[]>([]);
 
-  const [templates, setTemplates] = useState<Template[]>([
-    {
-      id: 1,
-      title: "Software Engineer",
-      description:
-        "Standard application template with Name, Email, Phone, and Resume.",
-      fields: [...DEFAULT_FORM_FIELDS],
-    },
-    {
-      id: 2,
-      title: "Product Manager",
-      description:
-        "Standard application template with Name, Email, Phone, and Resume.",
-      fields: [...DEFAULT_FORM_FIELDS],
-    },
-    {
-      id: 3,
-      title: "Data Analyst",
-      description:
-        "Standard application template with Name, Email, Phone, and Resume.",
-      fields: [...DEFAULT_FORM_FIELDS],
-    },
-    {
-      id: 4,
-      title: "UI Designer",
-      description:
-        "Standard application template with Name, Email, Phone, and Resume.",
-      fields: [...DEFAULT_FORM_FIELDS],
-    },
-    {
-      id: 5,
-      title: "DevOps Engineer",
-      description:
-        "Standard application template with Name, Email, Phone, and Resume.",
-      fields: [...DEFAULT_FORM_FIELDS],
-    },
-  ]);
+  // Load all forms on mount
+  useEffect(() => {
+    fetchAllForms();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleViewSubmission = (submission: Submission) => {
-    setSelectedSubmission(submission);
-    setShowViewModal(true);
+  useEffect(() => {
+    if (templates.length > 0) {
+      fetchAllSubmissions(templates);
+    } else {
+      setAllSubmissions([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy, filterStatus]);
+
+  const fetchAllForms = async () => {
+    try {
+      setLoadingForms(true);
+      const { forms } = await getAllJobForms();
+      setTemplates(forms);
+      await fetchAllSubmissions(forms);
+    } catch (error) {
+      console.error("Failed to load forms:", error);
+    } finally {
+      setLoadingForms(false);
+    }
   };
 
-  const handleEditTemplate = (template: Template) => {
-    setSelectedTemplate(template);
-    setEditTemplateName(template.title);
-    setEditTemplateDescription(template.description);
-    setEditTemplateFields(
-      template.fields.length > 0 ? [...template.fields] : [...DEFAULT_FORM_FIELDS],
-    );
-    setShowEditTemplateModal(true);
+  const fetchAllSubmissions = async (forms: JobForm[]) => {
+    if (forms.length === 0) {
+      setAllSubmissions([]);
+      setLoadingAllSubmissions(false);
+      return;
+    }
+
+    try {
+      setLoadingAllSubmissions(true);
+
+      const responses = await Promise.all(
+        forms.map(async (form) => {
+          const { submissions: formSubmissions } = await getFormSubmissions(
+            form._id,
+            {
+              sortBy,
+              status: filterStatus === "all" ? undefined : filterStatus,
+              page: 1,
+              limit: 1000,
+            },
+          );
+
+          return formSubmissions.map((submission) => ({
+            ...submission,
+            formTitle: form.title,
+          }));
+        }),
+      );
+
+      const merged = responses.flat();
+      merged.sort((a, b) => {
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
+        return sortBy === "latest" ? bTime - aTime : aTime - bTime;
+      });
+
+      setAllSubmissions(merged);
+    } catch (error) {
+      console.error("Failed to load all submissions:", error);
+    } finally {
+      setLoadingAllSubmissions(false);
+    }
   };
 
-  const handleEditFieldChange = (index: number, key: keyof FormField, value: string) => {
-    setEditTemplateFields((prev) =>
-      prev.map((field, fieldIndex) =>
-        fieldIndex === index ? { ...field, [key]: value } : field,
-      ),
-    );
+  const fetchSubmissions = async (formId: string) => {
+    try {
+      setLoadingSubmissions(true);
+      const { submissions: data } = await getFormSubmissions(formId, {
+        sortBy,
+        status: filterStatus === "all" ? undefined : filterStatus,
+      });
+      setSubmissions(data);
+      setSelectedFormId(formId);
+    } catch (error) {
+      console.error("Failed to load submissions:", error);
+    } finally {
+      setLoadingSubmissions(false);
+    }
   };
 
-  const handleAddEditField = () => {
-    setEditTemplateFields((prev) => [...prev, { label: "", type: "text" }]);
+  const handleCreateForm = async () => {
+    if (!newFormTitle.trim()) {
+      alert("Form title is required");
+      return;
+    }
+
+    const sanitizedFields = newFormFields
+      .map((f) => ({ ...f, label: f.label.trim() }))
+      .filter((f) => f.label.length > 0);
+
+    try {
+      await createJobForm({
+        title: newFormTitle,
+        description: newFormDescription,
+        jobRole: newFormJobRole,
+        fields: sanitizedFields,
+      });
+
+      // Reset form and reload
+      setNewFormTitle("");
+      setNewFormDescription("");
+      setNewFormJobRole("");
+      setNewFormFields([]);
+      setShowCreateModal(false);
+      await fetchAllForms();
+    } catch (error) {
+      alert(
+        `Failed to create form: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
   };
 
-  const handleRemoveEditField = (index: number) => {
-    setEditTemplateFields((prev) =>
-      prev.filter((_, fieldIndex) => fieldIndex !== index),
-    );
+  const handleEditForm = (form: JobForm) => {
+    setSelectedTemplate(form);
+    setEditFormTitle(form.title);
+    setEditFormDescription(form.description);
+    setEditFormJobRole(form.jobRole);
+    setEditFormFields([...form.fields]);
+    setShowEditModal(true);
   };
 
-  const handleDragStartEditField = (
-    event: DragEvent<HTMLButtonElement>,
-    sourceIndex: number,
-  ) => {
-    event.dataTransfer.setData("text/plain", sourceIndex.toString());
-    event.dataTransfer.effectAllowed = "move";
+  const handleSaveEditForm = async () => {
+    if (!selectedTemplate || !editFormTitle.trim()) {
+      alert("Form title is required");
+      return;
+    }
+
+    const sanitizedFields = editFormFields
+      .map((f) => ({ ...f, label: f.label.trim() }))
+      .filter((f) => f.label.length > 0);
+
+    try {
+      await updateJobForm(selectedTemplate._id, {
+        title: editFormTitle,
+        description: editFormDescription,
+        jobRole: editFormJobRole,
+        fields: sanitizedFields,
+      });
+
+      setShowEditModal(false);
+      setSelectedTemplate(null);
+      await fetchAllForms();
+    } catch (error) {
+      alert(
+        `Failed to update form: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
   };
 
-  const handleDropEditField = (
-    event: DragEvent<HTMLDivElement>,
-    targetIndex: number,
-  ) => {
-    event.preventDefault();
-    const sourceIndex = Number(event.dataTransfer.getData("text/plain"));
-
+  const handleDeleteForm = async (formId: string) => {
     if (
-      Number.isNaN(sourceIndex) ||
-      sourceIndex < 0 ||
-      sourceIndex >= editTemplateFields.length ||
-      sourceIndex === targetIndex
+      !confirm(
+        "Are you sure you want to delete this form and all its submissions?",
+      )
     ) {
       return;
     }
 
-    setEditTemplateFields((prev) => {
-      const updated = [...prev];
-      const [movedField] = updated.splice(sourceIndex, 1);
-      updated.splice(targetIndex, 0, movedField);
-      return updated;
-    });
-  };
-
-  const handleSaveTemplateChanges = () => {
-    if (!selectedTemplate) {
-      return;
+    try {
+      await deleteJobForm(formId);
+      await fetchAllForms();
+      if (selectedFormId === formId) {
+        setSelectedFormId(null);
+        setSubmissions([]);
+      }
+    } catch (error) {
+      alert(
+        `Failed to delete form: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
+  };
 
-    const sanitizedName = editTemplateName.trim();
-    const sanitizedDescription = editTemplateDescription.trim();
-    const sanitizedFields = editTemplateFields
-      .map((field) => ({ ...field, label: field.label.trim() }))
-      .filter((field) => field.label.length > 0);
-
-    if (!sanitizedName) {
-      alert("Template name is required.");
-      return;
+  const handleUpdateSubmissionStatus = async (
+    submissionId: string,
+    status: "submitted" | "reviewed" | "rejected" | "accepted",
+  ) => {
+    try {
+      await updateFormSubmissionStatus(submissionId, { status });
+      if (selectedFormId) {
+        await fetchSubmissions(selectedFormId);
+      }
+      await fetchAllSubmissions(templates);
+    } catch (error) {
+      alert(
+        `Failed to update submission: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
-
-    const updatedTemplate: Template = {
-      ...selectedTemplate,
-      title: sanitizedName,
-      description:
-        sanitizedDescription ||
-        "Standard application template with Name, Email, Phone, and Resume.",
-      fields: sanitizedFields.length > 0 ? sanitizedFields : [...DEFAULT_FORM_FIELDS],
-    };
-
-    setTemplates((prev) =>
-      prev.map((template) =>
-        template.id === selectedTemplate.id ? updatedTemplate : template,
-      ),
-    );
-
-    alert("Template updated successfully!");
-    setShowEditTemplateModal(false);
-    setSelectedTemplate(null);
-    setEditTemplateName("");
-    setEditTemplateDescription("");
-    setEditTemplateFields([]);
   };
 
-  const handlePreviewTemplate = (template: Template) => {
-    setSelectedTemplate(template);
-    setShowPreviewModal(true);
-  };
-
-  const handleCopyLink = (template: Template) => {
-    const formUrl = `${window.location.origin}/apply/${template.id}`;
+  const handleCopyLink = (formId: string) => {
+    const formUrl = `${window.location.origin}/apply/${formId}`;
     navigator.clipboard.writeText(formUrl).then(() => {
-      setCopySuccess(template.id);
+      setCopySuccess(formId);
       setTimeout(() => setCopySuccess(null), 2000);
     });
   };
 
-  const handleCreateForm = () => {
-    if (newFormTitle.trim()) {
-      const sanitizedFields = newFormFields
-        .map((f) => ({ ...f, label: f.label.trim() }))
-        .filter((f) => f.label.length > 0);
-      const newTemplate: Template = {
-        id: templates.length + 1,
-        title: newFormTitle,
-        description:
-          newFormDescription ||
-          "Standard application template with Name, Email, Phone, and Resume.",
-        fields: sanitizedFields.length > 0 ? sanitizedFields : [...DEFAULT_FORM_FIELDS],
-      };
-      setTemplates([...templates, newTemplate]);
-      setNewFormTitle("");
-      setNewFormDescription("");
-      setNewFormFields([...DEFAULT_FORM_FIELDS]);
-      setShowCreateModal(false);
+  const handleFieldChange = (
+    index: number,
+    key: keyof FormField,
+    value: string,
+    isEdit: boolean,
+  ) => {
+    if (isEdit) {
+      setEditFormFields((prev) =>
+        prev.map((f, i) => (i === index ? { ...f, [key]: value } : f)),
+      );
+    } else {
+      setNewFormFields((prev) =>
+        prev.map((f, i) => (i === index ? { ...f, [key]: value } : f)),
+      );
     }
   };
 
-  const handleNewFormFieldChange = (index: number, key: keyof FormField, value: string) => {
-    setNewFormFields((prev) =>
-      prev.map((field, i) => (i === index ? { ...field, [key]: value } : field)),
+  const handleAddField = (isEdit: boolean) => {
+    if (isEdit) {
+      setEditFormFields((prev) => [...prev, { label: "", type: "text" }]);
+    } else {
+      setNewFormFields((prev) => [...prev, { label: "", type: "text" }]);
+    }
+  };
+
+  const handleRemoveField = (index: number, isEdit: boolean) => {
+    if (isEdit) {
+      setEditFormFields((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setNewFormFields((prev) => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleDragStart = (
+    e: DragEvent<HTMLDivElement>,
+    index: number,
+    isEdit: boolean,
+  ) => {
+    e.dataTransfer.setData("text/plain", JSON.stringify({ index, isEdit }));
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (
+    e: DragEvent<HTMLDivElement>,
+    targetIndex: number,
+    isEdit: boolean,
+  ) => {
+    e.preventDefault();
+    const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+
+    if (data.isEdit !== isEdit || data.index === targetIndex) return;
+
+    if (isEdit) {
+      const fields = [...editFormFields];
+      const [movedField] = fields.splice(data.index, 1);
+      fields.splice(targetIndex, 0, movedField);
+      setEditFormFields(fields);
+    } else {
+      const fields = [...newFormFields];
+      const [movedField] = fields.splice(data.index, 1);
+      fields.splice(targetIndex, 0, movedField);
+      setNewFormFields(fields);
+    }
+  };
+
+  const renderFormModal = (isEdit: boolean) => {
+    const isOpen = isEdit ? showEditModal : showCreateModal;
+    const setIsOpen = isEdit ? setShowEditModal : setShowCreateModal;
+    const fields = isEdit ? editFormFields : newFormFields;
+    const title = isEdit ? editFormTitle : newFormTitle;
+    const setTitle = isEdit ? setEditFormTitle : setNewFormTitle;
+    const description = isEdit ? editFormDescription : newFormDescription;
+    const setDescription = isEdit
+      ? setEditFormDescription
+      : setNewFormDescription;
+    const jobRole = isEdit ? editFormJobRole : newFormJobRole;
+    const setJobRole = isEdit ? setEditFormJobRole : setNewFormJobRole;
+
+    if (!isOpen) return null;
+
+    return (
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        onClick={() => setIsOpen(false)}
+      >
+        <div
+          className="bg-white rounded-3xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="mb-8 pb-6 border-b border-gray-200">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              {isEdit ? "Edit Form" : "Create New Form"}
+            </h2>
+            <p className="text-gray-600">
+              {isEdit
+                ? "Modify your job application form"
+                : "Build a custom job application form to collect candidate information"}
+            </p>
+          </div>
+
+          <div className="space-y-8">
+            {/* Basic Information Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="bg-purple-100 text-purple-700 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">
+                  1
+                </span>
+                Basic Information
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Form Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g., Senior Software Engineer"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-600 focus:bg-purple-50 transition text-gray-900"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This is the title candidates will see
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Job Role{" "}
+                      <span className="text-gray-400 text-xs font-normal">
+                        (optional)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={jobRole}
+                      onChange={(e) => setJobRole(e.target.value)}
+                      placeholder="e.g., Engineering"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-600 focus:bg-purple-50 transition text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 block mb-2">
+                      Department
+                    </label>
+                    <div className="text-xs text-gray-500 px-4 py-3 border-2 border-gray-100 rounded-xl bg-gray-50">
+                      Auto-filled from job role
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description{" "}
+                    <span className="text-gray-400 text-xs font-normal">
+                      (optional)
+                    </span>
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Tell candidates about the role and what you're looking for..."
+                    rows={3}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-600 focus:bg-purple-50 transition resize-none text-gray-900"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {description.length}/500 characters
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form Fields Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="bg-purple-100 text-purple-700 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">
+                  2
+                </span>
+                Form Fields
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Customize the fields candidates need to fill out. Drag to
+                reorder.
+              </p>
+
+              <div className="space-y-3 mb-6 bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-xl border-2 border-dashed border-gray-300">
+                {fields.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-sm">
+                      No fields added yet. Click &ldquo;Add Field&rdquo; below
+                      to get started.
+                    </p>
+                  </div>
+                ) : (
+                  fields.map((field, idx) => (
+                    <div
+                      key={idx}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx, isEdit)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, idx, isEdit)}
+                      className="flex items-center gap-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:shadow-lg transition cursor-move group"
+                    >
+                      <div className="text-gray-400 group-hover:text-purple-600 text-xl font-bold transition">
+                        ⋮
+                      </div>
+                      <input
+                        type="text"
+                        value={field.label}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            idx,
+                            "label",
+                            e.target.value,
+                            isEdit,
+                          )
+                        }
+                        placeholder="Field label (e.g., Full Name, Portfolio URL)"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
+                      />
+                      <select
+                        value={field.type}
+                        onChange={(e) =>
+                          handleFieldChange(idx, "type", e.target.value, isEdit)
+                        }
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-xs font-semibold bg-white text-gray-700 cursor-pointer"
+                      >
+                        {Object.entries(FIELD_TYPE_LABELS).map(
+                          ([val, label]) => (
+                            <option key={val} value={val}>
+                              {label}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveField(idx, isEdit)}
+                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleAddField(isEdit)}
+                className="flex items-center gap-2 px-4 py-3 bg-purple-50 border-2 border-purple-200 text-purple-600 hover:bg-purple-100 hover:border-purple-400 rounded-xl font-semibold text-sm transition"
+              >
+                <span className="text-lg">+</span> Add Field
+              </button>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 mt-10 pt-6 border-t border-gray-200">
+            <button
+              onClick={isEdit ? handleSaveEditForm : handleCreateForm}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-semibold transition active:scale-95 shadow-lg hover:shadow-xl"
+            >
+              {isEdit ? "Save Changes" : "Create Form"}
+            </button>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition active:scale-95"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     );
   };
-
-  const handleAddNewFormField = () => {
-    setNewFormFields((prev) => [...prev, { label: "", type: "text" }]);
-  };
-
-  const handleRemoveNewFormField = (index: number) => {
-    setNewFormFields((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDownload = (submission: Submission) => {
-    // Simulate download
-    alert(`Downloading submission for ${submission.name}`);
-  };
-
-  // Filter submissions by job role
-  const filteredSubmissions =
-    filterJobRole === "all"
-      ? submissions
-      : submissions.filter((s) => s.jobRole === filterJobRole);
-
-  // Sort submissions
-  const sortedSubmissions = [...filteredSubmissions].sort((a, b) => {
-    const dateA = new Date(a.date).getTime();
-    const dateB = new Date(b.date).getTime();
-    return sortBy === "latest" ? dateB - dateA : dateA - dateB;
-  });
 
   return (
     <div className="space-y-8">
       <div>
         <p className="text-gray-500">Thursday, November 20</p>
-        <h1 className="text-3xl font-bold">Job Forms</h1>
+        <h1 className="text-4xl font-bold">Job Forms</h1>
       </div>
 
-      {/* Job Forms Section */}
-      <div className="bg-white rounded-2xl border p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">
-            Job Application Form Submissions
-          </h2>
+      {/* Form Templates Section */}
+      <div className="bg-white rounded-2xl border p-8">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-bold">Form Templates</h2>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition active:scale-95"
+          >
+            + Create New Form
+          </button>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-4 mb-6 flex-wrap">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">
-              Sort By:
-            </label>
+        {loadingForms ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading forms...</p>
+          </div>
+        ) : templates.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-600 text-lg mb-4">No forms created yet</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {templates.map((form) => (
+              <div
+                key={form._id}
+                className="border-2 border-gray-200 rounded-xl p-6 hover:shadow-lg transition"
+              >
+                <h3 className="font-bold text-lg mb-2">{form.title}</h3>
+                {form.jobRole && (
+                  <p className="text-sm text-gray-500 mb-2">
+                    📍 {form.jobRole}
+                  </p>
+                )}
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  {form.description}
+                </p>
+
+                <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 flex-wrap">
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                    {form.submissionCount} submissions
+                  </span>
+                  {form.isActive ? (
+                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium text-xs">
+                      ● Active
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full font-medium text-xs">
+                      ● Inactive
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      fetchSubmissions(form._id);
+                      setShowSubmissionsModal(true);
+                    }}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition active:scale-95"
+                  >
+                    View Submissions ({form.submissionCount})
+                  </button>
+
+                  <button
+                    onClick={() => handleCopyLink(form._id)}
+                    className="w-full bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-50 px-4 py-2 rounded-lg text-sm font-semibold transition active:scale-95"
+                  >
+                    {copySuccess === form._id ? "✓ Copied!" : "🔗 Copy Link"}
+                  </button>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => handleEditForm(form)}
+                      className="flex-1 text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm font-medium transition border border-purple-200"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteForm(form._id)}
+                      className="flex-1 text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg text-sm font-medium transition border border-red-200"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* All Submissions Table */}
+      <div className="bg-white rounded-2xl border p-8">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+          <h2 className="text-2xl font-bold">All Submissions</h2>
+          <div className="flex gap-3 flex-wrap">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as "latest" | "oldest")}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3] text-sm"
+              className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600 font-medium"
             >
-              <option value="latest">Latest</option>
-              <option value="oldest">Oldest</option>
+              <option value="latest">Latest First</option>
+              <option value="oldest">Oldest First</option>
             </select>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">
-              Job Role:
-            </label>
             <select
-              value={filterJobRole}
-              onChange={(e) => setFilterJobRole(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3] text-sm"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600 font-medium"
             >
-              <option value="all">All Job Roles</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.title}>
-                  {template.title}
-                </option>
-              ))}
+              <option value="all">All Status</option>
+              <option value="submitted">Submitted</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="accepted">Accepted</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
         </div>
 
-        <div
-          className="overflow-y-auto rounded-lg"
-          style={{
-            maxHeight: `${SUBMISSION_HEADER_HEIGHT_PX + MAX_VISIBLE_SUBMISSION_ROWS * SUBMISSION_ROW_HEIGHT_PX}px`,
-          }}
-        >
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-white z-10">
-              <tr className="text-gray-400 border-b">
-                <th className="py-3 font-medium">Date</th>
-                <th className="py-3 font-medium">Job Role</th>
-                <th className="py-3 font-medium">Name</th>
-                <th className="py-3 font-medium">Email</th>
-                <th className="py-3 font-medium">Status</th>
-                <th className="py-3 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {sortedSubmissions.length > 0 ? (
-                sortedSubmissions.map((submission) => (
-                  <tr key={submission.id} className="hover:bg-gray-50">
-                    <td className="py-4">{submission.date}</td>
-                    <td className="py-4">{submission.jobRole}</td>
-                    <td className="py-4">{submission.name}</td>
-                    <td className="py-4">{submission.email}</td>
-                    <td className="py-4">
-                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
-                        {submission.status}
+        {loadingForms || loadingAllSubmissions ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading submissions...</p>
+          </div>
+        ) : allSubmissions.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-600">No submissions found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-gray-200">
+                  <th className="text-left py-3 px-4 font-semibold">Form</th>
+                  <th className="text-left py-3 px-4 font-semibold">Email</th>
+                  <th className="text-left py-3 px-4 font-semibold">Status</th>
+                  <th className="text-left py-3 px-4 font-semibold">
+                    Submitted
+                  </th>
+                  <th className="text-left py-3 px-4 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allSubmissions.map((sub) => (
+                  <tr
+                    key={sub._id}
+                    className="border-b border-gray-200 hover:bg-gray-50"
+                  >
+                    <td className="py-3 px-4 font-medium text-gray-800">
+                      {sub.formTitle}
+                    </td>
+                    <td className="py-3 px-4 font-medium">
+                      {sub.submitterEmail}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          sub.status === "accepted"
+                            ? "bg-green-100 text-green-800"
+                            : sub.status === "rejected"
+                              ? "bg-red-100 text-red-800"
+                              : sub.status === "reviewed"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {sub.status}
                       </span>
                     </td>
-                    <td className="py-4 flex gap-2">
+                    <td className="py-3 px-4 text-gray-600">
+                      {new Date(sub.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 px-4">
                       <button
-                        onClick={() => handleViewSubmission(submission)}
-                        className="bg-[#5D20B3] text-white px-3 py-1 rounded text-xs hover:bg-[#4a1a8a]"
+                        onClick={() => {
+                          setSelectedSubmission(sub);
+                          setShowViewSubmissionModal(true);
+                        }}
+                        className="text-purple-600 hover:underline font-semibold transition"
                       >
                         View
                       </button>
-                      <button
-                        onClick={() => handleDownload(submission)}
-                        className="border border-gray-300 text-gray-700 px-3 py-1 rounded text-xs hover:bg-gray-50"
-                      >
-                        Download
-                      </button>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-gray-500">
-                    No applications found for the selected filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Form Templates */}
-      <div className="bg-white rounded-2xl border p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Form Templates</h2>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-[#5D20B3] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#4a1a8a]"
-          >
-            Create New Form
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {templates.map((template) => (
-            <div
-              key={template.id}
-              className="border rounded-lg p-4 hover:shadow-md transition"
-            >
-              <h3 className="font-bold text-lg mb-2">{template.title}</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                {template.description}
-              </p>
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handlePreviewTemplate(template)}
-                    className="flex-1 bg-[#5D20B3] text-white px-3 py-2 rounded-lg text-xs hover:bg-[#4a1a8a] transition"
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={() => handleCopyLink(template)}
-                    className="flex-1 bg-white text-[#5D20B3] border border-[#5D20B3] px-3 py-2 rounded-lg text-xs hover:bg-purple-50 transition"
-                  >
-                    {copySuccess === template.id ? "✓ Copied!" : "🔗 Copy Link"}
-                  </button>
-                </div>
-                <button
-                  onClick={() => handleEditTemplate(template)}
-                  className="text-[#5D20B3] text-sm font-medium hover:underline text-left"
-                >
-                  Edit Template →
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Create New Form Modal */}
-      {showCreateModal && (
+      {/* Submissions Modal */}
+      {showSubmissionsModal && selectedFormId && (
         <div
-          className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowCreateModal(false);
-            setNewFormTitle("");
-            setNewFormDescription("");
-            setNewFormFields([...DEFAULT_FORM_FIELDS]);
-          }}
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowSubmissionsModal(false)}
         >
           <div
-            className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold mb-4">
-              Create New Form Template
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Form Title
-                </label>
-                <input
-                  type="text"
-                  value={newFormTitle}
-                  onChange={(e) => setNewFormTitle(e.target.value)}
-                  placeholder="e.g., Backend Engineer"
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Description (Optional)
-                </label>
-                <textarea
-                  value={newFormDescription}
-                  onChange={(e) => setNewFormDescription(e.target.value)}
-                  placeholder="Describe the form template..."
-                  rows={3}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Form Fields
-                </label>
-                <div className="space-y-2">
-                  {newFormFields.map((field, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={field.label}
-                        onChange={(e) =>
-                          handleNewFormFieldChange(index, "label", e.target.value)
-                        }
-                        placeholder="Field label"
-                        className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
-                      />
-                      <select
-                        value={field.type}
-                        onChange={(e) =>
-                          handleNewFormFieldChange(index, "type", e.target.value)
-                        }
-                        className="px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3] text-sm bg-white"
-                      >
-                        {(Object.entries(FIELD_TYPE_LABELS) as [FieldType, string][]).map(
-                          ([val, lbl]) => (
-                            <option key={val} value={val}>
-                              {lbl}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveNewFormField(index)}
-                        className="text-red-500 hover:text-red-700 px-2"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={handleAddNewFormField}
-                    className="text-[#5D20B3] text-sm font-medium hover:underline"
-                  >
-                    + Add Field
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={handleCreateForm}
-                  className="flex-1 bg-[#5D20B3] text-white px-4 py-2 rounded-lg hover:bg-[#4a1a8a]"
-                >
-                  Create
-                </button>
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setNewFormTitle("");
-                    setNewFormDescription("");
-                    setNewFormFields([...DEFAULT_FORM_FIELDS]);
-                  }}
-                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
+            <h2 className="text-2xl font-bold mb-6">Form Submissions</h2>
+
+            <div className="mb-6 flex gap-4 flex-wrap">
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value as "latest" | "oldest");
+                  if (selectedFormId) {
+                    fetchSubmissions(selectedFormId);
+                  }
+                }}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600 font-medium"
+              >
+                <option value="latest">Latest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
+
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  if (selectedFormId) {
+                    fetchSubmissions(selectedFormId);
+                  }
+                }}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600 font-medium"
+              >
+                <option value="all">All Status</option>
+                <option value="submitted">Submitted</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+              </select>
             </div>
+
+            {loadingSubmissions ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
+                <p className="text-gray-600">Loading submissions...</p>
+              </div>
+            ) : submissions.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <p className="text-gray-600">No submissions found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-gray-200">
+                      <th className="text-left py-3 px-4 font-semibold">
+                        Email
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold">
+                        Status
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold">
+                        Submitted
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {submissions.map((sub) => (
+                      <tr
+                        key={sub._id}
+                        className="border-b border-gray-200 hover:bg-gray-50"
+                      >
+                        <td className="py-3 px-4 font-medium">
+                          {sub.submitterEmail}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              sub.status === "accepted"
+                                ? "bg-green-100 text-green-800"
+                                : sub.status === "rejected"
+                                  ? "bg-red-100 text-red-800"
+                                  : sub.status === "reviewed"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {sub.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-600">
+                          {new Date(sub.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => {
+                              setSelectedSubmission(sub);
+                              setShowViewSubmissionModal(true);
+                            }}
+                            className="text-purple-600 hover:underline font-semibold transition"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowSubmissionsModal(false)}
+              className="mt-6 w-full border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
 
       {/* View Submission Modal */}
-      {showViewModal && selectedSubmission && (
+      {showViewSubmissionModal && selectedSubmission && (
         <div
-          className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowViewModal(false);
-            setSelectedSubmission(null);
-          }}
+          className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowViewSubmissionModal(false)}
         >
           <div
-            className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+            className="bg-white rounded-2xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold mb-4">Application Details</h2>
-            <div className="space-y-4">
+            <h2 className="text-2xl font-bold mb-6">Submission Details</h2>
+
+            <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600">
-                    Name
-                  </label>
-                  <p className="text-lg">{selectedSubmission.name}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Email
                   </label>
-                  <p className="text-lg">{selectedSubmission.email}</p>
+                  <p className="text-lg text-gray-900 font-medium">
+                    {selectedSubmission.submitterEmail}
+                  </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600">
-                    Phone
-                  </label>
-                  <p className="text-lg">{selectedSubmission.phone || "N/A"}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600">
-                    Job Role
-                  </label>
-                  <p className="text-lg">{selectedSubmission.jobRole}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600">
-                    Date
-                  </label>
-                  <p className="text-lg">{selectedSubmission.date}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Status
                   </label>
-                  <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                    {selectedSubmission.status}
-                  </span>
+                  <select
+                    value={selectedSubmission.status}
+                    onChange={(e) => {
+                      const newStatus = e.target.value as
+                        | "submitted"
+                        | "reviewed"
+                        | "rejected"
+                        | "accepted";
+                      handleUpdateSubmissionStatus(
+                        selectedSubmission._id,
+                        newStatus,
+                      );
+                      setSelectedSubmission({
+                        ...selectedSubmission,
+                        status: newStatus,
+                      });
+                    }}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600 font-medium"
+                  >
+                    <option value="submitted">Submitted</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
                 </div>
               </div>
-              {selectedSubmission.resume && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Resume
-                  </label>
-                  <a href="#" className="text-[#5D20B3] hover:underline">
-                    {selectedSubmission.resume}
-                  </a>
-                </div>
-              )}
-              {selectedSubmission.coverLetter && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Cover Letter
-                  </label>
-                  <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">
-                    {selectedSubmission.coverLetter}
-                  </p>
-                </div>
-              )}
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => handleDownload(selectedSubmission)}
-                  className="flex-1 bg-[#5D20B3] text-white px-4 py-2 rounded-lg hover:bg-[#4a1a8a]"
-                >
-                  Download Full Application
-                </button>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false);
-                    setSelectedSubmission(null);
-                  }}
-                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Preview Modal */}
-      {showPreviewModal && selectedTemplate && (
-        <div
-          className="fixed inset-0 bg-black/10 flex items-center justify-center z-50 p-4"
-          onClick={() => {
-            setShowPreviewModal(false);
-            setSelectedTemplate(null);
-          }}
-        >
-          <div
-            className="bg-white rounded-xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className="text-3xl font-bold mb-2">
-                  {selectedTemplate.title}
-                </h2>
-                <p className="text-gray-600">Application Form Preview</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowPreviewModal(false);
-                  setSelectedTemplate(null);
-                }}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Candidate Form Preview */}
-            <div className="space-y-6">
-              <div className="bg-purple-50 border-l-4 border-[#5D20B3] p-4 rounded">
-                <p className="text-sm text-gray-700">
-                  📝 This is how candidates will see the application form
-                </p>
-              </div>
-
-              <form className="space-y-5">
-                {selectedTemplate.fields.map((field, index) => (
-                  <div key={index}>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                      {field.label}
-                      <span className="text-red-500">*</span>
-                      <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                        {FIELD_TYPE_LABELS[field.type]}
-                      </span>
-                    </label>
-                    {field.type === "file" ? (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#5D20B3] transition cursor-pointer">
-                        <div className="text-gray-400 mb-2">📎</div>
-                        <p className="text-sm text-gray-600">
-                          Click to upload or drag and drop
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Submitted Data
+                </label>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
+                  {Object.entries(selectedSubmission.submittedData).map(
+                    ([key, value]) => (
+                      <div
+                        key={key}
+                        className="border-b border-gray-200 pb-3 last:border-b-0"
+                      >
+                        <p className="text-sm font-semibold text-gray-700">
+                          {key}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          PDF, DOC, DOCX (Max 5MB)
+                        <p className="text-gray-900 break-all text-sm mt-1">
+                          {String(value)}
                         </p>
                       </div>
-                    ) : (
-                      <input
-                        type={
-                          field.type === "email"
-                            ? "email"
-                            : field.type === "phone"
-                              ? "tel"
-                              : field.type === "link"
-                                ? "url"
-                                : "text"
-                        }
-                        placeholder={
-                          field.type === "link"
-                            ? "https://..."
-                            : field.type === "phone"
-                              ? "+1 (555) 000-0000"
-                              : `Enter your ${field.label.toLowerCase()}...`
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3] focus:border-transparent"
-                        disabled
-                      />
-                    )}
-                  </div>
-                ))}
-
-                <div className="pt-4">
-                  <button
-                    type="button"
-                    className="w-full bg-[#5D20B3] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#4a1a8a] transition cursor-not-allowed opacity-70"
-                    disabled
-                  >
-                    Submit Application
-                  </button>
+                    ),
+                  )}
                 </div>
-              </form>
-            </div>
-
-            <div className="flex gap-3 mt-8 pt-6 border-t">
-              <button
-                onClick={() => handleCopyLink(selectedTemplate)}
-                className="flex-1 bg-white text-[#5D20B3] border border-[#5D20B3] px-4 py-2 rounded-lg hover:bg-purple-50 transition"
-              >
-                {copySuccess === selectedTemplate.id
-                  ? "✓ Link Copied!"
-                  : "🔗 Copy Form Link"}
-              </button>
-              <button
-                onClick={() => {
-                  setShowPreviewModal(false);
-                  setSelectedTemplate(null);
-                }}
-                className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50"
-              >
-                Close Preview
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Template Modal */}
-      {showEditTemplateModal && selectedTemplate && (
-        <div
-          className="fixed inset-0 bg-black/10 flex items-center justify-center z-50"
-          onClick={() => {
-            setShowEditTemplateModal(false);
-            setSelectedTemplate(null);
-          }}
-        >
-          <div
-            className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-2xl font-bold mb-4">
-              Edit Template: {selectedTemplate.title}
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Template Name
-                </label>
-                <input
-                  type="text"
-                  value={editTemplateName}
-                  onChange={(e) => setEditTemplateName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
-                />
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Description
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Notes
                 </label>
                 <textarea
-                  value={editTemplateDescription}
-                  onChange={(e) => setEditTemplateDescription(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
+                  defaultValue={selectedSubmission.notes}
+                  onBlur={(e) => {
+                    if (e.target.value !== selectedSubmission.notes) {
+                      updateFormSubmissionStatus(selectedSubmission._id, {
+                        notes: e.target.value,
+                      }).then(() => {
+                        setSelectedSubmission({
+                          ...selectedSubmission,
+                          notes: e.target.value,
+                        });
+                      });
+                    }
+                  }}
+                  placeholder="Add notes about this application..."
+                  rows={4}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-600 resize-none"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Form Fields
-                </label>
-                <div className="space-y-2">
-                  {editTemplateFields.map((field, index) => (
-                    <div
-                      key={`${index}-${field.label}`}
-                      className="flex items-center gap-2"
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={(event) => handleDropEditField(event, index)}
-                    >
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          draggable
-                          onDragStart={(event) =>
-                            handleDragStartEditField(event, index)
-                          }
-                          className="px-2 py-1 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50 cursor-grab active:cursor-grabbing"
-                          aria-label="Drag field to reorder"
-                          title="Drag to reorder"
-                        >
-                          ::
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        value={field.label}
-                        onChange={(e) =>
-                          handleEditFieldChange(index, "label", e.target.value)
-                        }
-                        placeholder="e.g., LinkedIn Profile"
-                        className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3]"
-                      />
-                      <select
-                        value={field.type}
-                        onChange={(e) =>
-                          handleEditFieldChange(index, "type", e.target.value)
-                        }
-                        className="px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5D20B3] text-sm bg-white"
-                      >
-                        {(Object.entries(FIELD_TYPE_LABELS) as [FieldType, string][]).map(
-                          ([val, lbl]) => (
-                            <option key={val} value={val}>
-                              {lbl}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveEditField(index)}
-                        className="text-red-500 hover:text-red-700 px-2"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={handleAddEditField}
-                    className="text-[#5D20B3] text-sm font-medium hover:underline"
-                  >
-                    + Add Field
-                  </button>
-                  <p className="text-xs text-gray-500">
-                    Drag rows using the :: handle to arrange fields.
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={handleSaveTemplateChanges}
-                  className="flex-1 bg-[#5D20B3] text-white px-4 py-2 rounded-lg hover:bg-[#4a1a8a]"
-                >
-                  Save Changes
-                </button>
-                <button
-                  onClick={() => {
-                    setShowEditTemplateModal(false);
-                    setSelectedTemplate(null);
-                    setEditTemplateName("");
-                    setEditTemplateDescription("");
-                    setEditTemplateFields([]);
-                  }}
-                  className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
+
+            <button
+              onClick={() => setShowViewSubmissionModal(false)}
+              className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold transition active:scale-95"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
+
+      {/* Form Modals */}
+      {renderFormModal(false)}
+      {renderFormModal(true)}
     </div>
   );
 }
