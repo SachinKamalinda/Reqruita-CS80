@@ -35,7 +35,9 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
 const DEFAULT_UNKNOWN_EMAIL = "unknown@example.com";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
-const getSubmissionEntries = (submittedData: unknown): Array<[string, unknown]> => {
+const getSubmissionEntries = (
+  submittedData: unknown,
+): Array<[string, unknown]> => {
   if (submittedData instanceof Map) {
     return Array.from(submittedData.entries());
   }
@@ -87,8 +89,7 @@ const resolveSubmissionEmail = (submission: FormSubmission): string => {
   const inferredEmail = submittedEntries
     .map(([, value]) => normalizePotentialEmail(value))
     .find(
-      (email): email is string =>
-        !!email && email !== DEFAULT_UNKNOWN_EMAIL,
+      (email): email is string => !!email && email !== DEFAULT_UNKNOWN_EMAIL,
     );
 
   if (inferredEmail) {
