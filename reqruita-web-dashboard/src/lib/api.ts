@@ -1,4 +1,4 @@
-const AUTH_API_BASE =
+export const AUTH_API_BASE =
   process.env.NEXT_PUBLIC_AUTH_API_URL || 'http://localhost:3003';
 
 export interface AuthUser {

@@ -349,10 +349,10 @@ export default function DashboardLayout({
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-gray-800">
-                    {currentUser ? (currentUser.fullName || currentUser.email) : "Admin User"}
+                    {currentUser ? (currentUser.fullName || currentUser.email) : "Not Connected"}
                   </p>
                   <p className="text-xs text-gray-500 capitalize">
-                    {currentUser?.role ?? "Administrator"}
+                    {currentUser?.role ?? "No Connection"}
                   </p>
                 </div>
                 <svg
