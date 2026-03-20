@@ -1,7 +1,8 @@
-const { Types } = require("mongoose");
+const mongoose = require("mongoose");
+const { Types } = mongoose;
 const JobForm = require("../models/JobForm");
 const FormSubmission = require("../models/FormSubmission");
-const SessionInterviewer = require("../models/SessionInterviewer");
+const User = require("../models/User");
 const InterviewSession = require("../models/InterviewSession");
 const SessionEmailTemplate = require("../models/SessionEmailTemplate");
 const SessionEmailLog = require("../models/SessionEmailLog");
@@ -13,31 +14,11 @@ const SESSION_ACCESS_ROLES = new Set([
   "interviewer",
 ]);
 
-const DEFAULT_INTERVIEWERS = [
-  {
-    interviewerId: "INT-001",
-    name: "Mia Carter",
-    email: "mia.carter@reqruita.com",
-    specialty: "Backend Systems",
-  },
-  {
-    interviewerId: "INT-002",
-    name: "Liam Green",
-    email: "liam.green@reqruita.com",
-    specialty: "Frontend Architecture",
-  },
-  {
-    interviewerId: "INT-003",
-    name: "Noah Hall",
-    email: "noah.hall@reqruita.com",
-    specialty: "Cloud and DevOps",
-  },
-  {
-    interviewerId: "INT-004",
-    name: "Emma Stone",
-    email: "emma.stone@reqruita.com",
-    specialty: "Behavioral Interviewing",
-  },
+const SESSION_INTERVIEWER_ROLES = [
+  "interviewer",
+  "hr manager",
+  "recruiter",
+  "admin",
 ];
 
 const DEFAULT_EMAIL_TEMPLATES = {
@@ -206,18 +187,47 @@ const generateSessionMeetingPassword = (sessionId) => {
   return `RQ${suffix}`;
 };
 
+const toObjectId = (value) => new Types.ObjectId(String(value));
+
+const buildUserFullName = (user) => {
+  const explicit = String(user.fullName || "").trim();
+  if (explicit) return explicit;
+
+  return `${String(user.firstName || "").trim()} ${String(user.lastName || "").trim()}`.trim() ||
+    user.email;
+};
+
+const getInterviewerSpecialty = (user) => {
+  const jobTitle = String(user.jobTitle || "").trim();
+  if (jobTitle) return jobTitle;
+
+  const roleLabel = String(user.role || "interviewer").replace(/\b\w/g, (char) =>
+    char.toUpperCase(),
+  );
+
+  return roleLabel;
+};
+
 const serializeJob = (job) => ({
   id: String(job._id),
   title: job.title,
+  description: String(job.description || ""),
+  jobRole: String(job.jobRole || ""),
   position: job.jobRole || job.title,
+  fields: (job.fields || []).map((field) => ({
+    label: String(field.label || ""),
+    type: String(field.type || "text"),
+    required: field.required !== false,
+    order: Number.isFinite(field.order) ? field.order : 0,
+  })),
   applicants: Number.isFinite(job.submissionCount) ? job.submissionCount : 0,
 });
 
 const serializeInterviewer = (interviewer) => ({
-  id: interviewer.interviewerId,
-  name: interviewer.name,
+  id: String(interviewer._id),
+  name: buildUserFullName(interviewer),
   email: interviewer.email,
-  specialty: interviewer.specialty,
+  specialty: getInterviewerSpecialty(interviewer),
 });
 
 const serializeCandidate = (submission) => {
@@ -391,10 +401,43 @@ const ensureSessionSeedData = async () => {
   }
 
   seedInFlight = (async () => {
-    const interviewerCount = await SessionInterviewer.countDocuments();
-    if (interviewerCount === 0) {
-      await SessionInterviewer.insertMany(DEFAULT_INTERVIEWERS);
+    const connection = mongoose.connection;
+    if (connection && connection.db) {
+      const legacyCollections = [
+        "sessionjobforms",
+        "sessioncandidates",
+        "sessioninterviewers",
+      ];
+
+      await Promise.all(
+        legacyCollections.map(async (collectionName) => {
+          const exists = await connection.db
+            .listCollections({ name: collectionName })
+            .hasNext();
+
+          if (!exists) return;
+
+          try {
+            await connection.db.collection(collectionName).drop();
+          } catch (dropError) {
+            if (dropError.codeName !== "NamespaceNotFound") return;
+          }
+        }),
+      );
     }
+
+    await InterviewSession.deleteMany({
+      jobId: { $not: /^[a-fA-F0-9]{24}$/ },
+    });
+
+    await InterviewSession.updateMany(
+      {},
+      {
+        $pull: {
+          candidates: { candidateId: { $not: /^[a-fA-F0-9]{24}$/ } },
+        },
+      },
+    );
 
     const templateCount = await SessionEmailTemplate.countDocuments();
     if (templateCount === 0) {
@@ -428,6 +471,41 @@ const fetchScopedJobForms = async (userId, requestedJobId = "") => {
   }
 
   return JobForm.find(filter).sort({ createdAt: -1 }).lean();
+};
+
+const buildInterviewerFilter = (reqUser) => {
+  const filter = {
+    role: { $in: SESSION_INTERVIEWER_ROLES },
+    status: "active",
+  };
+
+  if (!isValidObjectId(reqUser.companyId)) {
+    filter._id = { $exists: false };
+    return filter;
+  }
+
+  filter.companyId = toObjectId(reqUser.companyId);
+
+  return filter;
+};
+
+const fetchScopedInterviewers = async (reqUser) =>
+  User.find(buildInterviewerFilter(reqUser))
+    .select("firstName lastName fullName email role jobTitle companyId status")
+    .sort({ firstName: 1, lastName: 1, email: 1 })
+    .lean();
+
+const fetchScopedInterviewerById = async (reqUser, interviewerId) => {
+  if (!isValidObjectId(interviewerId)) {
+    return null;
+  }
+
+  return User.findOne({
+    ...buildInterviewerFilter(reqUser),
+    _id: toObjectId(interviewerId),
+  })
+    .select("firstName lastName fullName email role jobTitle companyId status")
+    .lean();
 };
 
 const fetchScopedSubmissions = async (formIds) => {
@@ -485,7 +563,7 @@ exports.getBootstrap = async (req, res) => {
     const jobIds = jobs.map((job) => String(job._id));
 
     const [interviewers, sessions, candidates, templates, emailLogs] = await Promise.all([
-      SessionInterviewer.find({}).sort({ interviewerId: 1 }).lean(),
+      fetchScopedInterviewers(req.user),
       fetchScopedSessions(jobIds),
       fetchScopedSubmissions(jobIds),
       buildTemplateMap(),
@@ -522,7 +600,7 @@ exports.getInterviewers = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
-    const interviewers = await SessionInterviewer.find({}).sort({ interviewerId: 1 }).lean();
+    const interviewers = await fetchScopedInterviewers(req.user);
     res.json(interviewers.map(serializeInterviewer));
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -729,7 +807,7 @@ exports.createSession = async (req, res) => {
 
     const [job, interviewer, existingSessions] = await Promise.all([
       JobForm.findOne({ _id: normalizedJobId, createdBy: req.user.id }).lean(),
-      SessionInterviewer.findOne({ interviewerId: String(interviewerId).trim() }).lean(),
+      fetchScopedInterviewerById(req.user, String(interviewerId).trim()),
       InterviewSession.find({ jobId: normalizedJobId }).select("sessionId").lean(),
     ]);
 
@@ -762,7 +840,7 @@ exports.createSession = async (req, res) => {
       sessionId: generatedSessionId,
       jobId: String(job._id),
       name: generatedSessionName,
-      interviewerId: interviewer.interviewerId,
+      interviewerId: String(interviewer._id),
       deadline: deadlineDate,
       requirements: String(requirements).trim(),
       remarks: String(remarks).trim(),
@@ -778,7 +856,7 @@ exports.createSession = async (req, res) => {
 
     const emailTemplates = await buildTemplateMap();
     const sessionEmailMessage = applyEmailTemplate(emailTemplates.container1, {
-      interviewerName: interviewer.name,
+      interviewerName: buildUserFullName(interviewer),
       sessionName: generatedSessionName,
       jobTitle: job.title,
       deadline: formatHumanDate(deadlineDate),
@@ -878,7 +956,7 @@ exports.assignCandidate = async (req, res) => {
     await refreshedTargetSession.save();
 
     const [interviewer, job, emailTemplates] = await Promise.all([
-      SessionInterviewer.findOne({ interviewerId: refreshedTargetSession.interviewerId }).lean(),
+      fetchScopedInterviewerById(req.user, refreshedTargetSession.interviewerId),
       JobForm.findById(refreshedTargetSession.jobId).lean(),
       buildTemplateMap(),
     ]);
@@ -887,7 +965,7 @@ exports.assignCandidate = async (req, res) => {
       candidateName: candidate.name,
       sessionName: refreshedTargetSession.name,
       jobTitle: job ? job.title : targetJob.title,
-      interviewerName: interviewer ? interviewer.name : "Interviewer",
+      interviewerName: interviewer ? buildUserFullName(interviewer) : "Interviewer",
       sessionDate: formatHumanDate(refreshedTargetSession.sessionDate),
       durationMinutes: refreshedTargetSession.durationMinutes,
     });
@@ -947,7 +1025,7 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
     }
 
     const [interviewer, job, emailTemplates] = await Promise.all([
-      SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
+      fetchScopedInterviewerById(req.user, session.interviewerId),
       fetchOwnedJobForSession(req.user.id, session),
       buildTemplateMap(),
     ]);
@@ -966,7 +1044,7 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
       candidateName: candidate.name,
       sessionName: session.name,
       jobTitle: job.title,
-      interviewerName: interviewer ? interviewer.name : "Interviewer",
+      interviewerName: interviewer ? buildUserFullName(interviewer) : "Interviewer",
       sessionDate: formatHumanDate(session.sessionDate),
       durationMinutes: session.durationMinutes,
     });
@@ -1134,14 +1212,14 @@ exports.sendScheduleEmails = async (req, res) => {
     }
 
     const [interviewer, emailTemplates] = await Promise.all([
-      SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
+      fetchScopedInterviewerById(req.user, session.interviewerId),
       buildTemplateMap(),
     ]);
 
     const scheduleForInterviewer = applyEmailTemplate(
       emailTemplates.container3Schedule,
       {
-        recipientName: interviewer ? interviewer.name : "Interviewer",
+        recipientName: interviewer ? buildUserFullName(interviewer) : "Interviewer",
         sessionName: session.name,
         jobTitle: ownedJob.title,
         action: "Schedule confirmed",
@@ -1229,7 +1307,7 @@ exports.sendResultEmails = async (req, res) => {
     }
 
     const [interviewer, emailTemplates] = await Promise.all([
-      SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
+      fetchScopedInterviewerById(req.user, session.interviewerId),
       buildTemplateMap(),
     ]);
 
@@ -1238,7 +1316,7 @@ exports.sendResultEmails = async (req, res) => {
     const resultForInterviewer = applyEmailTemplate(
       emailTemplates.container3Result,
       {
-        recipientName: interviewer ? interviewer.name : "Interviewer",
+        recipientName: interviewer ? buildUserFullName(interviewer) : "Interviewer",
         sessionName: session.name,
         jobTitle: ownedJob.title,
         action: "Result publication",
@@ -1435,7 +1513,7 @@ exports.getCandidatePacket = async (req, res) => {
 
     const [candidateSubmission, interviewer] = await Promise.all([
       fetchCandidateSubmission(candidateId),
-      SessionInterviewer.findOne({ interviewerId: session.interviewerId }).lean(),
+      fetchScopedInterviewerById(req.user, session.interviewerId),
     ]);
 
     const candidate = candidateSubmission ? serializeCandidate(candidateSubmission) : null;
@@ -1457,7 +1535,19 @@ exports.getCandidatePacket = async (req, res) => {
         id: session.sessionId,
         name: session.name,
         jobTitle: ownedJob.title,
-        interviewer: interviewer ? interviewer.name : "Unassigned",
+        jobForm: {
+          id: String(ownedJob._id),
+          title: ownedJob.title,
+          description: String(ownedJob.description || ""),
+          jobRole: String(ownedJob.jobRole || ""),
+          fields: (ownedJob.fields || []).map((field) => ({
+            label: String(field.label || ""),
+            type: String(field.type || "text"),
+            required: field.required !== false,
+            order: Number.isFinite(field.order) ? field.order : 0,
+          })),
+        },
+        interviewer: interviewer ? buildUserFullName(interviewer) : "Unassigned",
         interviewerEmail: interviewer ? interviewer.email : "",
         meetingId:
           session.meetingId || generateSessionMeetingId(session.sessionId),
