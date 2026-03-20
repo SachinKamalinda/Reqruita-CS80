@@ -83,6 +83,8 @@ export interface InterviewSession {
   sessionDate: string;
   startTime: string;
   durationMinutes: number;
+  meetingId: string;
+  meetingPassword: string;
   status: SessionStatus;
   candidates: SessionCandidateSlot[];
   lastEmailAt: string | null;
@@ -158,6 +160,8 @@ export interface SessionCandidatePacket {
     jobTitle: string;
     interviewer: string;
     interviewerEmail: string;
+    meetingId: string;
+    meetingPassword: string;
     deadline: string;
     sessionDate: string;
     defaultStartTime: string;
