@@ -50,7 +50,10 @@ export type EmailCategory =
 export interface SessionJobForm {
   id: string;
   title: string;
+  description: string;
+  jobRole: string;
   position: string;
+  fields: FormField[];
   applicants: number;
 }
 
@@ -169,6 +172,13 @@ export interface SessionCandidatePacket {
     id: string;
     name: string;
     jobTitle: string;
+    jobForm?: {
+      id: string;
+      title: string;
+      description: string;
+      jobRole: string;
+      fields: FormField[];
+    };
     interviewer: string;
     interviewerEmail: string;
     meetingId: string;
