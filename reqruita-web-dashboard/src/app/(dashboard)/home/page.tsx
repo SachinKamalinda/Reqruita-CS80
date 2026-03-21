@@ -164,6 +164,7 @@ export default function Dashboard() {
     assignedCandidates: 0,
   });
   const [userName, setUserName] = useState("User");
+  const [currentUserRole, setCurrentUserRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -199,6 +200,7 @@ export default function Dashboard() {
 
         if (settingsResult.status === "fulfilled") {
           setUserName(settingsResult.value.firstName || "User");
+          setCurrentUserRole(settingsResult.value.role || "");
         }
 
         if (sessionsResult.status === "fulfilled") {
@@ -406,73 +408,78 @@ export default function Dashboard() {
           )}
         </div>
 
-        <div className="bg-white rounded-2xl border p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold">
-              Recent Job Application Submissions
-            </h2>
-            <button
-              onClick={() => router.push("/job-forms")}
-              className="text-[#5D20B3] text-sm font-medium hover:underline"
-            >
-              View All &gt;
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center items-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
+        {currentUserRole === "admin" && (
+          <div className="bg-white rounded-2xl border p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">
+                Recent Job Application Submissions
+              </h2>
+              <button
+                onClick={() => router.push("/job-forms")}
+                className="text-[#5D20B3] text-sm font-medium hover:underline"
+              >
+                View All &gt;
+              </button>
             </div>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="text-gray-400 border-b">
-                  <th className="py-3 font-medium">Form</th>
-                  <th className="py-3 font-medium">Email</th>
-                  <th className="py-3 font-medium">Status</th>
-                  <th className="py-3 font-medium">Submitted</th>
-                  <th className="py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {submissions.length > 0 ? (
-                  submissions.map((submission) => (
-                    <tr key={submission.id} className="hover:bg-gray-50">
-                      <td className="py-4">{submission.formTitle}</td>
-                      <td className="py-4 text-purple-600">
-                        {submission.submitterEmail}
-                      </td>
-                      <td className="py-4">
-                        <span
-                          className={`rounded px-2 py-1 text-xs font-medium ${getSubmissionStatusClasses(submission.status)}`}
-                        >
-                          {submission.status}
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        {formatDateLabel(submission.createdAt)}
-                      </td>
-                      <td className="py-4">
-                        <button
-                          onClick={() => router.push("/job-forms")}
-                          className="bg-[#5D20B3] text-white px-3 py-1 rounded text-xs hover:bg-[#4a1a8a]"
-                        >
-                          View
-                        </button>
+
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
+              </div>
+            ) : (
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-gray-400 border-b">
+                    <th className="py-3 font-medium">Form</th>
+                    <th className="py-3 font-medium">Email</th>
+                    <th className="py-3 font-medium">Status</th>
+                    <th className="py-3 font-medium">Submitted</th>
+                    <th className="py-3 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {submissions.length > 0 ? (
+                    submissions.map((submission) => (
+                      <tr key={submission.id} className="hover:bg-gray-50">
+                        <td className="py-4">{submission.formTitle}</td>
+                        <td className="py-4 text-purple-600">
+                          {submission.submitterEmail}
+                        </td>
+                        <td className="py-4">
+                          <span
+                            className={`rounded px-2 py-1 text-xs font-medium ${getSubmissionStatusClasses(submission.status)}`}
+                          >
+                            {submission.status}
+                          </span>
+                        </td>
+                        <td className="py-4">
+                          {formatDateLabel(submission.createdAt)}
+                        </td>
+                        <td className="py-4">
+                          <button
+                            onClick={() => router.push("/job-forms")}
+                            className="bg-[#5D20B3] text-white px-3 py-1 rounded text-xs hover:bg-[#4a1a8a]"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-8 text-center text-gray-500"
+                      >
+                        No submissions yet
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">
-                      No submissions yet
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
