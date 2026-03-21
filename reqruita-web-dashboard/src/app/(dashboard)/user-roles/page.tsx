@@ -602,8 +602,6 @@ export default function UserRolesPage() {
                 >
                   <option value="admin">Administrator</option>
                   <option value="interviewer">Interviewer</option>
-                  <option value="recruiter">Recruiter</option>
-                  <option value="hr manager">HR Manager</option>
                 </select>
               </div>
 
