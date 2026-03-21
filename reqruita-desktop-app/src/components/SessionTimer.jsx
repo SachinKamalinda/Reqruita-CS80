@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
  * Displays elapsed time from timerStartedAt timestamp
  * Updates every second while interview is active
  */
-export default function SessionTimer({ timerStartedAt, isActive = true }) {
+export default function SessionTimer({ timerStartedAt, isActive = true, compact = false }) {
     const [elapsed, setElapsed] = useState(0);
 
     useEffect(() => {
@@ -41,6 +41,18 @@ export default function SessionTimer({ timerStartedAt, isActive = true }) {
         return null;
     }
 
+    if (compact) {
+        return (
+            <div style={compactContainerStyle}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.9 }}>
+                    <circle cx="12" cy="12" r="9" />
+                    <polyline points="12 7 12 12 15 15" />
+                </svg>
+                <span style={compactTimeStyle}>{formatTime(elapsed)}</span>
+            </div>
+        );
+    }
+
     return (
         <div style={timerContainerStyle}>
             <div style={timerLabelStyle}>SESSION TIME</div>
@@ -48,6 +60,27 @@ export default function SessionTimer({ timerStartedAt, isActive = true }) {
         </div>
     );
 }
+
+const compactContainerStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "10px 14px",
+    borderRadius: "14px",
+    color: "#e5e7eb",
+    background: "rgba(17, 24, 39, 0.85)",
+    border: "1px solid rgba(148, 163, 184, 0.35)",
+    minWidth: "92px",
+    justifyContent: "center",
+};
+
+const compactTimeStyle = {
+    fontFamily: "monospace",
+    fontSize: "14px",
+    fontWeight: "700",
+    letterSpacing: "0.4px",
+    lineHeight: 1,
+};
 
 const timerContainerStyle = {
     display: "flex",
