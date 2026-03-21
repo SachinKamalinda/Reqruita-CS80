@@ -167,6 +167,23 @@ const buildFallbackNameFromEmail = (email) => {
 
 const isValidTime = (value) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(value || "");
 
+const formatTimeWithMeridiem = (value) => {
+  const raw = toSafeString(value);
+  if (!raw) return "";
+
+  const match = raw.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) {
+    return raw;
+  }
+
+  const hours24 = Number.parseInt(match[1], 10);
+  const minutes = match[2];
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+
+  return `${hours12}:${minutes} ${period}`;
+};
+
 const formatDateInput = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -1435,7 +1452,7 @@ exports.sendScheduleEmails = async (req, res) => {
         sessionName: session.name,
         jobTitle: ownedJob.title,
         action: "Schedule confirmed",
-        slotTime: session.startTime,
+        slotTime: formatTimeWithMeridiem(session.startTime),
         durationMinutes: session.durationMinutes,
         resultSummary: `${session.candidates.length} candidates notified`,
       },
@@ -1467,7 +1484,7 @@ exports.sendScheduleEmails = async (req, res) => {
           sessionName: session.name,
           jobTitle: ownedJob.title,
           action: "Interview schedule",
-          slotTime: slot.slotTime || session.startTime,
+          slotTime: formatTimeWithMeridiem(slot.slotTime || session.startTime),
           durationMinutes: slot.durationMinutes || session.durationMinutes,
           resultSummary: "Please be ready before your assigned slot.",
         });
@@ -1598,7 +1615,7 @@ exports.sendResultEmails = async (req, res) => {
         sessionName: session.name,
         jobTitle: ownedJob.title,
         action: "Result publication",
-        slotTime: session.startTime,
+        slotTime: formatTimeWithMeridiem(session.startTime),
         durationMinutes: session.durationMinutes,
         resultSummary,
       },
@@ -1630,7 +1647,7 @@ exports.sendResultEmails = async (req, res) => {
           sessionName: session.name,
           jobTitle: ownedJob.title,
           action: "Result notification",
-          slotTime: slot.slotTime || session.startTime,
+          slotTime: formatTimeWithMeridiem(slot.slotTime || session.startTime),
           durationMinutes: slot.durationMinutes || session.durationMinutes,
           resultSummary: slot.result,
         });
@@ -1783,7 +1800,7 @@ exports.sendCandidateEmail = async (req, res) => {
       sessionName: session.name,
       jobTitle: ownedJob.title,
       action,
-      slotTime: slot.slotTime || session.startTime,
+      slotTime: formatTimeWithMeridiem(slot.slotTime || session.startTime),
       durationMinutes: slot.durationMinutes,
       resultSummary: slot.result,
     });
