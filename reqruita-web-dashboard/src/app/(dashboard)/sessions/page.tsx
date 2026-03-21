@@ -968,7 +968,7 @@ export default function SessionsPage() {
     setShowAssignModal(true);
   };
 
-  const handleConfirmAssignAndSendEmail = async () => {
+  const handleConfirmAssignCandidate = async () => {
     if (!assignCandidateId || !resolvedAssignTargetSessionId) {
       setStatusMessage("Select a valid session before assigning.");
       return;
@@ -2565,16 +2565,18 @@ export default function SessionsPage() {
 
               <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 Clicking assign will place the candidate into the selected
-                session.
+                session and auto-fill a slot time based on the session start
+                time and duration. You can edit the slot later before sending
+                emails.
               </p>
             </div>
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={handleConfirmAssignAndSendEmail}
+                onClick={handleConfirmAssignCandidate}
                 className="flex-1 rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
               >
-                Assign and Send Email
+                Assign Candidate
               </button>
               <button
                 onClick={() => {
