@@ -28,7 +28,7 @@ const DEFAULT_EMAIL_TEMPLATES = {
   container2:
     "Dear {{candidateName}},\n\nWe are pleased to inform you that you have been scheduled for \"{{sessionName}}\" as part of your application for the {{jobTitle}} role.\n\nInterview details:\n- Interviewer: {{interviewerName}}\n- Date: {{sessionDate}}\n- Expected duration: {{durationMinutes}} minutes\n\nPlease note: your exact time slot will be announced soon in a follow-up update.\n\nKind regards,\nReqruita Recruitment Team",
   container3Schedule:
-    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
+    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Meeting ID: {{meetingId}}\n- Meeting password: {{meetingPassword}}\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
   container3Result:
     "Dear {{recipientName}},\n\nThis is the final outcome update for \"{{sessionName}}\" ({{jobTitle}}).\n\nInterview outcome: {{resultSummary}}\n\nThank you for your time and participation in the interview process.\n\nSincerely,\nReqruita Interview Operations",
   container3Reminder:
@@ -54,7 +54,7 @@ const PREVIOUS_DEFAULT_EMAIL_TEMPLATES = {
   container2:
     "Dear {{candidateName}},\n\nWe are pleased to inform you that you have been scheduled for \"{{sessionName}}\" as part of your application for the {{jobTitle}} role.\n\nInterview details:\n- Interviewer: {{interviewerName}}\n- Date: {{sessionDate}}\n- Expected duration: {{durationMinutes}} minutes\n\nPlease ensure you are available at the scheduled time and join promptly.\n\nKind regards,\nReqruita Recruitment Team",
   container3Schedule:
-    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdate details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Current summary: {{resultSummary}}\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
+    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
   container3Result:
     "Dear {{recipientName}},\n\nThis is a result update for \"{{sessionName}}\" ({{jobTitle}}).\n\nResult details:\n- Action taken: {{action}}\n- Interview slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Outcome summary: {{resultSummary}}\n\nPlease review the result and continue with the appropriate follow-up actions.\n\nSincerely,\nReqruita Interview Operations",
   container3Reminder:
@@ -1633,6 +1633,12 @@ exports.sendScheduleEmails = async (req, res) => {
       }),
     );
 
+    const sessionMeetingId =
+      session.meetingId || generateSessionMeetingId(session.sessionId);
+    const sessionMeetingPassword =
+      session.meetingPassword ||
+      generateSessionMeetingPassword(session.sessionId);
+
     const scheduleForInterviewer = applyEmailTemplate(
       emailTemplates.container3Schedule,
       {
@@ -1642,6 +1648,8 @@ exports.sendScheduleEmails = async (req, res) => {
         action: "Schedule confirmed",
         slotTime: formatTimeWithMeridiem(session.startTime),
         durationMinutes: session.durationMinutes,
+        meetingId: sessionMeetingId,
+        meetingPassword: sessionMeetingPassword,
         resultSummary: `${session.candidates.length} candidates notified`,
       },
     );
@@ -1674,6 +1682,8 @@ exports.sendScheduleEmails = async (req, res) => {
           action: "Interview schedule",
           slotTime: formatTimeWithMeridiem(slot.slotTime || session.startTime),
           durationMinutes: slot.durationMinutes || session.durationMinutes,
+          meetingId: sessionMeetingId,
+          meetingPassword: sessionMeetingPassword,
           resultSummary: "Please be ready before your assigned slot.",
         });
 
@@ -1990,6 +2000,10 @@ exports.sendCandidateEmail = async (req, res) => {
       action,
       slotTime: formatTimeWithMeridiem(slot.slotTime || session.startTime),
       durationMinutes: slot.durationMinutes,
+      meetingId: session.meetingId || generateSessionMeetingId(session.sessionId),
+      meetingPassword:
+        session.meetingPassword ||
+        generateSessionMeetingPassword(session.sessionId),
       resultSummary: slot.result,
     });
 
