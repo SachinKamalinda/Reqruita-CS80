@@ -6,6 +6,7 @@ const User = require("../models/User");
 const InterviewSession = require("../models/InterviewSession");
 const SessionEmailTemplate = require("../models/SessionEmailTemplate");
 const SessionEmailLog = require("../models/SessionEmailLog");
+const { sendCustomEmail } = require("../config/resend");
 
 const SESSION_ACCESS_ROLES = new Set([
   "admin",
@@ -45,6 +46,9 @@ const EMAIL_OPTION_TO_CATEGORY = {
   result: "Result",
   reminder: "Reminder",
 };
+
+const UNKNOWN_EMAIL = "unknown@example.com";
+const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 const RESULT_VALUES = new Set(["Pending", "Passed", "Failed", "On Hold"]);
 
@@ -172,6 +176,48 @@ const applyEmailTemplate = (template, values) =>
     const value = values[key];
     return value === undefined || value === null ? "" : String(value);
   });
+
+const normalizeEmailAddress = (value) => toSafeString(value).toLowerCase();
+
+const isDeliverableEmailAddress = (value) => {
+  const normalized = normalizeEmailAddress(value);
+  return (
+    normalized &&
+    normalized !== UNKNOWN_EMAIL &&
+    EMAIL_ADDRESS_PATTERN.test(normalized)
+  );
+};
+
+const sendSessionEmail = async ({ to, subject, details }) => {
+  const recipient = normalizeEmailAddress(to);
+
+  if (!isDeliverableEmailAddress(recipient)) {
+    return {
+      sent: false,
+      recipient: recipient || UNKNOWN_EMAIL,
+      reason: "Recipient email is missing or invalid",
+    };
+  }
+
+  const result = await sendCustomEmail({
+    to: recipient,
+    subject,
+    text: details,
+  });
+
+  if (!result.sent) {
+    return {
+      sent: false,
+      recipient,
+      reason: result.reason || "Email provider could not send the message",
+    };
+  }
+
+  return {
+    sent: true,
+    recipient,
+  };
+};
 
 const sanitizeSessionToken = (value) =>
   String(value || "")
@@ -548,6 +594,18 @@ const fetchCandidateSubmission = async (candidateId) => {
   return FormSubmission.findById(candidateId).lean();
 };
 
+const fetchCandidateSubmissionsByIds = async (candidateIds) => {
+  const objectIds = (candidateIds || [])
+    .filter((candidateId) => isValidObjectId(candidateId))
+    .map((candidateId) => toObjectId(candidateId));
+
+  if (objectIds.length === 0) {
+    return [];
+  }
+
+  return FormSubmission.find({ _id: { $in: objectIds } }).lean();
+};
+
 const fetchSessionById = async (sessionId) =>
   InterviewSession.findOne({ sessionId });
 
@@ -866,21 +924,36 @@ exports.createSession = async (req, res) => {
       remarks: String(remarks).trim(),
     });
 
+    const sessionEmailSubject = `${generatedSessionName} created for ${job.title}`;
+    const sessionEmailResult = await sendSessionEmail({
+      to: interviewer.email,
+      subject: sessionEmailSubject,
+      details: sessionEmailMessage,
+    });
+
     await appendEmailLogs([
       {
         category: "Session",
-        recipient: interviewer.email,
-        subject: `${generatedSessionName} created for ${job.title}`,
+        recipient: sessionEmailResult.recipient,
+        subject: sessionEmailSubject,
         details: sessionEmailMessage,
         metadata: {
           sessionId: generatedSessionId,
           jobId: String(job._id),
+          deliveryStatus: sessionEmailResult.sent ? "sent" : "failed",
+          ...(sessionEmailResult.sent
+            ? {}
+            : { deliveryReason: sessionEmailResult.reason }),
         },
       },
     ]);
 
+    const message = sessionEmailResult.sent
+      ? `${generatedSessionName} created and session email sent for ${job.title}.`
+      : `${generatedSessionName} created for ${job.title}, but session email could not be sent (${sessionEmailResult.reason}).`;
+
     return res.status(201).json({
-      message: `${generatedSessionName} created and session email sent for ${job.title}.`,
+      message,
       session: serializeSession(createdSession.toObject()),
     });
   } catch (error) {
@@ -971,22 +1044,37 @@ exports.assignCandidate = async (req, res) => {
       durationMinutes: refreshedTargetSession.durationMinutes,
     });
 
+    const assignmentSubject = `Interview assigned: ${refreshedTargetSession.name}`;
+    const assignmentEmailResult = await sendSessionEmail({
+      to: candidate.email,
+      subject: assignmentSubject,
+      details: assignmentMessage,
+    });
+
     await appendEmailLogs([
       {
         category: "Assignment",
-        recipient: candidate.email,
-        subject: `Interview assigned: ${refreshedTargetSession.name}`,
+        recipient: assignmentEmailResult.recipient,
+        subject: assignmentSubject,
         details: assignmentMessage,
         metadata: {
           sessionId: refreshedTargetSession.sessionId,
           candidateId,
+          deliveryStatus: assignmentEmailResult.sent ? "sent" : "failed",
+          ...(assignmentEmailResult.sent
+            ? {}
+            : { deliveryReason: assignmentEmailResult.reason }),
         },
       },
     ]);
 
-    const message = previouslyAssignedSession
-      ? `${candidate.name} moved from ${previouslyAssignedSession.name} to ${refreshedTargetSession.name} and assignment email sent.`
-      : `${candidate.name} assigned to ${refreshedTargetSession.name} and email sent.`;
+    const assignmentSummary = previouslyAssignedSession
+      ? `${candidate.name} moved from ${previouslyAssignedSession.name} to ${refreshedTargetSession.name}.`
+      : `${candidate.name} assigned to ${refreshedTargetSession.name}.`;
+
+    const message = assignmentEmailResult.sent
+      ? `${assignmentSummary} Assignment email sent.`
+      : `${assignmentSummary} Assignment email could not be sent (${assignmentEmailResult.reason}).`;
 
     return res.json({
       message,
@@ -1050,18 +1138,40 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
       durationMinutes: session.durationMinutes,
     });
 
-    await appendEmailLogs([
+    const assignmentSubject = `Assignment update: ${session.name}`;
+    const assignmentEmailResult = await sendSessionEmail({
+      to: candidate.email,
+      subject: assignmentSubject,
+      details: assignmentMessage,
+    });
+
+    const emailLogs = await appendEmailLogs([
       {
         category: "Assignment",
-        recipient: candidate.email,
-        subject: `Assignment update: ${session.name}`,
+        recipient: assignmentEmailResult.recipient,
+        subject: assignmentSubject,
         details: assignmentMessage,
         metadata: {
           sessionId: session.sessionId,
           candidateId,
+          deliveryStatus: assignmentEmailResult.sent ? "sent" : "failed",
+          ...(assignmentEmailResult.sent
+            ? {}
+            : { deliveryReason: assignmentEmailResult.reason }),
         },
       },
     ]);
+
+    if (!assignmentEmailResult.sent) {
+      const statusCode = assignmentEmailResult.reason === "Recipient email is missing or invalid"
+        ? 400
+        : 502;
+
+      return res.status(statusCode).json({
+        message: `Assignment email could not be sent (${assignmentEmailResult.reason}).`,
+        emailLog: emailLogs[0] ? serializeEmailLog(emailLogs[0].toObject()) : null,
+      });
+    }
 
     session.lastEmailAt = new Date();
     await session.save();
@@ -1069,6 +1179,7 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
     return res.json({
       message: `Assignment email sent to ${candidate.name}.`,
       session: serializeSession(session.toObject()),
+      emailLog: emailLogs[0] ? serializeEmailLog(emailLogs[0].toObject()) : null,
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
@@ -1217,6 +1328,16 @@ exports.sendScheduleEmails = async (req, res) => {
       buildTemplateMap(),
     ]);
 
+    const candidateSubmissions = await fetchCandidateSubmissionsByIds(
+      (session.candidates || []).map((candidate) => candidate.candidateId),
+    );
+    const candidateById = new Map(
+      candidateSubmissions.map((submission) => {
+        const serialized = serializeCandidate(submission);
+        return [serialized.id, serialized];
+      }),
+    );
+
     const scheduleForInterviewer = applyEmailTemplate(
       emailTemplates.container3Schedule,
       {
@@ -1230,39 +1351,88 @@ exports.sendScheduleEmails = async (req, res) => {
       },
     );
 
-    const scheduleForCandidates = applyEmailTemplate(
-      emailTemplates.container3Schedule,
-      {
-        recipientName: "Candidate",
-        sessionName: session.name,
-        jobTitle: ownedJob.title,
-        action: "Interview schedule",
-        slotTime: session.startTime,
-        durationMinutes: session.durationMinutes,
-        resultSummary: "Check your exact slot in dashboard",
-      },
+    const interviewerSubject = `${session.name} schedule confirmed`;
+    const interviewerEmailResult = await sendSessionEmail({
+      to: interviewer ? interviewer.email : "",
+      subject: interviewerSubject,
+      details: scheduleForInterviewer,
+    });
+
+    const candidateEmailResults = await Promise.all(
+      (session.candidates || []).map(async (slot) => {
+        const candidate = candidateById.get(slot.candidateId);
+        if (!candidate) {
+          return {
+            candidateId: slot.candidateId,
+            recipient: UNKNOWN_EMAIL,
+            subject: `${session.name} slot schedule`,
+            details: "Candidate record could not be resolved for email delivery.",
+            sent: false,
+            reason: "Candidate record not found",
+          };
+        }
+
+        const details = applyEmailTemplate(emailTemplates.container3Schedule, {
+          recipientName: candidate.name,
+          sessionName: session.name,
+          jobTitle: ownedJob.title,
+          action: "Interview schedule",
+          slotTime: slot.slotTime || session.startTime,
+          durationMinutes: slot.durationMinutes || session.durationMinutes,
+          resultSummary: "Please be ready before your assigned slot.",
+        });
+
+        const subject = `${session.name} slot schedule`;
+        const delivery = await sendSessionEmail({
+          to: candidate.email,
+          subject,
+          details,
+        });
+
+        return {
+          candidateId: slot.candidateId,
+          recipient: delivery.recipient,
+          subject,
+          details,
+          sent: delivery.sent,
+          reason: delivery.reason,
+        };
+      }),
     );
 
     const emailLogs = await appendEmailLogs([
       {
         category: "Schedule",
-        recipient: interviewer ? interviewer.email : "Interviewer not assigned",
-        subject: `${session.name} schedule confirmed`,
+        recipient: interviewerEmailResult.recipient,
+        subject: interviewerSubject,
         details: scheduleForInterviewer,
         metadata: {
           sessionId: session.sessionId,
+          deliveryStatus: interviewerEmailResult.sent ? "sent" : "failed",
+          ...(interviewerEmailResult.sent
+            ? {}
+            : { deliveryReason: interviewerEmailResult.reason }),
         },
       },
-      {
+      ...candidateEmailResults.map((result) => ({
         category: "Schedule",
-        recipient: `${session.candidates.length} candidates in ${session.name}`,
-        subject: `${session.name} slot schedule`,
-        details: scheduleForCandidates,
+        recipient: result.recipient,
+        subject: result.subject,
+        details: result.details,
         metadata: {
           sessionId: session.sessionId,
+          candidateId: result.candidateId,
+          deliveryStatus: result.sent ? "sent" : "failed",
+          ...(result.sent ? {} : { deliveryReason: result.reason }),
         },
-      },
+      })),
     ]);
+
+    const sentCount =
+      (interviewerEmailResult.sent ? 1 : 0) +
+      candidateEmailResults.filter((result) => result.sent).length;
+    const totalCount = 1 + candidateEmailResults.length;
+    const failedCount = totalCount - sentCount;
 
     if (session.status !== "Completed") {
       session.status = "Scheduled";
@@ -1271,7 +1441,10 @@ exports.sendScheduleEmails = async (req, res) => {
     await session.save();
 
     return res.json({
-      message: `Schedule emails sent for ${session.name}. Session marked as Scheduled.`,
+      message:
+        failedCount === 0
+          ? `Schedule emails sent for ${session.name}. Session marked as Scheduled.`
+          : `Schedule emails processed for ${session.name}. Sent ${sentCount}/${totalCount}; ${failedCount} failed.`,
       session: serializeSession(session.toObject()),
       emailLogs: emailLogs.map((item) => serializeEmailLog(item.toObject())),
     });
@@ -1312,6 +1485,20 @@ exports.sendResultEmails = async (req, res) => {
       buildTemplateMap(),
     ]);
 
+    const reviewedSlots = (session.candidates || []).filter(
+      (candidate) => candidate.result !== "Pending",
+    );
+
+    const reviewedSubmissions = await fetchCandidateSubmissionsByIds(
+      reviewedSlots.map((candidate) => candidate.candidateId),
+    );
+    const candidateById = new Map(
+      reviewedSubmissions.map((submission) => {
+        const serialized = serializeCandidate(submission);
+        return [serialized.id, serialized];
+      }),
+    );
+
     const resultSummary = `${breakdown.passed} passed, ${breakdown.failed} failed, ${breakdown.onHold} on hold, ${breakdown.pending} pending`;
 
     const resultForInterviewer = applyEmailTemplate(
@@ -1327,41 +1514,90 @@ exports.sendResultEmails = async (req, res) => {
       },
     );
 
-    const resultForCandidates = applyEmailTemplate(
-      emailTemplates.container3Result,
-      {
-        recipientName: "Candidate",
-        sessionName: session.name,
-        jobTitle: ownedJob.title,
-        action: "Result notification",
-        slotTime: "Refer to your slot",
-        durationMinutes: session.durationMinutes,
-        resultSummary,
-      },
+    const interviewerSubject = `${session.name} result summary`;
+    const interviewerEmailResult = await sendSessionEmail({
+      to: interviewer ? interviewer.email : "",
+      subject: interviewerSubject,
+      details: resultForInterviewer,
+    });
+
+    const candidateEmailResults = await Promise.all(
+      reviewedSlots.map(async (slot) => {
+        const candidate = candidateById.get(slot.candidateId);
+        if (!candidate) {
+          return {
+            candidateId: slot.candidateId,
+            recipient: UNKNOWN_EMAIL,
+            subject: `${session.name} interview outcome`,
+            details: "Candidate record could not be resolved for result email delivery.",
+            sent: false,
+            reason: "Candidate record not found",
+          };
+        }
+
+        const details = applyEmailTemplate(emailTemplates.container3Result, {
+          recipientName: candidate.name,
+          sessionName: session.name,
+          jobTitle: ownedJob.title,
+          action: "Result notification",
+          slotTime: slot.slotTime || session.startTime,
+          durationMinutes: slot.durationMinutes || session.durationMinutes,
+          resultSummary: slot.result,
+        });
+
+        const subject = `${session.name} interview outcome`;
+        const delivery = await sendSessionEmail({
+          to: candidate.email,
+          subject,
+          details,
+        });
+
+        return {
+          candidateId: slot.candidateId,
+          recipient: delivery.recipient,
+          subject,
+          details,
+          sent: delivery.sent,
+          reason: delivery.reason,
+        };
+      }),
     );
 
     const emailLogs = await appendEmailLogs([
       {
         category: "Result",
-        recipient: interviewer ? interviewer.email : "Interviewer not assigned",
-        subject: `${session.name} result summary`,
+        recipient: interviewerEmailResult.recipient,
+        subject: interviewerSubject,
         details: resultForInterviewer,
         metadata: {
           sessionId: session.sessionId,
           reviewed,
+          deliveryStatus: interviewerEmailResult.sent ? "sent" : "failed",
+          ...(interviewerEmailResult.sent
+            ? {}
+            : { deliveryReason: interviewerEmailResult.reason }),
         },
       },
-      {
+      ...candidateEmailResults.map((result) => ({
         category: "Result",
-        recipient: `${reviewed} candidates in ${session.name}`,
-        subject: `${session.name} interview outcomes`,
-        details: resultForCandidates,
+        recipient: result.recipient,
+        subject: result.subject,
+        details: result.details,
         metadata: {
           sessionId: session.sessionId,
           reviewed,
+          candidateId: result.candidateId,
+          deliveryStatus: result.sent ? "sent" : "failed",
+          ...(result.sent ? {} : { deliveryReason: result.reason }),
         },
-      },
+      })),
     ]);
+
+    const sentCount =
+      (interviewerEmailResult.sent ? 1 : 0) +
+      candidateEmailResults.filter((result) => result.sent).length;
+    const totalCount = 1 + candidateEmailResults.length;
+    const failedCount = totalCount - sentCount;
 
     if (breakdown.pending === 0) {
       session.status = "Completed";
@@ -1371,7 +1607,10 @@ exports.sendResultEmails = async (req, res) => {
     await session.save();
 
     return res.json({
-      message: `Result emails sent for ${session.name}. Reviewed candidates: ${reviewed}.`,
+      message:
+        failedCount === 0
+          ? `Result emails sent for ${session.name}. Reviewed candidates: ${reviewed}.`
+          : `Result emails processed for ${session.name}. Sent ${sentCount}/${totalCount}; ${failedCount} failed.`,
       session: serializeSession(session.toObject()),
       breakdown,
       emailLogs: emailLogs.map((item) => serializeEmailLog(item.toObject())),
@@ -1459,24 +1698,43 @@ exports.sendCandidateEmail = async (req, res) => {
       resultSummary: slot.result,
     });
 
+    const delivery = await sendSessionEmail({
+      to: candidate.email,
+      subject,
+      details,
+    });
+
     const emailLog = await appendEmailLogs([
       {
         category: EMAIL_OPTION_TO_CATEGORY[emailOption],
-        recipient: candidate.email,
+        recipient: delivery.recipient,
         subject,
         details,
         metadata: {
           sessionId: session.sessionId,
           candidateId,
+          deliveryStatus: delivery.sent ? "sent" : "failed",
+          ...(delivery.sent ? {} : { deliveryReason: delivery.reason }),
         },
       },
     ]);
+
+    if (!delivery.sent) {
+      const statusCode = delivery.reason === "Recipient email is missing or invalid"
+        ? 400
+        : 502;
+
+      return res.status(statusCode).json({
+        message: `${subject} email could not be sent (${delivery.reason}).`,
+        emailLog: emailLog[0] ? serializeEmailLog(emailLog[0].toObject()) : null,
+      });
+    }
 
     session.lastEmailAt = new Date();
     await session.save();
 
     return res.json({
-      message: `${subject} email queued successfully.`,
+      message: `${subject} email sent successfully.`,
       session: serializeSession(session.toObject()),
       emailLog: serializeEmailLog(emailLog[0].toObject()),
     });
