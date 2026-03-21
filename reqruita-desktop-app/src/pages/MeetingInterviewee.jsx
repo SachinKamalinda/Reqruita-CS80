@@ -250,10 +250,13 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 const participants = Array.isArray(data) ? data : (data?.participants || []);
                 const current = participants.find(p => p.id === participantId);
                 if (current) {
+                    console.log("✓ Current participant data:", current);
                     setCurrentParticipant(current);
+                } else {
+                    console.log("⚠ Participant not found in list. ID:", participantId, "Available:", participants.map(p => p.id));
                 }
             } catch (e) {
-                console.log("Fetch participant data failed:", e);
+                console.error("✗ Fetch participant data failed:", e);
             }
         };
 
