@@ -172,6 +172,26 @@ export default function JobFormFillerPage() {
     );
   }
 
+  if (!form.isActive) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-purple-900 flex flex-col items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="text-5xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Submissions Closed
+          </h1>
+          <p className="text-gray-600 mb-2">
+            Applications for <span className="font-semibold">{form.title}</span>{" "}
+            are no longer being accepted.
+          </p>
+          <p className="text-sm text-gray-500">
+            This submission link is currently offline.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-purple-900 flex flex-col items-center justify-center p-4">

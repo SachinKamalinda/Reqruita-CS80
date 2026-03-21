@@ -32,6 +32,7 @@ export interface AuthResponse {
 
 export interface ApiError {
   message: string;
+  error?: string;
 }
 
 export interface MessageResponse {
@@ -710,6 +711,7 @@ export interface PublicJobForm {
   description: string;
   jobRole: string;
   fields: FormField[];
+  isActive: boolean;
   company: string;
 }
 
@@ -720,7 +722,11 @@ export async function getJobFormById(formId: string): Promise<PublicJobForm> {
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch form");
+    throw new Error(
+      (data as ApiError).message ||
+        (data as ApiError).error ||
+        "Failed to fetch form",
+    );
   }
 
   return data;
@@ -728,7 +734,7 @@ export async function getJobFormById(formId: string): Promise<PublicJobForm> {
 
 export async function updateJobForm(
   formId: string,
-  payload: Partial<CreateJobFormPayload>,
+  payload: Partial<CreateJobFormPayload> & { isActive?: boolean },
 ): Promise<{ message: string; form: JobForm }> {
   const token = getToken();
   if (!token) {
@@ -746,7 +752,11 @@ export async function updateJobForm(
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to update form");
+    throw new Error(
+      (data as ApiError).message ||
+        (data as ApiError).error ||
+        "Failed to update form",
+    );
   }
 
   return data;
@@ -794,7 +804,11 @@ export async function submitJobFormResponse(
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to submit form");
+    throw new Error(
+      (data as ApiError).message ||
+        (data as ApiError).error ||
+        "Failed to submit form",
+    );
   }
 
   return data;
