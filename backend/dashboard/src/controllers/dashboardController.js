@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const { sendEmail } = require("../config/resend");
+const { sendEmail, sendCustomEmail } = require("../config/resend");
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -310,6 +310,23 @@ exports.deleteUser = async (req, res) => {
       return res.status(400).json({ message: "Cannot remove yourself" });
 
         await User.findOneAndDelete({ _id: targetUserId, companyId: req.user.companyId });
+
+        // Best-effort notification for removed users; deletion should still succeed
+        const recipientName =
+          `${String(userToDelete.firstName || "").trim()} ${String(userToDelete.lastName || "").trim()}`.trim() ||
+          String(userToDelete.fullName || "").trim() ||
+          "User";
+
+        await sendCustomEmail({
+          to: userToDelete.email,
+          subject: "Your Reqruita dashboard access has been removed",
+          text:
+            `Dear ${recipientName},\n\n` +
+            "This is to inform you that your access to the Reqruita dashboard has been removed by your company administrator.\n\n" +
+            "If you believe this was done in error, please contact your administrator.\n\n" +
+            "Regards,\nReqruita Team",
+        });
+
         res.status(200).json({ message: "User successfully removed" });
     } catch (error) {
         res.status(500).json({ error: error.message });
