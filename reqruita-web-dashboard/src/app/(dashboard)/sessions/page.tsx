@@ -1350,7 +1350,7 @@ export default function SessionsPage() {
                           }
                           className="rounded-lg bg-[#5D20B3] px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {isAssigned ? "Assigned" : "Assign"}
+                          {isAssigned ? "Send Email" : "Assign"}
                         </button>
                       </div>
                     </td>
