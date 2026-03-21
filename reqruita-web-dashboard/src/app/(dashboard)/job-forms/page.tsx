@@ -60,12 +60,11 @@ const isPermanentField = (field: FormField): boolean => {
 };
 
 const ensurePermanentFields = (fields: FormField[]): FormField[] => {
-  const customFields = (fields || []).filter((field) => !isPermanentField(field));
+  const customFields = (fields || []).filter(
+    (field) => !isPermanentField(field),
+  );
 
-  return [
-    ...PERMANENT_FIELDS,
-    ...customFields,
-  ].map((field, index) => ({
+  return [...PERMANENT_FIELDS, ...customFields].map((field, index) => ({
     ...field,
     required: true,
     order: index,
@@ -281,8 +280,8 @@ export default function JobFormsPage() {
 
     const sanitizedFields = ensurePermanentFields(
       newFormFields
-      .map((f) => ({ ...f, label: f.label.trim() }))
-      .filter((f) => f.label.length > 0),
+        .map((f) => ({ ...f, label: f.label.trim() }))
+        .filter((f) => f.label.length > 0),
     );
 
     try {
@@ -324,8 +323,8 @@ export default function JobFormsPage() {
 
     const sanitizedFields = ensurePermanentFields(
       editFormFields
-      .map((f) => ({ ...f, label: f.label.trim() }))
-      .filter((f) => f.label.length > 0),
+        .map((f) => ({ ...f, label: f.label.trim() }))
+        .filter((f) => f.label.length > 0),
     );
 
     try {
