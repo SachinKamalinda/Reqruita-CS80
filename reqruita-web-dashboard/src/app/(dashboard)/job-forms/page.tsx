@@ -563,7 +563,7 @@ export default function JobFormsPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Job Role{" "}
@@ -578,14 +578,6 @@ export default function JobFormsPage() {
                       placeholder="e.g., Engineering"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-600 focus:bg-purple-50 transition text-gray-900"
                     />
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 block mb-2">
-                      Department
-                    </label>
-                    <div className="text-xs text-gray-500 px-4 py-3 border-2 border-gray-100 rounded-xl bg-gray-50">
-                      Auto-filled from job role
-                    </div>
                   </div>
                 </div>
 

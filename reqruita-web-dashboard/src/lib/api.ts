@@ -14,14 +14,6 @@ export interface AuthUser {
   jobTitle?: string;
   industry?: string;
   country?: string;
-  notificationPreferences?: NotificationPreferences;
-}
-
-export interface NotificationPreferences {
-  weeklyDigest: boolean;
-  interviewReminders: boolean;
-  candidateAlerts: boolean;
-  securityAlerts: boolean;
 }
 
 export interface AuthResponse {
@@ -339,7 +331,6 @@ export interface UpdateSettingsPayload {
   email: string;
   companyName?: string;
   jobTitle?: string;
-  notificationPreferences: NotificationPreferences;
 }
 
 export interface SettingsResponse {

@@ -561,7 +561,6 @@ export default function UserRolesPage() {
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#5D20B3]/20 focus:border-[#5D20B3] outline-none transition-all"
-                    placeholder="John"
                   />
                 </div>
                 <div>
@@ -573,7 +572,6 @@ export default function UserRolesPage() {
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#5D20B3]/20 focus:border-[#5D20B3] outline-none transition-all"
-                    placeholder="Doe"
                   />
                 </div>
               </div>
@@ -587,7 +585,6 @@ export default function UserRolesPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#5D20B3]/20 focus:border-[#5D20B3] outline-none transition-all"
-                  placeholder="name@company.com"
                 />
               </div>
 
