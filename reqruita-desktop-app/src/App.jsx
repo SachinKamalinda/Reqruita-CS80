@@ -13,21 +13,7 @@ import FeedbackModal from "./components/FeedbackModal.jsx";
 import ToastContainer from "./components/Toast.jsx";
 import useToast from "./hooks/useToast.js";
 
-// TEMP hardcoded credentials
-const USERS = [
-  {
-    role: "join", // Interviewee (Candidate) joins interview
-    email: "123",
-    meetingId: "123",
-    password: "123",
-  },
-  {
-    role: "conduct", // Interviewer conducts interview
-    email: "123",
-    meetingId: "123",
-    password: "123",
-  },
-];
+// Removed hardcoded USERS array
 
 function AppHeader({ isWorkspace, isInterviewer }) {
   const headerClass = isWorkspace
@@ -58,8 +44,7 @@ export default function App() {
 
   const { toasts, addToast, removeToast } = useToast();
 
-  const users = useMemo(() => USERS, []);
-
+  // Removed legacy users array
   useEffect(() => {
     // Check if we are in the workspace view via URL check
     const params = new URLSearchParams(window.location.search);
@@ -98,45 +83,23 @@ export default function App() {
     goTo("login");
   }
 
-  // Accept BOTH shapes:
-  // - { id, meetingId, password, role }
-  // - { email, meetingId, password, role }
   function onLogin(payload) {
     const {
-      id,
       email,
       meetingId,
-      password,
       role: roleFromLogin,
+      participantId,
+      name
     } = payload || {};
 
-    const em = (id || email || "").trim().toLowerCase();
-    const mId = (meetingId || "").trim();
-    const pwd = (password || "").trim();
     const currentRole = roleFromLogin || role;
 
-    if (!em || !mId || !pwd || !currentRole) {
-      addToast("Please enter Email, Meeting ID, and Password.", "error");
-      return { ok: false };
-    }
-
-    const found = users.find(
-      (u) =>
-        u.role === currentRole &&
-        u.email.toLowerCase() === em &&
-        u.meetingId === mId &&
-        u.password === pwd
-    );
-
-    if (!found) {
-      addToast("Invalid Email, Meeting ID, or Password.", "error");
-      return { ok: false };
-    }
-
     setSession({
-      role: found.role,
-      email: found.email,
-      meetingId: found.meetingId,
+      role: currentRole,
+      email: email,
+      meetingId: meetingId,
+      participantId: participantId,
+      name: name
     });
 
     addToast("Login successful! Setting up devices…", "success");

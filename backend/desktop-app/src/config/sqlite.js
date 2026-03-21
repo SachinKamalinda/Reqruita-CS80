@@ -30,6 +30,25 @@ const initSqlite = () => {
                 }
             );
 
+            // Create auth_credentials table
+            db.run(
+                `CREATE TABLE IF NOT EXISTS auth_credentials (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            meetingId TEXT NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL,
+            participantId TEXT NOT NULL,
+            name TEXT NOT NULL
+          )`, (err) => {
+                    if (err) {
+                        console.error("Create auth_credentials table error:", err.message);
+                    } else {
+                        console.log("Auth Credentials table ready");
+                    }
+                }
+            );
+
             // 2) Check and add timerStartedAt column if it doesn't exist (for existing databases)
             db.all("PRAGMA table_info(participants)", [], (err, columns) => {
                 if (err) {

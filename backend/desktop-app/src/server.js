@@ -12,6 +12,8 @@ const getDb = require("./config/sqlite");
 const participantRoutes = require("./routes/participantRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const remarkRoutes = require("./routes/remarkRoutes");
+const authRoutes = require("./routes/authRoutes");
+const { syncAuthData } = require("./services/syncService");
 
 const socketHandler = require("./sockets/socketHandler");
 
@@ -27,13 +29,17 @@ app.use((req, res, next) => {
 });
 
 // Database Init
-connectMongo();
+connectMongo().then(() => {
+    // Sync credentials after mongodb is ready
+    syncAuthData();
+});
 getDb(); // Initializes SQLite
 
 // Routes
 app.use("/api/participants", participantRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/remarks", remarkRoutes);
+app.use("/api/auth", authRoutes);
 
 // Server & Socket.IO
 const server = http.createServer(app);
