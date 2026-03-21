@@ -43,6 +43,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [pdfName, setPdfName] = useState("");
     const [participantId, setParticipantId] = useState(null);
     const [currentParticipant, setCurrentParticipant] = useState(null);
+    const [candidateTimerStartedAt, setCandidateTimerStartedAt] = useState(null);
 
     // Modal state
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -227,6 +228,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 const data = await res.json();
                 if (data.id) {
                     setParticipantId(data.id);
+                    const participants = Array.isArray(data?.participants) ? data.participants : [];
+                    const joined = participants.find((p) => p.id === data.id);
+                    setCandidateTimerStartedAt(joined?.timerStartedAt || new Date().toISOString());
                 }
             } catch (e) {
                 if (e.name === "AbortError") return; // normal cleanup
@@ -252,6 +256,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 if (current) {
                     console.log("✓ Current participant data:", current);
                     setCurrentParticipant(current);
+                    if (current.timerStartedAt) {
+                        setCandidateTimerStartedAt(current.timerStartedAt);
+                    }
                 } else {
                     console.log("⚠ Participant not found in list. ID:", participantId, "Available:", participants.map(p => p.id));
                 }
@@ -698,7 +705,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
                 <div className="jm-right">
                     <SessionTimer
-                        timerStartedAt={currentParticipant?.timerStartedAt}
+                        timerStartedAt={currentParticipant?.timerStartedAt || candidateTimerStartedAt}
                         isActive={true}
                         compact={true}
                     />
