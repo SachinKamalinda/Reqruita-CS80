@@ -7,6 +7,7 @@ import {
   createInterviewSession,
   fetchSessionCandidatePacket,
   fetchSessionsBootstrap,
+  getStoredUser,
   sendAssignmentEmailToCandidate as sendAssignmentEmailToCandidateRequest,
   sendSessionCandidateEmail,
   sendSessionResultEmails,
@@ -277,6 +278,8 @@ const statCard = (label: string, value: string | number, helper: string) => (
 );
 
 export default function SessionsPage() {
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [jobs, setJobs] = useState<JobForm[]>([]);
   const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
   const [candidatePool, setCandidatePool] = useState<
@@ -366,6 +369,16 @@ export default function SessionsPage() {
   >(null);
   const [container3EmailOption, setContainer3EmailOption] =
     useState<Container3EmailOption>("reminder");
+
+  const isInterviewer = currentUserRole === "interviewer";
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user) {
+      setCurrentUserId(user.id);
+      setCurrentUserRole(user.role);
+    }
+  }, []);
 
   const setStatusMessage = useCallback((message: string) => {
     setStatusMessageState(message);
@@ -485,14 +498,74 @@ export default function SessionsPage() {
     [interviewers],
   );
 
+  const scopedSessions = useMemo(() => {
+    if (!isInterviewer) return sessions;
+    if (!currentUserId) return [];
+    return sessions.filter(
+      (session) => session.interviewerId === currentUserId,
+    );
+  }, [sessions, isInterviewer, currentUserId]);
+
+  const candidateJobOptions = useMemo(() => {
+    if (!isInterviewer) return jobs;
+    const jobIds = new Set(scopedSessions.map((session) => session.jobId));
+    return jobs.filter((job) => jobIds.has(job.id));
+  }, [jobs, scopedSessions, isInterviewer]);
+
+  const interviewJobOptions = candidateJobOptions;
+
+  useEffect(() => {
+    if (candidateJobOptions.length === 0) {
+      setCandidateJobFilter("");
+      return;
+    }
+
+    setCandidateJobFilter((current) =>
+      candidateJobOptions.some((job) => job.id === current)
+        ? current
+        : candidateJobOptions[0].id,
+    );
+  }, [candidateJobOptions]);
+
+  useEffect(() => {
+    if (candidateSessionFilterId === "all") return;
+
+    const exists = scopedSessions.some(
+      (session) => session.id === candidateSessionFilterId,
+    );
+    if (!exists) {
+      setCandidateSessionFilterId("all");
+    }
+  }, [candidateSessionFilterId, scopedSessions]);
+
+  useEffect(() => {
+    if (interviewJobOptions.length === 0) {
+      setInterviewJobFilter("");
+      return;
+    }
+
+    setInterviewJobFilter((current) =>
+      interviewJobOptions.some((job) => job.id === current)
+        ? current
+        : interviewJobOptions[0].id,
+    );
+  }, [interviewJobOptions]);
+
+  useEffect(() => {
+    if (!isInterviewer) return;
+    setCandidateAssignmentFilter("assigned");
+  }, [isInterviewer]);
+
   const sessionsForCandidateJob = useMemo(
-    () => sessions.filter((session) => session.jobId === candidateJobFilter),
-    [sessions, candidateJobFilter],
+    () =>
+      scopedSessions.filter((session) => session.jobId === candidateJobFilter),
+    [scopedSessions, candidateJobFilter],
   );
 
   const sessionsForInterviewJob = useMemo(
-    () => sessions.filter((session) => session.jobId === interviewJobFilter),
-    [sessions, interviewJobFilter],
+    () =>
+      scopedSessions.filter((session) => session.jobId === interviewJobFilter),
+    [scopedSessions, interviewJobFilter],
   );
 
   const resolvedCandidateSessionFilterId = useMemo(() => {
@@ -529,14 +602,14 @@ export default function SessionsPage() {
 
   const sessionLookup = useMemo(
     () =>
-      sessions.reduce<Record<string, InterviewSession>>(
+      scopedSessions.reduce<Record<string, InterviewSession>>(
         (accumulator, session) => {
           accumulator[session.id] = session;
           return accumulator;
         },
         {},
       ),
-    [sessions],
+    [scopedSessions],
   );
 
   const selectedSession = useMemo(() => {
@@ -590,10 +663,10 @@ export default function SessionsPage() {
   const assignModalSessions = useMemo(() => {
     if (!assignModalCandidate) return [];
 
-    return sessions.filter(
+    return scopedSessions.filter(
       (session) => session.jobId === assignModalCandidate.jobId,
     );
-  }, [sessions, assignModalCandidate]);
+  }, [scopedSessions, assignModalCandidate]);
 
   const resolvedAssignTargetSessionId = useMemo(() => {
     if (assignModalSessions.length === 0) return "";
@@ -631,6 +704,10 @@ export default function SessionsPage() {
       const assignedSessionId =
         assignedSessionByCandidateId[candidate.id] ?? "";
 
+      if (isInterviewer && !isAssigned) {
+        return false;
+      }
+
       if (candidateAssignmentFilter === "assigned") {
         if (!isAssigned) return false;
       }
@@ -648,6 +725,7 @@ export default function SessionsPage() {
   }, [
     candidateJobFilter,
     candidatePool,
+    isInterviewer,
     candidateAssignmentFilter,
     resolvedCandidateSessionFilterId,
     assignedSessionByCandidateId,
@@ -1141,20 +1219,22 @@ export default function SessionsPage() {
       <section className="rounded-2xl border bg-white p-6 shadow-sm">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold">Sessions</h2>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowCreateSessionModal(true)}
-              className="rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
-            >
-              Create Session
-            </button>
-            <button
-              onClick={() => setShowContainer1TemplateModal(true)}
-              className="rounded-lg border border-[#5D20B3] px-4 py-2 text-sm font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
-            >
-              Edit Predefined Email
-            </button>
-          </div>
+          {!isInterviewer && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowCreateSessionModal(true)}
+                className="rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
+              >
+                Create Session
+              </button>
+              <button
+                onClick={() => setShowContainer1TemplateModal(true)}
+                className="rounded-lg border border-[#5D20B3] px-4 py-2 text-sm font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
+              >
+                Edit Predefined Email
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="max-h-[500px] overflow-auto rounded-xl border border-gray-200">
@@ -1171,7 +1251,7 @@ export default function SessionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y bg-white">
-              {sessions.map((session) => {
+              {scopedSessions.map((session) => {
                 const interviewer = interviewerLookup[session.interviewerId];
                 const job = jobLookup[session.jobId];
 
@@ -1216,9 +1296,11 @@ export default function SessionsPage() {
             </tbody>
           </table>
 
-          {sessions.length === 0 && (
+          {scopedSessions.length === 0 && (
             <div className="py-8 text-center text-sm text-gray-500">
-              No sessions created yet.
+              {isInterviewer
+                ? "No sessions assigned to you yet."
+                : "No sessions created yet."}
             </div>
           )}
         </div>
@@ -1241,7 +1323,7 @@ export default function SessionsPage() {
               onChange={(event) => setCandidateJobFilter(event.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              {jobs.map((job) => (
+              {candidateJobOptions.map((job) => (
                 <option key={job.id} value={job.id}>
                   {job.title}
                 </option>
@@ -1280,11 +1362,12 @@ export default function SessionsPage() {
                   event.target.value as AssignmentFilter,
                 )
               }
+              disabled={isInterviewer}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="all">All</option>
+              {!isInterviewer && <option value="all">All</option>}
               <option value="assigned">Assigned</option>
-              <option value="unassigned">Unassigned</option>
+              {!isInterviewer && <option value="unassigned">Unassigned</option>}
             </select>
           </div>
         </div>
@@ -1385,7 +1468,7 @@ export default function SessionsPage() {
               onChange={(event) => setInterviewJobFilter(event.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              {jobs.map((job) => (
+              {interviewJobOptions.map((job) => (
                 <option key={job.id} value={job.id}>
                   {job.title}
                 </option>
