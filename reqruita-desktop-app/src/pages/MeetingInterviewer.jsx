@@ -484,9 +484,18 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         <div className="mt-wrap">
             {error && <div className="mt-err">{error}</div>}
 
-            {/* Connection status indicator + Session Timer */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                <div>
+            {/* Top Bar: Connection Status + Session Timer */}
+            <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                padding: "12px 16px", 
+                background: "linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4))",
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                minHeight: "60px"
+            }}>
+                {/* Left: Connection Status */}
+                <div style={{ flex: 1 }}>
                     {showConnStatus && (
                         <div className="mt-conn-status" style={{ margin: 0 }}>
                             <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
@@ -497,10 +506,12 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                         </div>
                     )}
                 </div>
-                <div>
+                
+                {/* Right: Session Timer */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginLeft: "16px" }}>
                     <SessionTimer 
                         timerStartedAt={currentCandidate?.timerStartedAt} 
-                        isActive={currentCandidate?.status === "interviewing"}
+                        isActive={true}
                     />
                 </div>
             </div>

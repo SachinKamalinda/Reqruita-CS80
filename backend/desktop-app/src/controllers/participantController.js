@@ -27,13 +27,12 @@ exports.allowParticipant = (req, res) => {
         }
 
         console.log(`[ALLOW] Proceeding to admit participant ID: ${id}`);
-        const now = new Date().toISOString();
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
 
             db.run(
-                "UPDATE participants SET status = 'interviewing', timerStartedAt = ? WHERE id = ? AND status = 'waiting'",
-                [now, id],
+                "UPDATE participants SET status = 'interviewing' WHERE id = ? AND status = 'waiting'",
+                [id],
                 function (err) {
                     if (err) {
                         console.error(`[ALLOW] Update error for ${id}:`, err.message);
@@ -53,7 +52,7 @@ exports.allowParticipant = (req, res) => {
                             db.run("ROLLBACK");
                             return res.status(500).json({ error: "Failed to commit transaction" });
                         }
-                        console.log(`[ALLOW] Participant ${id} is now interviewing. Timer started at ${now}`);
+                        console.log(`[ALLOW] Participant ${id} is now interviewing.`);
                         getAllParticipants(res, "Success");
                     });
                 }
@@ -66,9 +65,10 @@ exports.joinParticipant = (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: "Name is required" });
     const id = "p_" + Math.random().toString(36).substr(2, 9);
+    const now = new Date().toISOString();
     
     const db = getDb();
-    db.run("INSERT INTO participants (id, name, status) VALUES (?, ?, ?)", [id, name, "waiting"], function (err) {
+    db.run("INSERT INTO participants (id, name, status, timerStartedAt) VALUES (?, ?, ?, ?)", [id, name, "waiting", now], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         
         db.all("SELECT * FROM participants", [], (err, rows) => {
