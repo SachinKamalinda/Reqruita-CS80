@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getToken, AUTH_API_BASE } from "@/lib/api";
+import { getToken, AUTH_API_BASE, removeToken } from "@/lib/api";
 
 export default function UserRolesPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -65,6 +65,12 @@ export default function UserRolesPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      if (res.status === 401 || res.status === 403) {
+        removeToken();
+        window.location.href = "/signin";
+        return;
+      }
+
       const data = await res.json();
       if (res.ok) {
         setUsers(data);
@@ -121,6 +127,12 @@ export default function UserRolesPage() {
         body: JSON.stringify({ email, role, firstName, lastName }),
       });
 
+      if (res.status === 401 || res.status === 403) {
+        removeToken();
+        window.location.href = "/signin";
+        return;
+      }
+
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Failed to invite user");
@@ -174,6 +186,12 @@ export default function UserRolesPage() {
         },
       );
 
+      if (res.status === 401 || res.status === 403) {
+        removeToken();
+        window.location.href = "/signin";
+        return;
+      }
+
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Failed to update role");
@@ -217,6 +235,12 @@ export default function UserRolesPage() {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
+
+      if (res.status === 401 || res.status === 403) {
+        removeToken();
+        window.location.href = "/signin";
+        return;
+      }
 
       const data = await res.json();
       console.log("Delete Response Data:", data);

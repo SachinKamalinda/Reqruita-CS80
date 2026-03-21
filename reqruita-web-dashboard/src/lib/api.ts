@@ -329,16 +329,8 @@ export async function signin(payload: SigninPayload): Promise<AuthResponse> {
 }
 
 export async function fetchMe(): Promise<AuthUser> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch user");
-  }
-  return (data as { user: AuthUser }).user;
+  const data = await authedJsonRequest<{ user: AuthUser }>('/api/me');
+  return data.user;
 }
 
 export interface UpdateSettingsPayload {
@@ -362,59 +354,26 @@ export interface ChangePasswordPayload {
 }
 
 export async function fetchSettings(): Promise<AuthUser> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/settings`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch settings");
-  }
-
-  return (data as { user: AuthUser }).user;
+  const data = await authedJsonRequest<{ user: AuthUser }>('/api/settings');
+  return data.user;
 }
 
 export async function updateSettings(
   payload: UpdateSettingsPayload,
 ): Promise<SettingsResponse> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/settings`, {
+  return authedJsonRequest<SettingsResponse>('/api/settings', {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to update settings");
-  }
-
-  return data as SettingsResponse;
 }
 
 export async function changePassword(
   payload: ChangePasswordPayload,
 ): Promise<MessageResponse> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/settings/password`, {
+  return authedJsonRequest<MessageResponse>('/api/settings/password', {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to change password");
-  }
-
-  return data as MessageResponse;
 }
 
 export interface ForgotPasswordRequestPayload {
@@ -659,50 +618,17 @@ export interface CreateJobFormPayload {
 export async function createJobForm(
   payload: CreateJobFormPayload,
 ): Promise<{ message: string; form: JobForm }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms`, {
+  return authedJsonRequest<{ message: string; form: JobForm }>('/api/forms', {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to create job form");
-  }
-
-  return data;
 }
 
 export async function getAllJobForms(): Promise<{
   forms: JobForm[];
   count: number;
 }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch job forms");
-  }
-
-  return data;
+  return authedJsonRequest<{ forms: JobForm[]; count: number }>('/api/forms');
 }
 
 export interface PublicJobForm {
@@ -736,51 +662,19 @@ export async function updateJobForm(
   formId: string,
   payload: Partial<CreateJobFormPayload> & { isActive?: boolean },
 ): Promise<{ message: string; form: JobForm }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms/${formId}`, {
+  return authedJsonRequest<{ message: string; form: JobForm }>(
+    `/api/forms/${formId}`,
+    {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      (data as ApiError).message ||
-        (data as ApiError).error ||
-        "Failed to update form",
-    );
-  }
-
-  return data;
+    },
+  );
 }
 
 export async function deleteJobForm(formId: string): Promise<MessageResponse> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms/${formId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  return authedJsonRequest<MessageResponse>(`/api/forms/${formId}`, {
+    method: 'DELETE',
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to delete form");
-  }
-
-  return data;
 }
 
 export interface FormSubmissionPayload {
@@ -840,35 +734,18 @@ export async function getFormSubmissions(
   page: number;
   totalPages: number;
 }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
   const params = new URLSearchParams();
   if (options?.sortBy) params.append("sortBy", options.sortBy);
   if (options?.status) params.append("status", options.status);
   if (options?.page) params.append("page", options.page.toString());
   if (options?.limit) params.append("limit", options.limit.toString());
-
-  const res = await fetch(
-    `${AUTH_API_BASE}/api/forms/${formId}/submissions?${params}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      (data as ApiError).message || "Failed to fetch submissions",
-    );
-  }
-
-  return data;
+  const query = params.toString();
+  return authedJsonRequest<{
+    submissions: FormSubmission[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }>(`/api/forms/${formId}/submissions${query ? `?${query}` : ''}`);
 }
 
 export interface UpdateSubmissionPayload {
@@ -881,26 +758,11 @@ export async function updateFormSubmissionStatus(
   submissionId: string,
   payload: UpdateSubmissionPayload,
 ): Promise<{ message: string; submission: FormSubmission }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/submissions/${submissionId}`, {
+  return authedJsonRequest<{ message: string; submission: FormSubmission }>(
+    `/api/submissions/${submissionId}`,
+    {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      (data as ApiError).message || "Failed to update submission",
-    );
-  }
-
-  return data;
+    },
+  );
 }
