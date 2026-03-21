@@ -23,6 +23,11 @@ router.put(
 router.get("/sessions/email-logs", authenticateToken, sessionsController.getEmailLogs);
 
 router.post("/sessions", authenticateToken, sessionsController.createSession);
+router.put(
+  "/sessions/:sessionId",
+  authenticateToken,
+  sessionsController.updateSession,
+);
 router.post(
   "/sessions/assign-candidate",
   authenticateToken,
