@@ -167,6 +167,61 @@ const buildFallbackNameFromEmail = (email) => {
 
 const isValidTime = (value) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(value || "");
 
+const timeToMinutes = (value) => {
+  if (!isValidTime(value)) return null;
+
+  const [hours, minutes] = String(value)
+    .split(":")
+    .map((part) => Number.parseInt(part, 10));
+
+  return hours * 60 + minutes;
+};
+
+const minutesToTime = (value) => {
+  const normalized = ((value % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalized / 60)
+    .toString()
+    .padStart(2, "0");
+  const minutes = (normalized % 60).toString().padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
+const resolveNextCandidateSlotTime = (session) => {
+  const defaultStartMinutes = timeToMinutes(session.startTime) ?? 9 * 60;
+  const defaultDuration = clamp(
+    Number.parseInt(String(session.durationMinutes || 30), 10) || 30,
+    10,
+    120,
+  );
+  const existingSlots = Array.isArray(session.candidates) ? session.candidates : [];
+
+  if (existingSlots.length === 0) {
+    return minutesToTime(defaultStartMinutes);
+  }
+
+  let latestSlotEnd = null;
+  existingSlots.forEach((slot) => {
+    const slotStart = timeToMinutes(slot.slotTime);
+    if (slotStart === null) return;
+
+    const slotDuration = clamp(
+      Number.parseInt(String(slot.durationMinutes || defaultDuration), 10) ||
+        defaultDuration,
+      10,
+      120,
+    );
+
+    const slotEnd = slotStart + slotDuration;
+    latestSlotEnd = latestSlotEnd === null ? slotEnd : Math.max(latestSlotEnd, slotEnd);
+  });
+
+  if (latestSlotEnd !== null) {
+    return minutesToTime(latestSlotEnd);
+  }
+
+  return minutesToTime(defaultStartMinutes + existingSlots.length * defaultDuration);
+};
+
 const formatTimeWithMeridiem = (value) => {
   const raw = toSafeString(value);
   if (!raw) return "";
@@ -1300,62 +1355,21 @@ exports.assignCandidate = async (req, res) => {
       return res.status(404).json({ message: "Target session no longer exists" });
     }
 
+    const assignedSlotTime = resolveNextCandidateSlotTime(refreshedTargetSession);
+
     refreshedTargetSession.candidates.push({
       candidateId,
-      slotTime: "",
+      slotTime: assignedSlotTime,
       durationMinutes: refreshedTargetSession.durationMinutes,
       result: "Pending",
       notes: "",
     });
-    refreshedTargetSession.lastEmailAt = new Date();
     await refreshedTargetSession.save();
-
-    const [interviewer, job, emailTemplates] = await Promise.all([
-      fetchScopedInterviewerById(req.user, refreshedTargetSession.interviewerId),
-      JobForm.findById(refreshedTargetSession.jobId).lean(),
-      buildTemplateMap(),
-    ]);
-
-    const assignmentMessage = applyEmailTemplate(emailTemplates.container2, {
-      candidateName: candidate.name,
-      sessionName: refreshedTargetSession.name,
-      jobTitle: job ? job.title : targetJob.title,
-      interviewerName: interviewer ? buildUserFullName(interviewer) : "Interviewer",
-      sessionDate: formatHumanDate(refreshedTargetSession.sessionDate),
-      durationMinutes: refreshedTargetSession.durationMinutes,
-    });
-
-    const assignmentSubject = `Interview assigned: ${refreshedTargetSession.name}`;
-    const assignmentEmailResult = await sendSessionEmail({
-      to: candidate.email,
-      subject: assignmentSubject,
-      details: assignmentMessage,
-    });
-
-    await appendEmailLogs([
-      {
-        category: "Assignment",
-        recipient: assignmentEmailResult.recipient,
-        subject: assignmentSubject,
-        details: assignmentMessage,
-        metadata: {
-          sessionId: refreshedTargetSession.sessionId,
-          candidateId,
-          deliveryStatus: assignmentEmailResult.sent ? "sent" : "failed",
-          ...(assignmentEmailResult.sent
-            ? {}
-            : { deliveryReason: assignmentEmailResult.reason }),
-        },
-      },
-    ]);
 
     const assignmentSummary = previouslyAssignedSession
       ? `${candidate.name} moved from ${previouslyAssignedSession.name} to ${refreshedTargetSession.name}.`
       : `${candidate.name} assigned to ${refreshedTargetSession.name}.`;
-
-    const message = assignmentEmailResult.sent
-      ? `${assignmentSummary} Assignment email sent.`
-      : `${assignmentSummary} Assignment email could not be sent (${assignmentEmailResult.reason}).`;
+    const message = `${assignmentSummary} Slot auto-set to ${formatTimeWithMeridiem(assignedSlotTime)}. Email not sent yet.`;
 
     return res.json({
       message,
