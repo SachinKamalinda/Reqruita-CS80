@@ -2,6 +2,12 @@ const mongoose = require("mongoose");
 
 const sessionEmailLogSchema = new mongoose.Schema(
   {
+    companyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: true,
+      index: true,
+    },
     sentAt: {
       type: Date,
       default: Date.now,
@@ -34,6 +40,7 @@ const sessionEmailLogSchema = new mongoose.Schema(
   { timestamps: false },
 );
 
+sessionEmailLogSchema.index({ companyId: 1, sentAt: -1 });
 sessionEmailLogSchema.index({ sentAt: -1 });
 
 module.exports = mongoose.model("SessionEmailLog", sessionEmailLogSchema);
