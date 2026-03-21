@@ -397,19 +397,19 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 </div>
             )}
 
-            {/* Connection status */}
-            {showConnStatus && (
-                <div style={{ 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "space-between", 
-                    padding: "12px 16px", 
-                    background: "linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4))",
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    minHeight: "60px"
-                }}>
-                    {/* Left: Connection Status */}
-                    <div style={{ flex: 1 }}>
+            {/* Top Bar: Connection status + Session Timer */}
+            <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                padding: "12px 16px", 
+                background: "linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4))",
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                minHeight: "60px"
+            }}>
+                {/* Left: Connection Status */}
+                <div style={{ flex: 1 }}>
+                    {showConnStatus && (
                         <div className="mt-conn-status" style={{ margin: 0 }}>
                             <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
                             <span className="mt-conn-text">
@@ -417,17 +417,17 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                             </span>
                             <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
                         </div>
-                    </div>
-                    
-                    {/* Right: Session Timer */}
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginLeft: "16px" }}>
-                        <SessionTimer 
-                            timerStartedAt={currentParticipant?.timerStartedAt} 
-                            isActive={true}
-                        />
-                    </div>
+                    )}
                 </div>
-            )}
+
+                {/* Right: Session Timer (always visible once candidate has joined) */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginLeft: "16px" }}>
+                    <SessionTimer
+                        timerStartedAt={currentParticipant?.timerStartedAt}
+                        isActive={true}
+                    />
+                </div>
+            </div>
 
             <div className={`jm-row ${chatOpen ? "jm-chat-open" : ""}`}>
                 {/* Main area */}

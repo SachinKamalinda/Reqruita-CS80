@@ -79,17 +79,12 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     const waiting = useMemo(() => participants.filter((p) => p.status === "waiting"), [participants]);
     const completed = useMemo(() => participants.filter((p) => p.status === "completed"), [participants]);
 
-    // Log current candidate for debugging timer
-    useEffect(() => {
-        if (currentCandidate) {
-            console.log("✓ Current Candidate:", {
-                id: currentCandidate.id,
-                name: currentCandidate.name,
-                status: currentCandidate.status,
-                timerStartedAt: currentCandidate.timerStartedAt,
-            });
-        }
-    }, [currentCandidate]);
+    // Timer source: show session time as soon as candidate joins (waiting/interviewing)
+    const timerParticipant = useMemo(() => {
+        const withTimer = participants.filter((p) => p.timerStartedAt);
+        if (!withTimer.length) return null;
+        return [...withTimer].sort((a, b) => new Date(b.timerStartedAt) - new Date(a.timerStartedAt))[0];
+    }, [participants]);
 
     const API_URL = `${BACKEND_URL}/api/participants`;
 
@@ -522,7 +517,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                 {/* Right: Session Timer */}
                 <div style={{ display: "flex", justifyContent: "flex-end", marginLeft: "16px" }}>
                     <SessionTimer 
-                        timerStartedAt={currentCandidate?.timerStartedAt} 
+                        timerStartedAt={timerParticipant?.timerStartedAt} 
                         isActive={true}
                     />
                 </div>
