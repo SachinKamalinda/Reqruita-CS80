@@ -2,16 +2,26 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { sendEmail, sendCustomEmail } = require("../config/resend");
+const { generateUniqueCode } = require("../utils/codeGenerator");
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const toNumericSuffix = (value, size = 6) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(-size)
+    .padStart(size, "0");
 
 const mapUserResponse = (user) => ({
   id: user._id,
+  userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
   fullName: `${user.firstName} ${user.lastName}`,
   firstName: user.firstName,
   lastName: user.lastName,
   email: user.email,
   role: user.role,
+  companyId: user.companyId,
+  companyCode:
+    user.companyCode || `COM-${toNumericSuffix(user.companyId)}`,
   companyName: user.companyName,
   jobTitle: user.jobTitle,
   industry: user.industry,
@@ -174,7 +184,15 @@ exports.getUsers = async (req, res) => {
     }
 
     const users = await User.find(filter, "-password").sort({ createdAt: -1 });
-    res.status(200).json(users);
+    res.status(200).json(
+      users.map((user) => ({
+        ...user.toObject(),
+        userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
+        companyCode:
+          user.companyCode ||
+          `COM-${toNumericSuffix(user.companyId)}`,
+      })),
+    );
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -205,7 +223,7 @@ exports.addUser = async (req, res) => {
         const finalLastName = lastName || "User";
         const fullName = `${finalFirstName} ${finalLastName}`;
 
-        const inviter = await User.findById(req.user.id).select("companyId companyName");
+        const inviter = await User.findById(req.user.id).select("companyId companyName companyCode");
         if (!inviter) {
           return res.status(404).json({ message: "Inviter account not found" });
         }
@@ -214,11 +232,15 @@ exports.addUser = async (req, res) => {
           companyId: inviter.companyId,
           role: "admin",
           isMainAdmin: true,
-        }).select("companyId companyName");
+        }).select("companyId companyName companyCode");
 
         const companyId = companyContext?.companyId || inviter.companyId;
         const companyName =
           (companyContext?.companyName || inviter.companyName || "").trim();
+        const companyCode =
+          (companyContext?.companyCode || inviter.companyCode || "").trim() ||
+          `COM-${toNumericSuffix(companyId)}`;
+        const userCode = await generateUniqueCode(User, "userCode", "USR");
 
         const newUser = new User({
             firstName: finalFirstName,
@@ -232,7 +254,9 @@ exports.addUser = async (req, res) => {
             inviteToken,
             inviteExpires,
             companyId,
-            companyName
+            companyName,
+            companyCode,
+            userCode,
         });
 
         await newUser.save();
@@ -248,7 +272,17 @@ exports.addUser = async (req, res) => {
             resetUrl: setupLink
         });
 
-        res.status(201).json({ message: "Invitation sent successfully!", user: { id: newUser._id, email: newUser.email, role: newUser.role, fullName: newUser.fullName } });
+        res.status(201).json({
+          message: "Invitation sent successfully!",
+          user: {
+            id: newUser._id,
+            userId: newUser.userCode,
+            companyCode: newUser.companyCode,
+            email: newUser.email,
+            role: newUser.role,
+            fullName: newUser.fullName,
+          },
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
