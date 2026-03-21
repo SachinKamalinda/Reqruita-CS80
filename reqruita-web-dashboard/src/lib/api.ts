@@ -32,10 +32,177 @@ export interface AuthResponse {
 
 export interface ApiError {
   message: string;
+  error?: string;
 }
 
 export interface MessageResponse {
   message: string;
+}
+
+export type CandidateResult = 'Pending' | 'Passed' | 'Failed' | 'On Hold';
+export type SessionStatus = 'Draft' | 'Scheduled' | 'Completed';
+export type EmailCategory =
+  | 'Session'
+  | 'Assignment'
+  | 'Schedule'
+  | 'Result'
+  | 'Reminder';
+
+export interface SessionJobForm {
+  id: string;
+  title: string;
+  description: string;
+  jobRole: string;
+  position: string;
+  fields: FormField[];
+  applicants: number;
+}
+
+export interface SessionInterviewer {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  specialty: string;
+}
+
+export interface SessionCandidate {
+  id: string;
+  jobId: string;
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  experienceYears: number;
+  portfolioUrl: string;
+  resumeFile: string;
+  appliedDate: string;
+  summary: string;
+}
+
+export interface SessionCandidateSlot {
+  candidateId: string;
+  slotTime: string;
+  durationMinutes: number;
+  result: CandidateResult;
+  notes: string;
+}
+
+export interface InterviewSession {
+  id: string;
+  jobId: string;
+  name: string;
+  interviewerId: string;
+  deadline: string;
+  requirements: string;
+  remarks: string;
+  sessionDate: string;
+  startTime: string;
+  durationMinutes: number;
+  meetingId: string;
+  meetingPassword: string;
+  status: SessionStatus;
+  candidates: SessionCandidateSlot[];
+  lastEmailAt: string | null;
+}
+
+export type SessionEmailTemplateKey =
+  | 'container1'
+  | 'container2'
+  | 'container3Schedule'
+  | 'container3Result'
+  | 'container3Reminder';
+
+export type SessionEmailTemplates = Record<SessionEmailTemplateKey, string>;
+
+export interface SessionEmailLog {
+  id: string;
+  sentAt: string;
+  category: EmailCategory;
+  recipient: string;
+  subject: string;
+  details: string;
+}
+
+export interface SessionsBootstrapResponse {
+  jobs: SessionJobForm[];
+  interviewers: SessionInterviewer[];
+  candidates: SessionCandidate[];
+  sessions: InterviewSession[];
+  emailTemplates: SessionEmailTemplates;
+  emailLogs: SessionEmailLog[];
+}
+
+export interface CreateSessionPayload {
+  jobId: string;
+  sessionName: string;
+  interviewerId: string;
+  deadline: string;
+  sessionDate: string;
+  startTime: string;
+  durationMinutes: number;
+  requirements: string;
+  remarks: string;
+}
+
+export interface SessionWithMessageResponse {
+  message: string;
+  session: InterviewSession;
+}
+
+export interface AssignCandidatePayload {
+  candidateId: string;
+  targetSessionId: string;
+}
+
+export interface SendCandidateEmailPayload {
+  candidateId: string;
+  emailOption: 'schedule' | 'result' | 'reminder';
+}
+
+export interface UpdateSessionCandidatePayload {
+  slotTime?: string;
+  durationMinutes?: number;
+  result?: CandidateResult;
+  notes?: string;
+}
+
+export interface UpdateSessionPayload {
+  interviewerId?: string;
+  requirements?: string;
+  remarks?: string;
+}
+
+export interface SessionCandidatePacket {
+  generatedAt: string;
+  candidate: SessionCandidate;
+  session: {
+    id: string;
+    name: string;
+    jobTitle: string;
+    jobForm?: {
+      id: string;
+      title: string;
+      description: string;
+      jobRole: string;
+      fields: FormField[];
+    };
+    interviewer: string;
+    interviewerEmail: string;
+    meetingId: string;
+    meetingPassword: string;
+    deadline: string;
+    sessionDate: string;
+    defaultStartTime: string;
+    requirements: string;
+    remarks: string;
+  };
+  interviewSlot: {
+    candidateSlotTime: string;
+    durationMinutes: number;
+    result: CandidateResult;
+    notes: string;
+  };
 }
 
 // ── Token helpers ────────────────────────────────────────────────────────────
@@ -75,6 +242,42 @@ export function getStoredUser(): AuthUser | null {
 
 export function isAuthenticated(): boolean {
   return !!getToken();
+}
+
+async function authedJsonRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const token = getToken();
+
+  if (!token) {
+    throw new Error('You are not authenticated. Please sign in again.');
+  }
+
+  const headers = new Headers(init.headers || {});
+  headers.set('Authorization', `Bearer ${token}`);
+
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const res = await fetch(`${AUTH_API_BASE}${path}`, {
+    ...init,
+    headers,
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      removeToken();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/signin')) {
+        window.location.href = '/signin';
+      }
+    }
+    throw new Error((data as ApiError).message || 'Request failed');
+  }
+
+  return data as T;
 }
 
 // ── Auth API calls ───────────────────────────────────────────────────────────
@@ -126,16 +329,8 @@ export async function signin(payload: SigninPayload): Promise<AuthResponse> {
 }
 
 export async function fetchMe(): Promise<AuthUser> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch user");
-  }
-  return (data as { user: AuthUser }).user;
+  const data = await authedJsonRequest<{ user: AuthUser }>('/api/me');
+  return data.user;
 }
 
 export interface UpdateSettingsPayload {
@@ -159,59 +354,26 @@ export interface ChangePasswordPayload {
 }
 
 export async function fetchSettings(): Promise<AuthUser> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/settings`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch settings");
-  }
-
-  return (data as { user: AuthUser }).user;
+  const data = await authedJsonRequest<{ user: AuthUser }>('/api/settings');
+  return data.user;
 }
 
 export async function updateSettings(
   payload: UpdateSettingsPayload,
 ): Promise<SettingsResponse> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/settings`, {
+  return authedJsonRequest<SettingsResponse>('/api/settings', {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to update settings");
-  }
-
-  return data as SettingsResponse;
 }
 
 export async function changePassword(
   payload: ChangePasswordPayload,
 ): Promise<MessageResponse> {
-  const token = getToken();
-  const res = await fetch(`${AUTH_API_BASE}/api/settings/password`, {
+  return authedJsonRequest<MessageResponse>('/api/settings/password', {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to change password");
-  }
-
-  return data as MessageResponse;
 }
 
 export interface ForgotPasswordRequestPayload {
@@ -281,6 +443,148 @@ export async function verifyEmail(
   return data as AuthResponse;
 }
 
+export async function fetchSessionsBootstrap(
+  jobId?: string,
+): Promise<SessionsBootstrapResponse> {
+  const query = jobId ? `?jobId=${encodeURIComponent(jobId)}` : '';
+  return authedJsonRequest<SessionsBootstrapResponse>(
+    `/api/sessions/bootstrap${query}`,
+  );
+}
+
+export async function createInterviewSession(
+  payload: CreateSessionPayload,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>('/api/sessions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function assignCandidateToSession(
+  payload: AssignCandidatePayload,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    '/api/sessions/assign-candidate',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function sendAssignmentEmailToCandidate(
+  candidateId: string,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    '/api/sessions/send-assignment-email',
+    {
+      method: 'POST',
+      body: JSON.stringify({ candidateId }),
+    },
+  );
+}
+
+export async function updateSessionCandidateDetails(
+  sessionId: string,
+  candidateId: string,
+  payload: UpdateSessionCandidatePayload,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/candidates/${encodeURIComponent(candidateId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function updateInterviewSession(
+  sessionId: string,
+  payload: UpdateSessionPayload,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    `/api/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function conductInterviewSession(
+  sessionId: string,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/conduct`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export async function sendSessionScheduleEmails(
+  sessionId: string,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/send-schedule-emails`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export async function sendSessionResultEmails(
+  sessionId: string,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/send-result-emails`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export async function sendSessionCandidateEmail(
+  sessionId: string,
+  payload: SendCandidateEmailPayload,
+): Promise<{
+  message: string;
+  session: InterviewSession;
+  emailLog: SessionEmailLog;
+}> {
+  return authedJsonRequest<{
+    message: string;
+    session: InterviewSession;
+    emailLog: SessionEmailLog;
+  }>(`/api/sessions/${encodeURIComponent(sessionId)}/send-candidate-email`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchSessionCandidatePacket(
+  sessionId: string,
+  candidateId: string,
+): Promise<SessionCandidatePacket> {
+  return authedJsonRequest<SessionCandidatePacket>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/candidates/${encodeURIComponent(candidateId)}/packet`,
+  );
+}
+
+export async function updateSessionEmailTemplate(
+  templateKey: SessionEmailTemplateKey,
+  content: string,
+): Promise<{ message: string; emailTemplates: SessionEmailTemplates }> {
+  return authedJsonRequest<{ message: string; emailTemplates: SessionEmailTemplates }>(
+    `/api/sessions/email-templates/${encodeURIComponent(templateKey)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    },
+  );
+}
+
 // ── Job Forms API ────────────────────────────────────────────────────────────
 
 export type FieldType = "text" | "phone" | "email" | "file" | "link";
@@ -314,50 +618,17 @@ export interface CreateJobFormPayload {
 export async function createJobForm(
   payload: CreateJobFormPayload,
 ): Promise<{ message: string; form: JobForm }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms`, {
+  return authedJsonRequest<{ message: string; form: JobForm }>('/api/forms', {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to create job form");
-  }
-
-  return data;
 }
 
 export async function getAllJobForms(): Promise<{
   forms: JobForm[];
   count: number;
 }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch job forms");
-  }
-
-  return data;
+  return authedJsonRequest<{ forms: JobForm[]; count: number }>('/api/forms');
 }
 
 export interface PublicJobForm {
@@ -366,6 +637,7 @@ export interface PublicJobForm {
   description: string;
   jobRole: string;
   fields: FormField[];
+  isActive: boolean;
   company: string;
 }
 
@@ -376,7 +648,11 @@ export async function getJobFormById(formId: string): Promise<PublicJobForm> {
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to fetch form");
+    throw new Error(
+      (data as ApiError).message ||
+        (data as ApiError).error ||
+        "Failed to fetch form",
+    );
   }
 
   return data;
@@ -384,49 +660,21 @@ export async function getJobFormById(formId: string): Promise<PublicJobForm> {
 
 export async function updateJobForm(
   formId: string,
-  payload: Partial<CreateJobFormPayload>,
+  payload: Partial<CreateJobFormPayload> & { isActive?: boolean },
 ): Promise<{ message: string; form: JobForm }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms/${formId}`, {
+  return authedJsonRequest<{ message: string; form: JobForm }>(
+    `/api/forms/${formId}`,
+    {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to update form");
-  }
-
-  return data;
+    },
+  );
 }
 
 export async function deleteJobForm(formId: string): Promise<MessageResponse> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/forms/${formId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  return authedJsonRequest<MessageResponse>(`/api/forms/${formId}`, {
+    method: 'DELETE',
   });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to delete form");
-  }
-
-  return data;
 }
 
 export interface FormSubmissionPayload {
@@ -450,7 +698,11 @@ export async function submitJobFormResponse(
 
   const data = await res.json();
   if (!res.ok) {
-    throw new Error((data as ApiError).message || "Failed to submit form");
+    throw new Error(
+      (data as ApiError).message ||
+        (data as ApiError).error ||
+        "Failed to submit form",
+    );
   }
 
   return data;
@@ -459,7 +711,7 @@ export async function submitJobFormResponse(
 export interface FormSubmission {
   _id: string;
   formId: string;
-  submittedData: Record<string, any>;
+  submittedData: Record<string, unknown>;
   submitterEmail: string;
   status: "submitted" | "reviewed" | "rejected" | "accepted";
   notes: string;
@@ -482,35 +734,18 @@ export async function getFormSubmissions(
   page: number;
   totalPages: number;
 }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
   const params = new URLSearchParams();
   if (options?.sortBy) params.append("sortBy", options.sortBy);
   if (options?.status) params.append("status", options.status);
   if (options?.page) params.append("page", options.page.toString());
   if (options?.limit) params.append("limit", options.limit.toString());
-
-  const res = await fetch(
-    `${AUTH_API_BASE}/api/forms/${formId}/submissions?${params}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  );
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      (data as ApiError).message || "Failed to fetch submissions",
-    );
-  }
-
-  return data;
+  const query = params.toString();
+  return authedJsonRequest<{
+    submissions: FormSubmission[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }>(`/api/forms/${formId}/submissions${query ? `?${query}` : ''}`);
 }
 
 export interface UpdateSubmissionPayload {
@@ -523,26 +758,11 @@ export async function updateFormSubmissionStatus(
   submissionId: string,
   payload: UpdateSubmissionPayload,
 ): Promise<{ message: string; submission: FormSubmission }> {
-  const token = getToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const res = await fetch(`${AUTH_API_BASE}/api/submissions/${submissionId}`, {
+  return authedJsonRequest<{ message: string; submission: FormSubmission }>(
+    `/api/submissions/${submissionId}`,
+    {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(payload),
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      (data as ApiError).message || "Failed to update submission",
-    );
-  }
-
-  return data;
+    },
+  );
 }

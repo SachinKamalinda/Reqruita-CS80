@@ -1,15 +1,40 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  assignCandidateToSession,
+  conductInterviewSession,
+  createInterviewSession,
+  fetchSessionCandidatePacket,
+  fetchSessionsBootstrap,
+  getStoredUser,
+  sendAssignmentEmailToCandidate as sendAssignmentEmailToCandidateRequest,
+  sendSessionCandidateEmail,
+  sendSessionResultEmails,
+  sendSessionScheduleEmails,
+  updateInterviewSession,
+  updateSessionCandidateDetails,
+  updateSessionEmailTemplate,
+} from "@/lib/api";
 
 type CandidateResult = "Pending" | "Passed" | "Failed" | "On Hold";
 
 type SessionStatus = "Draft" | "Scheduled" | "Completed";
 
+interface JobFormField {
+  label: string;
+  type: string;
+  required?: boolean;
+  order?: number;
+}
+
 interface JobForm {
   id: string;
   title: string;
+  description: string;
+  jobRole: string;
   position: string;
+  fields: JobFormField[];
   applicants: number;
 }
 
@@ -17,6 +42,7 @@ interface Interviewer {
   id: string;
   name: string;
   email: string;
+  role: string;
   specialty: string;
 }
 
@@ -53,6 +79,8 @@ interface InterviewSession {
   sessionDate: string;
   startTime: string;
   durationMinutes: number;
+  meetingId: string;
+  meetingPassword: string;
   status: SessionStatus;
   candidates: SessionCandidate[];
   lastEmailAt: string | null;
@@ -66,7 +94,7 @@ type EmailCategory =
   | "Reminder";
 
 interface EmailLog {
-  id: number;
+  id: string;
   sentAt: string;
   category: EmailCategory;
   recipient: string;
@@ -93,6 +121,12 @@ interface CreateSessionForm {
   remarks: string;
 }
 
+interface EditSessionForm {
+  interviewerId: string;
+  requirements: string;
+  remarks: string;
+}
+
 type AssignmentFilter = "all" | "assigned" | "unassigned";
 
 type EmailTemplateKey =
@@ -106,100 +140,13 @@ type Container3EmailOption = "schedule" | "result" | "reminder";
 
 type EmailTemplates = Record<EmailTemplateKey, string>;
 
-const JOB_FORMS: JobForm[] = [
-  {
-    id: "JOB-SE-2026",
-    title: "Senior Software Engineer",
-    position: "Software Engineer",
-    applicants: 120,
-  },
-  {
-    id: "JOB-FE-2026",
-    title: "Frontend Engineer",
-    position: "Frontend Engineer",
-    applicants: 90,
-  },
-  {
-    id: "JOB-QA-2026",
-    title: "QA Automation Engineer",
-    position: "QA Engineer",
-    applicants: 70,
-  },
-];
+type ToastTone = "success" | "error" | "info";
 
-const INTERVIEWERS: Interviewer[] = [
-  {
-    id: "INT-001",
-    name: "Mia Carter",
-    email: "mia.carter@reqruita.com",
-    specialty: "Backend Systems",
-  },
-  {
-    id: "INT-002",
-    name: "Liam Green",
-    email: "liam.green@reqruita.com",
-    specialty: "Frontend Architecture",
-  },
-  {
-    id: "INT-003",
-    name: "Noah Hall",
-    email: "noah.hall@reqruita.com",
-    specialty: "Cloud and DevOps",
-  },
-  {
-    id: "INT-004",
-    name: "Emma Stone",
-    email: "emma.stone@reqruita.com",
-    specialty: "Behavioral Interviewing",
-  },
-];
-
-const FIRST_NAMES = [
-  "Alex",
-  "Jordan",
-  "Taylor",
-  "Sam",
-  "Riley",
-  "Casey",
-  "Avery",
-  "Morgan",
-  "Drew",
-  "Skyler",
-  "Parker",
-  "Jamie",
-  "Elliot",
-  "Kris",
-  "Quinn",
-];
-
-const LAST_NAMES = [
-  "Perera",
-  "Silva",
-  "Fernando",
-  "Jayasuriya",
-  "Gunasekara",
-  "Wijesinghe",
-  "Dias",
-  "Ramanayake",
-  "Abeysekera",
-  "Ilangakoon",
-  "Mendis",
-  "Samarasinghe",
-  "Seneviratne",
-  "Karunaratne",
-  "Bandara",
-];
-
-const LOCATIONS = [
-  "Colombo",
-  "Kandy",
-  "Galle",
-  "Jaffna",
-  "Negombo",
-  "Kurunegala",
-  "Matara",
-  "Nugegoda",
-];
+interface ToastItem {
+  id: number;
+  message: string;
+  tone: ToastTone;
+}
 
 const RESULT_STYLES: Record<CandidateResult, string> = {
   Pending: "bg-gray-100 text-gray-700",
@@ -210,15 +157,15 @@ const RESULT_STYLES: Record<CandidateResult, string> = {
 
 const DEFAULT_EMAIL_TEMPLATES: EmailTemplates = {
   container1:
-    "Dear {{interviewerName}},\n\nYou have been assigned to conduct {{sessionName}} for {{jobTitle}}.\nDeadline: {{deadline}}\nSession date: {{sessionDate}}\nRequirements: {{requirements}}\nRemarks: {{remarks}}\n\nRegards,\nReqruita Admin",
+    'Dear {{interviewerName}},\n\nThis is to confirm that you have been assigned to the interview session "{{sessionName}}" for the {{jobTitle}} position.\n\nSession details:\n- Submission deadline: {{deadline}}\n- Interview date: {{sessionDate}}\n- Key requirements: {{requirements}}\n- Additional interviewer notes: {{remarks}}\n\nPlease review these details and prepare accordingly.\n\nBest regards,\nReqruita Interview Operations',
   container2:
-    "Dear {{candidateName}},\n\nYou have been assigned to {{sessionName}} for {{jobTitle}}.\nInterviewer: {{interviewerName}}\nInterview date: {{sessionDate}}\nExpected duration: {{durationMinutes}} minutes\n\nRegards,\nReqruita Team",
+    'Dear {{candidateName}},\n\nWe are pleased to inform you that you have been scheduled for "{{sessionName}}" as part of your application for the {{jobTitle}} role.\n\nInterview details:\n- Interviewer: {{interviewerName}}\n- Date: {{sessionDate}}\n- Expected duration: {{durationMinutes}} minutes\n\nPlease note: your exact time slot will be announced soon in a follow-up update.\n\nKind regards,\nReqruita Recruitment Team',
   container3Schedule:
-    "Dear {{recipientName}},\n\nSchedule Update for {{sessionName}} ({{jobTitle}}).\nAction: {{action}}\nSlot time: {{slotTime}}\nDuration: {{durationMinutes}} minutes\nSummary: {{resultSummary}}\n\nRegards,\nReqruita Interview Ops",
+    'Dear {{recipientName}},\n\nThis is an interview schedule update for "{{sessionName}}" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations',
   container3Result:
-    "Dear {{recipientName}},\n\nResult update for {{sessionName}} ({{jobTitle}}).\nAction: {{action}}\nSlot time: {{slotTime}}\nDuration: {{durationMinutes}} minutes\nSummary: {{resultSummary}}\n\nRegards,\nReqruita Interview Ops",
+    'Dear {{recipientName}},\n\nThis is the final outcome update for "{{sessionName}}" ({{jobTitle}}).\n\nInterview outcome: {{resultSummary}}\n\nThank you for your time and participation in the interview process.\n\nSincerely,\nReqruita Interview Operations',
   container3Reminder:
-    "Dear {{recipientName}},\n\nFriendly reminder for {{sessionName}} ({{jobTitle}}).\nAction: {{action}}\nSlot time: {{slotTime}}\nDuration: {{durationMinutes}} minutes\nSummary: {{resultSummary}}\n\nRegards,\nReqruita Interview Ops",
+    'Dear {{recipientName}},\n\nThis is a professional reminder that you have an interview related to "{{sessionName}}" ({{jobTitle}}).\n\nInterview schedule:\n- Time slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease be prepared and ensure timely participation.\n\nBest regards,\nReqruita Interview Operations',
 };
 
 const CONTAINER3_TEMPLATE_KEYS: Record<
@@ -254,163 +201,41 @@ const formatHumanDate = (value: string): string => {
   });
 };
 
-const applyEmailTemplate = (
-  template: string,
-  values: Record<string, string | number>,
-): string =>
-  template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => {
-    const value = values[key];
-    return value === undefined || value === null ? "" : String(value);
-  });
+const getToastTone = (message: string): ToastTone => {
+  const normalized = message.toLowerCase();
 
-const buildCandidatesForJob = (jobId: string, total: number): Candidate[] =>
-  Array.from({ length: total }, (_, index) => {
-    const first = FIRST_NAMES[index % FIRST_NAMES.length];
-    const last =
-      LAST_NAMES[Math.floor(index / FIRST_NAMES.length) % LAST_NAMES.length];
-    const sequence = index + 1;
-    const emailFirst = first.toLowerCase();
-    const emailLast = last.toLowerCase();
-    const location = LOCATIONS[index % LOCATIONS.length];
-    const experienceYears = (index % 8) + 1;
-    const appliedDate = formatDateInput(
-      addDays(new Date(), -((index % 24) + 1)),
-    );
+  if (
+    normalized.includes("failed") ||
+    normalized.includes("error") ||
+    normalized.includes("unable") ||
+    normalized.includes("invalid") ||
+    normalized.includes("required") ||
+    normalized.includes("select") ||
+    normalized.includes("must") ||
+    normalized.includes("not found") ||
+    normalized.includes("denied")
+  ) {
+    return "error";
+  }
 
-    return {
-      id: `${jobId}-C${sequence.toString().padStart(3, "0")}`,
-      jobId,
-      name: `${first} ${last}`,
-      email: `${emailFirst}.${emailLast}${sequence}@mail.reqruita.com`,
-      phone: `+94 77 ${String(1000000 + sequence).slice(-7)}`,
-      location,
-      experienceYears,
-      portfolioUrl: `https://portfolio.reqruita.dev/${emailFirst}-${emailLast}-${sequence}`,
-      resumeFile: `${first}_${last}_${sequence}.pdf`,
-      appliedDate,
-      summary: `${experienceYears} years in engineering with emphasis on clean architecture, communication, and production delivery.`,
-    };
-  });
+  if (
+    normalized.includes("saved") ||
+    normalized.includes("created") ||
+    normalized.includes("updated") ||
+    normalized.includes("sent") ||
+    normalized.includes("started") ||
+    normalized.includes("downloaded") ||
+    normalized.includes("queued")
+  ) {
+    return "success";
+  }
 
-const CANDIDATE_POOL: Record<string, Candidate[]> = JOB_FORMS.reduce<
-  Record<string, Candidate[]>
->((accumulator, job) => {
-  accumulator[job.id] = buildCandidatesForJob(job.id, job.applicants);
-  return accumulator;
-}, {});
+  return "info";
+};
 
-const CANDIDATE_LOOKUP: Record<string, Candidate> = Object.values(
-  CANDIDATE_POOL,
-)
-  .flat()
-  .reduce<Record<string, Candidate>>((accumulator, candidate) => {
-    accumulator[candidate.id] = candidate;
-    return accumulator;
-  }, {});
-
-const buildDummySessions = (): InterviewSession[] => {
-  const sessionOneCandidates: SessionCandidate[] = (
-    CANDIDATE_POOL["JOB-SE-2026"] ?? []
-  )
-    .slice(0, 4)
-    .map((candidate, index) => ({
-      candidateId: candidate.id,
-      slotTime: `09:${(index * 30).toString().padStart(2, "0")}`,
-      durationMinutes: 30,
-      result:
-        index === 0
-          ? "Passed"
-          : index === 1
-            ? "Pending"
-            : index === 2
-              ? "On Hold"
-              : "Failed",
-      notes:
-        index === 0
-          ? "Strong architecture explanation."
-          : index === 1
-            ? "Needs deeper API design discussion."
-            : index === 2
-              ? "Waiting for panel confirmation."
-              : "Limited backend depth.",
-    }));
-
-  const sessionTwoCandidates: SessionCandidate[] = (
-    CANDIDATE_POOL["JOB-SE-2026"] ?? []
-  )
-    .slice(4, 8)
-    .map((candidate, index) => ({
-      candidateId: candidate.id,
-      slotTime: `13:${(index * 30).toString().padStart(2, "0")}`,
-      durationMinutes: 30,
-      result: "Pending" as CandidateResult,
-      notes: "Initial assessment pending.",
-    }));
-
-  const sessionThreeCandidates: SessionCandidate[] = (
-    CANDIDATE_POOL["JOB-FE-2026"] ?? []
-  )
-    .slice(0, 3)
-    .map((candidate, index) => ({
-      candidateId: candidate.id,
-      slotTime: `10:${(index * 35).toString().padStart(2, "0")}`,
-      durationMinutes: 35,
-      result: index === 0 ? "Passed" : "Pending",
-      notes:
-        index === 0 ? "Good React system thinking." : "Awaiting interview.",
-    }));
-
-  return [
-    {
-      id: "JOB-SE-2026-S01",
-      jobId: "JOB-SE-2026",
-      name: "Session 1",
-      interviewerId: "INT-001",
-      deadline: formatDateInput(addDays(new Date(), 4)),
-      requirements:
-        "Assess backend architecture, performance trade-offs, and debugging approach.",
-      remarks:
-        "Focus on practical scalability decisions and communication under pressure.",
-      sessionDate: formatDateInput(addDays(new Date(), 6)),
-      startTime: "09:00",
-      durationMinutes: 30,
-      status: "Scheduled",
-      candidates: sessionOneCandidates,
-      lastEmailAt: new Date().toLocaleString(),
-    },
-    {
-      id: "JOB-SE-2026-S02",
-      jobId: "JOB-SE-2026",
-      name: "Session 2",
-      interviewerId: "INT-003",
-      deadline: formatDateInput(addDays(new Date(), 5)),
-      requirements:
-        "Evaluate cloud-native deployment awareness and incident response thinking.",
-      remarks: "Probe CI/CD reliability and ownership mindset.",
-      sessionDate: formatDateInput(addDays(new Date(), 7)),
-      startTime: "13:00",
-      durationMinutes: 30,
-      status: "Draft",
-      candidates: sessionTwoCandidates,
-      lastEmailAt: null,
-    },
-    {
-      id: "JOB-FE-2026-S01",
-      jobId: "JOB-FE-2026",
-      name: "Frontend Session 1",
-      interviewerId: "INT-002",
-      deadline: formatDateInput(addDays(new Date(), 3)),
-      requirements:
-        "Check component architecture, state management, and accessibility basics.",
-      remarks: "Request one production issue troubleshooting example.",
-      sessionDate: formatDateInput(addDays(new Date(), 5)),
-      startTime: "10:00",
-      durationMinutes: 35,
-      status: "Scheduled",
-      candidates: sessionThreeCandidates,
-      lastEmailAt: new Date().toLocaleString(),
-    },
-  ];
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  return "Request failed. Please try again.";
 };
 
 const getSessionBreakdown = (session: InterviewSession): SessionBreakdown =>
@@ -460,16 +285,29 @@ const statCard = (label: string, value: string | number, helper: string) => (
 );
 
 export default function SessionsPage() {
-  const [sessions, setSessions] =
-    useState<InterviewSession[]>(buildDummySessions());
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [jobs, setJobs] = useState<JobForm[]>([]);
+  const [interviewers, setInterviewers] = useState<Interviewer[]>([]);
+  const [candidatePool, setCandidatePool] = useState<
+    Record<string, Candidate[]>
+  >({});
+  const [candidateLookup, setCandidateLookup] = useState<
+    Record<string, Candidate>
+  >({});
+  const [sessions, setSessions] = useState<InterviewSession[]>([]);
   const [, setEmailLogs] = useState<EmailLog[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplates>(
     DEFAULT_EMAIL_TEMPLATES,
   );
-  const [statusMessage, setStatusMessage] = useState<string>("Ready.");
+  const [savedEmailTemplates, setSavedEmailTemplates] =
+    useState<EmailTemplates>(DEFAULT_EMAIL_TEMPLATES);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+  const [statusMessage, setStatusMessageState] = useState<string>("Ready.");
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const [createForm, setCreateForm] = useState<CreateSessionForm>({
-    jobId: JOB_FORMS[0].id,
+    jobId: "",
     sessionName: "",
     interviewerId: "",
     deadline: formatDateInput(addDays(new Date(), 5)),
@@ -493,13 +331,18 @@ export default function SessionsPage() {
     useState<boolean>(false);
   const [showSessionCandidatesModal, setShowSessionCandidatesModal] =
     useState<boolean>(false);
+  const [showEditSessionModal, setShowEditSessionModal] =
+    useState<boolean>(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
+  const [editSessionForm, setEditSessionForm] = useState<EditSessionForm>({
+    interviewerId: "",
+    requirements: "",
+    remarks: "",
+  });
 
-  const [candidateJobFilter, setCandidateJobFilter] = useState<string>(
-    JOB_FORMS[0].id,
-  );
+  const [candidateJobFilter, setCandidateJobFilter] = useState<string>("");
   const [candidateSessionFilterId, setCandidateSessionFilterId] =
     useState<string>("all");
   const [candidateAssignmentFilter, setCandidateAssignmentFilter] =
@@ -515,9 +358,7 @@ export default function SessionsPage() {
   const [container2DetailsCandidateId, setContainer2DetailsCandidateId] =
     useState<string | null>(null);
 
-  const [interviewJobFilter, setInterviewJobFilter] = useState<string>(
-    JOB_FORMS[0].id,
-  );
+  const [interviewJobFilter, setInterviewJobFilter] = useState<string>("");
   const [interviewSessionId, setInterviewSessionId] = useState<string>("");
   const [interviewCandidateSearch, setInterviewCandidateSearch] =
     useState<string>("");
@@ -535,41 +376,210 @@ export default function SessionsPage() {
     useState<string>("");
   const [showContainer3EmailModal, setShowContainer3EmailModal] =
     useState<boolean>(false);
+  const [showContainer3SessionInfoModal, setShowContainer3SessionInfoModal] =
+    useState<boolean>(false);
   const [container3EmailCandidateId, setContainer3EmailCandidateId] = useState<
     string | null
   >(null);
   const [container3EmailOption, setContainer3EmailOption] =
     useState<Container3EmailOption>("reminder");
 
+  const isInterviewer = currentUserRole === "interviewer";
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user) {
+      setCurrentUserId(user.id);
+      setCurrentUserRole(user.role);
+    }
+  }, []);
+
+  const setStatusMessage = useCallback((message: string) => {
+    setStatusMessageState(message);
+
+    if (!message || message === "Ready.") return;
+
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    const tone = getToastTone(message);
+
+    setToasts((current) => [{ id, message, tone }, ...current].slice(0, 4));
+
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 3500);
+  }, []);
+
+  const refreshSessionsData = useCallback(async () => {
+    try {
+      const data = await fetchSessionsBootstrap();
+
+      const nextPool: Record<string, Candidate[]> = data.jobs.reduce(
+        (accumulator, job) => {
+          accumulator[job.id] = [];
+          return accumulator;
+        },
+        {} as Record<string, Candidate[]>,
+      );
+
+      const nextLookup = data.candidates.reduce<Record<string, Candidate>>(
+        (accumulator, candidate) => {
+          accumulator[candidate.id] = candidate;
+          if (!nextPool[candidate.jobId]) {
+            nextPool[candidate.jobId] = [];
+          }
+          nextPool[candidate.jobId].push(candidate);
+          return accumulator;
+        },
+        {},
+      );
+
+      Object.keys(nextPool).forEach((jobId) => {
+        nextPool[jobId] = [...nextPool[jobId]].sort((a, b) =>
+          a.id.localeCompare(b.id),
+        );
+      });
+
+      setJobs(data.jobs);
+      setInterviewers(data.interviewers);
+      setCandidatePool(nextPool);
+      setCandidateLookup(nextLookup);
+      setSessions(data.sessions as InterviewSession[]);
+      const nextTemplates = data.emailTemplates as EmailTemplates;
+
+      setEmailTemplates(nextTemplates);
+      setSavedEmailTemplates(nextTemplates);
+      setEmailLogs(data.emailLogs as EmailLog[]);
+
+      const firstJobId = data.jobs[0]?.id ?? "";
+      const firstInterviewerId = data.interviewers[0]?.id ?? "";
+      const jobExists = (jobId: string) =>
+        data.jobs.some((job) => job.id === jobId);
+      const interviewerExists = (interviewerId: string) =>
+        data.interviewers.some(
+          (interviewer) => interviewer.id === interviewerId,
+        );
+
+      setCreateForm((current) => ({
+        ...current,
+        jobId:
+          current.jobId && jobExists(current.jobId)
+            ? current.jobId
+            : firstJobId,
+        interviewerId:
+          current.interviewerId && interviewerExists(current.interviewerId)
+            ? current.interviewerId
+            : firstInterviewerId,
+      }));
+      setCandidateJobFilter((current) =>
+        current && jobExists(current) ? current : firstJobId,
+      );
+      setInterviewJobFilter((current) =>
+        current && jobExists(current) ? current : firstJobId,
+      );
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
+    }
+  }, [setStatusMessage]);
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoadingData(true);
+      await refreshSessionsData();
+      setIsLoadingData(false);
+    };
+
+    void load();
+  }, [refreshSessionsData]);
+
   const jobLookup = useMemo(
     () =>
-      JOB_FORMS.reduce<Record<string, JobForm>>((accumulator, job) => {
+      jobs.reduce<Record<string, JobForm>>((accumulator, job) => {
         accumulator[job.id] = job;
         return accumulator;
       }, {}),
-    [],
+    [jobs],
   );
 
   const interviewerLookup = useMemo(
     () =>
-      INTERVIEWERS.reduce<Record<string, Interviewer>>(
+      interviewers.reduce<Record<string, Interviewer>>(
         (accumulator, person) => {
           accumulator[person.id] = person;
           return accumulator;
         },
         {},
       ),
-    [],
+    [interviewers],
   );
 
+  const scopedSessions = useMemo(() => {
+    if (!isInterviewer) return sessions;
+    if (!currentUserId) return [];
+    return sessions.filter(
+      (session) => session.interviewerId === currentUserId,
+    );
+  }, [sessions, isInterviewer, currentUserId]);
+
+  const candidateJobOptions = useMemo(() => {
+    if (!isInterviewer) return jobs;
+    const jobIds = new Set(scopedSessions.map((session) => session.jobId));
+    return jobs.filter((job) => jobIds.has(job.id));
+  }, [jobs, scopedSessions, isInterviewer]);
+
+  const interviewJobOptions = candidateJobOptions;
+
+  useEffect(() => {
+    if (candidateJobOptions.length === 0) {
+      setCandidateJobFilter("");
+      return;
+    }
+
+    setCandidateJobFilter((current) =>
+      candidateJobOptions.some((job) => job.id === current)
+        ? current
+        : candidateJobOptions[0].id,
+    );
+  }, [candidateJobOptions]);
+
+  useEffect(() => {
+    if (candidateSessionFilterId === "all") return;
+
+    const exists = scopedSessions.some(
+      (session) => session.id === candidateSessionFilterId,
+    );
+    if (!exists) {
+      setCandidateSessionFilterId("all");
+    }
+  }, [candidateSessionFilterId, scopedSessions]);
+
+  useEffect(() => {
+    if (interviewJobOptions.length === 0) {
+      setInterviewJobFilter("");
+      return;
+    }
+
+    setInterviewJobFilter((current) =>
+      interviewJobOptions.some((job) => job.id === current)
+        ? current
+        : interviewJobOptions[0].id,
+    );
+  }, [interviewJobOptions]);
+
+  useEffect(() => {
+    if (!isInterviewer) return;
+    setCandidateAssignmentFilter("assigned");
+  }, [isInterviewer]);
+
   const sessionsForCandidateJob = useMemo(
-    () => sessions.filter((session) => session.jobId === candidateJobFilter),
-    [sessions, candidateJobFilter],
+    () =>
+      scopedSessions.filter((session) => session.jobId === candidateJobFilter),
+    [scopedSessions, candidateJobFilter],
   );
 
   const sessionsForInterviewJob = useMemo(
-    () => sessions.filter((session) => session.jobId === interviewJobFilter),
-    [sessions, interviewJobFilter],
+    () =>
+      scopedSessions.filter((session) => session.jobId === interviewJobFilter),
+    [scopedSessions, interviewJobFilter],
   );
 
   const resolvedCandidateSessionFilterId = useMemo(() => {
@@ -606,14 +616,14 @@ export default function SessionsPage() {
 
   const sessionLookup = useMemo(
     () =>
-      sessions.reduce<Record<string, InterviewSession>>(
+      scopedSessions.reduce<Record<string, InterviewSession>>(
         (accumulator, session) => {
           accumulator[session.id] = session;
           return accumulator;
         },
         {},
       ),
-    [sessions],
+    [scopedSessions],
   );
 
   const selectedSession = useMemo(() => {
@@ -627,7 +637,7 @@ export default function SessionsPage() {
 
     return selectedSession.candidates
       .map((slot) => {
-        const candidate = CANDIDATE_LOOKUP[slot.candidateId];
+        const candidate = candidateLookup[slot.candidateId];
         if (!candidate) return null;
         return { candidate, slot };
       })
@@ -639,26 +649,38 @@ export default function SessionsPage() {
           slot: SessionCandidate;
         } => row !== null,
       );
-  }, [selectedSession]);
+  }, [selectedSession, candidateLookup]);
 
   const activeContainer3TemplateKey = useMemo(
     () => CONTAINER3_TEMPLATE_KEYS[container3TemplateEditorOption],
     [container3TemplateEditorOption],
   );
 
+  const hasUnsavedTemplate = useCallback(
+    (templateKey: EmailTemplateKey) =>
+      (emailTemplates[templateKey] ?? "") !==
+      (savedEmailTemplates[templateKey] ?? ""),
+    [emailTemplates, savedEmailTemplates],
+  );
+
+  const activeContainer3HasUnsaved = useMemo(
+    () => hasUnsavedTemplate(activeContainer3TemplateKey),
+    [activeContainer3TemplateKey, hasUnsavedTemplate],
+  );
+
   const assignModalCandidate = useMemo(
     () =>
-      assignCandidateId ? (CANDIDATE_LOOKUP[assignCandidateId] ?? null) : null,
-    [assignCandidateId],
+      assignCandidateId ? (candidateLookup[assignCandidateId] ?? null) : null,
+    [assignCandidateId, candidateLookup],
   );
 
   const assignModalSessions = useMemo(() => {
     if (!assignModalCandidate) return [];
 
-    return sessions.filter(
+    return scopedSessions.filter(
       (session) => session.jobId === assignModalCandidate.jobId,
     );
-  }, [sessions, assignModalCandidate]);
+  }, [scopedSessions, assignModalCandidate]);
 
   const resolvedAssignTargetSessionId = useMemo(() => {
     if (assignModalSessions.length === 0) return "";
@@ -673,9 +695,9 @@ export default function SessionsPage() {
   const container2DetailsCandidate = useMemo(
     () =>
       container2DetailsCandidateId
-        ? (CANDIDATE_LOOKUP[container2DetailsCandidateId] ?? null)
+        ? (candidateLookup[container2DetailsCandidateId] ?? null)
         : null,
-    [container2DetailsCandidateId],
+    [container2DetailsCandidateId, candidateLookup],
   );
 
   const container2DetailsSession = useMemo(() => {
@@ -689,12 +711,16 @@ export default function SessionsPage() {
   }, [container2DetailsCandidate, assignedSessionByCandidateId, sessionLookup]);
 
   const filteredCandidates = useMemo(() => {
-    const candidatesForJob = CANDIDATE_POOL[candidateJobFilter] ?? [];
+    const candidatesForJob = candidatePool[candidateJobFilter] ?? [];
 
     return candidatesForJob.filter((candidate) => {
       const isAssigned = Boolean(assignedSessionByCandidateId[candidate.id]);
       const assignedSessionId =
         assignedSessionByCandidateId[candidate.id] ?? "";
+
+      if (isInterviewer && !isAssigned) {
+        return false;
+      }
 
       if (candidateAssignmentFilter === "assigned") {
         if (!isAssigned) return false;
@@ -712,6 +738,8 @@ export default function SessionsPage() {
     });
   }, [
     candidateJobFilter,
+    candidatePool,
+    isInterviewer,
     candidateAssignmentFilter,
     resolvedCandidateSessionFilterId,
     assignedSessionByCandidateId,
@@ -725,6 +753,16 @@ export default function SessionsPage() {
     return byId ?? sessionsForInterviewJob[0] ?? null;
   }, [sessionsForInterviewJob, resolvedInterviewSessionId]);
 
+  const activeInterviewInterviewer = useMemo(() => {
+    if (!activeInterviewSession) return null;
+    return interviewerLookup[activeInterviewSession.interviewerId] ?? null;
+  }, [activeInterviewSession, interviewerLookup]);
+
+  const activeInterviewJob = useMemo(() => {
+    if (!activeInterviewSession) return null;
+    return jobLookup[activeInterviewSession.jobId] ?? null;
+  }, [activeInterviewSession, jobLookup]);
+
   const activeInterviewRows = useMemo(() => {
     if (!activeInterviewSession) return [];
 
@@ -732,7 +770,7 @@ export default function SessionsPage() {
 
     return activeInterviewSession.candidates
       .map((slot) => {
-        const candidate = CANDIDATE_LOOKUP[slot.candidateId];
+        const candidate = candidateLookup[slot.candidateId];
         if (!candidate) return null;
         return { slot, candidate };
       })
@@ -752,7 +790,7 @@ export default function SessionsPage() {
 
         return haystack.includes(query);
       });
-  }, [activeInterviewSession, interviewCandidateSearch]);
+  }, [activeInterviewSession, interviewCandidateSearch, candidateLookup]);
 
   const container3DetailsRow = useMemo(() => {
     if (!container3DetailsCandidateId) return null;
@@ -796,21 +834,12 @@ export default function SessionsPage() {
     );
   };
 
-  const addEmailLogs = (entries: Omit<EmailLog, "id" | "sentAt">[]) => {
-    if (entries.length === 0) return;
-
-    setEmailLogs((previousLogs) => {
-      const highestId = previousLogs[0]?.id ?? 0;
-      const timestamp = new Date().toLocaleString();
-
-      const created = entries.map((entry, index) => ({
-        id: highestId + index + 1,
-        sentAt: timestamp,
-        ...entry,
-      }));
-
-      return [...created.reverse(), ...previousLogs].slice(0, 250);
-    });
+  const replaceSession = (updatedSession: InterviewSession) => {
+    setSessions((previous) =>
+      previous.map((session) =>
+        session.id === updatedSession.id ? updatedSession : session,
+      ),
+    );
   };
 
   const updateEmailTemplate = (
@@ -823,13 +852,71 @@ export default function SessionsPage() {
     }));
   };
 
-  const handleSaveTemplate = (container: EmailTemplateKey) => {
-    setStatusMessage(`Automated email template saved for ${container}.`);
+  const handleSaveTemplate = async (container: EmailTemplateKey) => {
+    try {
+      const response = await updateSessionEmailTemplate(
+        container,
+        emailTemplates[container],
+      );
+      const nextTemplates = response.emailTemplates as EmailTemplates;
+
+      setEmailTemplates(nextTemplates);
+      setSavedEmailTemplates(nextTemplates);
+      setStatusMessage(response.message);
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
+    }
   };
 
   const handleOpenSessionDetails = (sessionId: string) => {
     setSelectedSessionId(sessionId);
     setShowSessionDetailsModal(true);
+  };
+
+  const handleOpenEditSession = () => {
+    if (!selectedSession) return;
+
+    setEditSessionForm({
+      interviewerId: selectedSession.interviewerId,
+      requirements: selectedSession.requirements,
+      remarks: selectedSession.remarks,
+    });
+    setShowEditSessionModal(true);
+  };
+
+  const handleSaveSessionEdits = async () => {
+    if (!selectedSession) {
+      setStatusMessage("Select a valid session first.");
+      return;
+    }
+
+    const nextRequirements = editSessionForm.requirements.trim();
+    const nextRemarks = editSessionForm.remarks.trim();
+
+    if (!editSessionForm.interviewerId) {
+      setStatusMessage("Select an interviewer for this session.");
+      return;
+    }
+
+    if (!nextRequirements || !nextRemarks) {
+      setStatusMessage("Requirements and remarks are required.");
+      return;
+    }
+
+    try {
+      const response = await updateInterviewSession(selectedSession.id, {
+        interviewerId: editSessionForm.interviewerId,
+        requirements: nextRequirements,
+        remarks: nextRemarks,
+      });
+
+      replaceSession(response.session as InterviewSession);
+      setStatusMessage(response.message);
+      setShowEditSessionModal(false);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
+    }
   };
 
   const handleOpenSessionCandidates = () => {
@@ -839,19 +926,20 @@ export default function SessionsPage() {
     setShowSessionCandidatesModal(true);
   };
 
-  const handleConductSession = () => {
+  const handleConductSession = async () => {
     if (!activeInterviewSession) {
       setStatusMessage("Select a valid session first.");
       return;
     }
 
-    updateSession(activeInterviewSession.id, (current) => ({
-      ...current,
-      status: current.status === "Completed" ? "Completed" : "Scheduled",
-      lastEmailAt: new Date().toLocaleString(),
-    }));
-
-    setStatusMessage(`Session started for ${activeInterviewSession.name}.`);
+    try {
+      const response = await conductInterviewSession(activeInterviewSession.id);
+      replaceSession(response.session as InterviewSession);
+      setStatusMessage(response.message);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
+    }
   };
 
   const handleOpenContainer2Details = (candidateId: string) => {
@@ -860,7 +948,7 @@ export default function SessionsPage() {
   };
 
   const handleOpenAssignModal = (candidateId: string) => {
-    const candidate = CANDIDATE_LOOKUP[candidateId];
+    const candidate = candidateLookup[candidateId];
 
     if (!candidate) return;
 
@@ -880,15 +968,21 @@ export default function SessionsPage() {
     setShowAssignModal(true);
   };
 
-  const handleConfirmAssignAndSendEmail = () => {
+  const handleConfirmAssignCandidate = async () => {
     if (!assignCandidateId || !resolvedAssignTargetSessionId) {
       setStatusMessage("Select a valid session before assigning.");
       return;
     }
 
-    handleAssignCandidate(assignCandidateId, resolvedAssignTargetSessionId);
-    setShowAssignModal(false);
-    setAssignCandidateId(null);
+    const succeeded = await handleAssignCandidate(
+      assignCandidateId,
+      resolvedAssignTargetSessionId,
+    );
+
+    if (succeeded) {
+      setShowAssignModal(false);
+      setAssignCandidateId(null);
+    }
   };
 
   const handleOpenContainer3Details = (candidateId: string) => {
@@ -905,18 +999,23 @@ export default function SessionsPage() {
     setShowContainer3DetailsModal(true);
   };
 
-  const handleSaveContainer3Details = () => {
+  const handleSaveContainer3Details = async () => {
     if (!container3DetailsCandidateId) return;
 
-    handleUpdateActiveCandidate(container3DetailsCandidateId, {
-      slotTime: container3DetailSlotTime,
-      durationMinutes: clamp(container3DetailDuration, 10, 120),
-      result: container3DetailResult,
-      notes: container3DetailNotes,
-    });
+    const updated = await handleUpdateActiveCandidate(
+      container3DetailsCandidateId,
+      {
+        slotTime: container3DetailSlotTime,
+        durationMinutes: clamp(container3DetailDuration, 10, 120),
+        result: container3DetailResult,
+        notes: container3DetailNotes,
+      },
+    );
 
-    setStatusMessage("Candidate interview details updated.");
-    setShowContainer3DetailsModal(false);
+    if (updated) {
+      setStatusMessage("Candidate interview details updated.");
+      setShowContainer3DetailsModal(false);
+    }
   };
 
   const handleOpenContainer3EmailModal = (candidateId: string) => {
@@ -925,7 +1024,7 @@ export default function SessionsPage() {
     setShowContainer3EmailModal(true);
   };
 
-  const handleCreateSession = () => {
+  const handleCreateSession = async () => {
     const selectedJob = jobLookup[createForm.jobId];
 
     if (!selectedJob) {
@@ -945,161 +1044,67 @@ export default function SessionsPage() {
       return;
     }
 
-    const duration = clamp(createForm.durationMinutes, 10, 120);
-    const nextNumber =
-      sessions.filter((session) => session.jobId === createForm.jobId).length +
-      1;
-    const sessionName =
-      createForm.sessionName.trim() || `Session ${nextNumber.toString()}`;
-    const sessionId = `${createForm.jobId}-S${nextNumber.toString().padStart(2, "0")}`;
-    const interviewer = interviewerLookup[createForm.interviewerId];
-    const emailTimestamp = new Date().toLocaleString();
-    const sessionEmailMessage = applyEmailTemplate(emailTemplates.container1, {
-      interviewerName: interviewer?.name ?? "Interviewer",
-      sessionName,
-      jobTitle: selectedJob.title,
-      deadline: formatHumanDate(createForm.deadline),
-      sessionDate: formatHumanDate(createForm.sessionDate),
-      requirements: createForm.requirements.trim(),
-      remarks: createForm.remarks.trim(),
-    });
+    try {
+      const response = await createInterviewSession({
+        ...createForm,
+        durationMinutes: clamp(createForm.durationMinutes, 10, 120),
+      });
 
-    const newSession: InterviewSession = {
-      id: sessionId,
-      jobId: createForm.jobId,
-      name: sessionName,
-      interviewerId: createForm.interviewerId,
-      deadline: createForm.deadline,
-      requirements: createForm.requirements.trim(),
-      remarks: createForm.remarks.trim(),
-      sessionDate: createForm.sessionDate,
-      startTime: createForm.startTime,
-      durationMinutes: duration,
-      status: "Draft",
-      candidates: [],
-      lastEmailAt: emailTimestamp,
-    };
+      setCandidateJobFilter(createForm.jobId);
+      setCandidateSessionFilterId("all");
+      setInterviewJobFilter(createForm.jobId);
+      setInterviewSessionId(response.session.id);
 
-    setSessions((previous) => [...previous, newSession]);
+      setCreateForm((current) => ({
+        ...current,
+        sessionName: "",
+      }));
 
-    setCandidateJobFilter(createForm.jobId);
-    setCandidateSessionFilterId("all");
-    setInterviewJobFilter(createForm.jobId);
-    setInterviewSessionId(sessionId);
-
-    setCreateForm((current) => ({
-      ...current,
-      sessionName: "",
-    }));
-
-    addEmailLogs([
-      {
-        category: "Session",
-        recipient: interviewer?.email ?? "Interviewer not assigned",
-        subject: `${sessionName} created for ${selectedJob.title}`,
-        details: sessionEmailMessage,
-      },
-    ]);
-
-    setStatusMessage(
-      `${sessionName} created and session email sent for ${selectedJob.title}. Use container 2 to assign candidates.`,
-    );
-    setShowCreateSessionModal(false);
+      setStatusMessage(response.message);
+      setShowCreateSessionModal(false);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
+    }
   };
 
   const handleAssignCandidate = (
     candidateId: string,
     targetSessionId: string,
-  ) => {
+  ): Promise<boolean> => {
     const targetSession = sessionLookup[targetSessionId];
-    const candidate = CANDIDATE_LOOKUP[candidateId];
+    const candidate = candidateLookup[candidateId];
 
     if (!targetSession || !candidate) {
       setStatusMessage(
         "Unable to assign candidate. Try selecting the session again.",
       );
-      return;
+      return Promise.resolve(false);
     }
 
     if (targetSession.jobId !== candidate.jobId) {
       setStatusMessage(
         "Candidate can only be assigned to sessions under the same job form.",
       );
-      return;
+      return Promise.resolve(false);
     }
 
-    const previouslyAssignedSessionId =
-      assignedSessionByCandidateId[candidateId];
-    const previouslyAssignedSessionName = previouslyAssignedSessionId
-      ? sessionLookup[previouslyAssignedSessionId]?.name
-      : null;
-
-    const now = new Date().toLocaleString();
-
-    setSessions((previous) =>
-      previous.map((session) => {
-        if (session.jobId !== candidate.jobId) {
-          return session;
-        }
-
-        const withoutCandidate = session.candidates.filter(
-          (slot) => slot.candidateId !== candidateId,
-        );
-
-        if (session.id !== targetSession.id) {
-          return {
-            ...session,
-            candidates: withoutCandidate,
-          };
-        }
-
-        return {
-          ...session,
-          candidates: [
-            ...withoutCandidate,
-            {
-              candidateId,
-              slotTime: "",
-              durationMinutes: session.durationMinutes,
-              result: "Pending",
-              notes: "",
-            },
-          ],
-          lastEmailAt: now,
-        };
-      }),
-    );
-
-    const interviewer = interviewerLookup[targetSession.interviewerId];
-    const selectedJob = jobLookup[targetSession.jobId];
-    const assignmentMessage = applyEmailTemplate(emailTemplates.container2, {
-      candidateName: candidate.name,
-      sessionName: targetSession.name,
-      jobTitle: selectedJob?.title ?? targetSession.jobId,
-      interviewerName: interviewer?.name ?? "Interviewer",
-      sessionDate: formatHumanDate(targetSession.sessionDate),
-      durationMinutes: targetSession.durationMinutes,
-    });
-
-    addEmailLogs([
-      {
-        category: "Assignment",
-        recipient: candidate.email,
-        subject: `Interview assigned: ${targetSession.name}`,
-        details: assignmentMessage,
-      },
-    ]);
-
-    setStatusMessage(
-      previouslyAssignedSessionName
-        ? `${candidate.name} moved from ${previouslyAssignedSessionName} to ${targetSession.name} and assignment email sent.`
-        : `${candidate.name} assigned to ${targetSession.name} and email sent.`,
-    );
+    return assignCandidateToSession({ candidateId, targetSessionId })
+      .then(async (response) => {
+        replaceSession(response.session as InterviewSession);
+        setStatusMessage(response.message);
+        await refreshSessionsData();
+        return true;
+      })
+      .catch((error) => {
+        setStatusMessage(getErrorMessage(error));
+        return false;
+      });
   };
 
-  const handleSendAssignmentEmailToCandidate = (candidateId: string) => {
+  const handleSendAssignmentEmailToCandidate = async (candidateId: string) => {
     const sessionId = assignedSessionByCandidateId[candidateId];
-    const candidate = CANDIDATE_LOOKUP[candidateId];
+    const candidate = candidateLookup[candidateId];
 
     if (!sessionId || !candidate) {
       setStatusMessage(
@@ -1108,44 +1113,25 @@ export default function SessionsPage() {
       return;
     }
 
-    const session = sessionLookup[sessionId];
-    if (!session) return;
-
-    const interviewer = interviewerLookup[session.interviewerId];
-    const selectedJob = jobLookup[session.jobId];
-    const assignmentMessage = applyEmailTemplate(emailTemplates.container2, {
-      candidateName: candidate.name,
-      sessionName: session.name,
-      jobTitle: selectedJob?.title ?? session.jobId,
-      interviewerName: interviewer?.name ?? "Interviewer",
-      sessionDate: formatHumanDate(session.sessionDate),
-      durationMinutes: session.durationMinutes,
-    });
-
-    addEmailLogs([
-      {
-        category: "Assignment",
-        recipient: candidate.email,
-        subject: `Assignment update: ${session.name}`,
-        details: assignmentMessage,
-      },
-    ]);
-
-    updateSession(session.id, (current) => ({
-      ...current,
-      lastEmailAt: new Date().toLocaleString(),
-    }));
-
-    setStatusMessage(`Assignment email sent to ${candidate.name}.`);
+    try {
+      const response = await sendAssignmentEmailToCandidateRequest(candidateId);
+      replaceSession(response.session as InterviewSession);
+      setStatusMessage(response.message);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
+    }
   };
 
   const handleUpdateActiveCandidate = (
     candidateId: string,
     patch: Partial<SessionCandidate>,
-  ) => {
-    if (!activeInterviewSession) return;
+  ): Promise<boolean> => {
+    if (!activeInterviewSession) return Promise.resolve(false);
 
-    updateSession(activeInterviewSession.id, (current) => ({
+    const activeSessionId = activeInterviewSession.id;
+
+    updateSession(activeSessionId, (current) => ({
       ...current,
       candidates: current.candidates.map((candidate) =>
         candidate.candidateId === candidateId
@@ -1156,253 +1142,93 @@ export default function SessionsPage() {
           : candidate,
       ),
     }));
+
+    return updateSessionCandidateDetails(activeSessionId, candidateId, patch)
+      .then((response) => {
+        replaceSession(response.session as InterviewSession);
+        return true;
+      })
+      .catch(async (error) => {
+        setStatusMessage(getErrorMessage(error));
+        await refreshSessionsData();
+        return false;
+      });
   };
 
-  const handleSendScheduleEmails = () => {
+  const handleSendScheduleEmails = async () => {
     if (!activeInterviewSession) {
       setStatusMessage("Select a session first to send schedule emails.");
       return;
     }
 
-    if (activeInterviewSession.candidates.length === 0) {
-      setStatusMessage(
-        "No candidates in this session yet. Assign candidates before sending schedule emails.",
+    try {
+      const response = await sendSessionScheduleEmails(
+        activeInterviewSession.id,
       );
-      return;
+      replaceSession(response.session as InterviewSession);
+      setStatusMessage(response.message);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
     }
-
-    const interviewer = interviewerLookup[activeInterviewSession.interviewerId];
-    const selectedJob = jobLookup[activeInterviewSession.jobId];
-    const scheduleForInterviewer = applyEmailTemplate(
-      emailTemplates.container3Schedule,
-      {
-        recipientName: interviewer?.name ?? "Interviewer",
-        sessionName: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        action: "Schedule confirmed",
-        slotTime: activeInterviewSession.startTime,
-        durationMinutes: activeInterviewSession.durationMinutes,
-        resultSummary: `${activeInterviewSession.candidates.length} candidates notified`,
-      },
-    );
-    const scheduleForCandidates = applyEmailTemplate(
-      emailTemplates.container3Schedule,
-      {
-        recipientName: "Candidate",
-        sessionName: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        action: "Interview schedule",
-        slotTime: activeInterviewSession.startTime,
-        durationMinutes: activeInterviewSession.durationMinutes,
-        resultSummary: "Check your exact slot in dashboard",
-      },
-    );
-
-    addEmailLogs([
-      {
-        category: "Schedule",
-        recipient: interviewer?.email ?? "Interviewer not assigned",
-        subject: `${activeInterviewSession.name} schedule confirmed`,
-        details: scheduleForInterviewer,
-      },
-      {
-        category: "Schedule",
-        recipient: `${activeInterviewSession.candidates.length} candidates in ${activeInterviewSession.name}`,
-        subject: `${activeInterviewSession.name} slot schedule`,
-        details: scheduleForCandidates,
-      },
-    ]);
-
-    updateSession(activeInterviewSession.id, (current) => ({
-      ...current,
-      status: current.status === "Completed" ? "Completed" : "Scheduled",
-      lastEmailAt: new Date().toLocaleString(),
-    }));
-
-    setStatusMessage(
-      `Schedule emails sent for ${activeInterviewSession.name}. Session marked as Scheduled.`,
-    );
   };
 
-  const handleSendResultEmails = () => {
+  const handleSendResultEmails = async () => {
     if (!activeInterviewSession) {
       setStatusMessage("Select a session first to send result emails.");
       return;
     }
 
-    const breakdown = getSessionBreakdown(activeInterviewSession);
-    const reviewed = breakdown.passed + breakdown.failed + breakdown.onHold;
-
-    if (reviewed === 0) {
-      setStatusMessage(
-        "Set candidate results before sending outcome emails from container 3.",
-      );
-      return;
+    try {
+      const response = await sendSessionResultEmails(activeInterviewSession.id);
+      replaceSession(response.session as InterviewSession);
+      setStatusMessage(response.message);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
     }
-
-    const interviewer = interviewerLookup[activeInterviewSession.interviewerId];
-    const selectedJob = jobLookup[activeInterviewSession.jobId];
-    const resultSummary = `${breakdown.passed} passed, ${breakdown.failed} failed, ${breakdown.onHold} on hold, ${breakdown.pending} pending`;
-    const resultForInterviewer = applyEmailTemplate(
-      emailTemplates.container3Result,
-      {
-        recipientName: interviewer?.name ?? "Interviewer",
-        sessionName: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        action: "Result publication",
-        slotTime: activeInterviewSession.startTime,
-        durationMinutes: activeInterviewSession.durationMinutes,
-        resultSummary,
-      },
-    );
-    const resultForCandidates = applyEmailTemplate(
-      emailTemplates.container3Result,
-      {
-        recipientName: "Candidate",
-        sessionName: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        action: "Result notification",
-        slotTime: "Refer to your slot",
-        durationMinutes: activeInterviewSession.durationMinutes,
-        resultSummary,
-      },
-    );
-
-    addEmailLogs([
-      {
-        category: "Result",
-        recipient: interviewer?.email ?? "Interviewer not assigned",
-        subject: `${activeInterviewSession.name} result summary`,
-        details: resultForInterviewer,
-      },
-      {
-        category: "Result",
-        recipient: `${reviewed} candidates in ${activeInterviewSession.name}`,
-        subject: `${activeInterviewSession.name} interview outcomes`,
-        details: resultForCandidates,
-      },
-    ]);
-
-    updateSession(activeInterviewSession.id, (current) => ({
-      ...current,
-      status: breakdown.pending === 0 ? "Completed" : current.status,
-      lastEmailAt: new Date().toLocaleString(),
-    }));
-
-    setStatusMessage(
-      `Result emails sent for ${activeInterviewSession.name}. Reviewed candidates: ${reviewed}.`,
-    );
   };
 
-  const handleSendSelectedContainer3Email = () => {
+  const handleSendSelectedContainer3Email = async () => {
     if (!activeInterviewSession || !container3EmailCandidateId) return;
 
-    const candidate = CANDIDATE_LOOKUP[container3EmailCandidateId];
-    const slot = activeInterviewSession.candidates.find(
-      (item) => item.candidateId === container3EmailCandidateId,
-    );
-    const selectedJob = jobLookup[activeInterviewSession.jobId];
+    try {
+      const response = await sendSessionCandidateEmail(
+        activeInterviewSession.id,
+        {
+          candidateId: container3EmailCandidateId,
+          emailOption: container3EmailOption,
+        },
+      );
 
-    if (!candidate || !slot) return;
-
-    let details = "";
-    let recipient = candidate.email;
-    let subject = `Reminder: ${activeInterviewSession.name}`;
-    let category: EmailCategory = "Reminder";
-
-    if (container3EmailOption === "schedule") {
-      details = applyEmailTemplate(emailTemplates.container3Schedule, {
-        recipientName: candidate.name,
-        sessionName: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        action: "Schedule",
-        slotTime: slot.slotTime || activeInterviewSession.startTime,
-        durationMinutes: slot.durationMinutes,
-        resultSummary: "Please review your interview timing.",
-      });
-      recipient = candidate.email;
-      subject = `Schedule: ${activeInterviewSession.name}`;
-      category = "Schedule";
-    } else if (container3EmailOption === "result") {
-      details = applyEmailTemplate(emailTemplates.container3Result, {
-        recipientName: candidate.name,
-        sessionName: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        action: "Result update",
-        slotTime: slot.slotTime || activeInterviewSession.startTime,
-        durationMinutes: slot.durationMinutes,
-        resultSummary: slot.result,
-      });
-      recipient = candidate.email;
-      subject = `Result Update: ${activeInterviewSession.name}`;
-      category = "Result";
-    } else {
-      details = applyEmailTemplate(emailTemplates.container3Reminder, {
-        recipientName: candidate.name,
-        sessionName: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        action: "Reminder",
-        slotTime: slot.slotTime || activeInterviewSession.startTime,
-        durationMinutes: slot.durationMinutes,
-        resultSummary: slot.result,
-      });
-      recipient = candidate.email;
-      subject = `Reminder: ${activeInterviewSession.name}`;
-      category = "Reminder";
+      replaceSession(response.session as InterviewSession);
+      setStatusMessage(response.message);
+      setShowContainer3EmailModal(false);
+      setContainer3EmailCandidateId(null);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
     }
-
-    addEmailLogs([
-      {
-        category,
-        recipient,
-        subject,
-        details,
-      },
-    ]);
-
-    updateSession(activeInterviewSession.id, (current) => ({
-      ...current,
-      lastEmailAt: new Date().toLocaleString(),
-    }));
-
-    setStatusMessage(`${subject} email queued successfully.`);
-    setShowContainer3EmailModal(false);
-    setContainer3EmailCandidateId(null);
   };
 
-  const handleDownloadCandidateDetails = (
-    candidate: Candidate,
-    slot: SessionCandidate,
-  ) => {
+  const handleDownloadCandidateDetails = (candidate: Candidate) => {
     if (!activeInterviewSession) return;
 
-    const selectedJob = jobLookup[activeInterviewSession.jobId];
-    const interviewer = interviewerLookup[activeInterviewSession.interviewerId];
-
-    downloadJsonFile(`${candidate.id}-${activeInterviewSession.id}.json`, {
-      generatedAt: new Date().toISOString(),
-      candidate,
-      session: {
-        id: activeInterviewSession.id,
-        name: activeInterviewSession.name,
-        jobTitle: selectedJob?.title ?? activeInterviewSession.jobId,
-        interviewer: interviewer?.name ?? "Unassigned",
-        interviewerEmail: interviewer?.email ?? "",
-        deadline: activeInterviewSession.deadline,
-        sessionDate: activeInterviewSession.sessionDate,
-        defaultStartTime: activeInterviewSession.startTime,
-        requirements: activeInterviewSession.requirements,
-        remarks: activeInterviewSession.remarks,
-      },
-      interviewSlot: {
-        candidateSlotTime: slot.slotTime,
-        durationMinutes: slot.durationMinutes,
-        result: slot.result,
-        notes: slot.notes,
-      },
-    });
-
-    setStatusMessage(`Candidate packet downloaded for ${candidate.name}.`);
+    void (async () => {
+      try {
+        const packet = await fetchSessionCandidatePacket(
+          activeInterviewSession.id,
+          candidate.id,
+        );
+        downloadJsonFile(
+          `${candidate.id}-${activeInterviewSession.id}.json`,
+          packet,
+        );
+        setStatusMessage(`Candidate packet downloaded for ${candidate.name}.`);
+      } catch (error) {
+        setStatusMessage(getErrorMessage(error));
+      }
+    })();
   };
 
   const activeBreakdown = activeInterviewSession
@@ -1411,9 +1237,40 @@ export default function SessionsPage() {
 
   return (
     <div className="space-y-8">
+      <div className="pointer-events-none fixed right-4 top-4 z-[60] space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto flex min-w-[320px] max-w-[420px] items-start justify-between gap-3 rounded-lg border px-3 py-2 text-sm shadow-lg ${
+              toast.tone === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : toast.tone === "error"
+                  ? "border-red-200 bg-red-50 text-red-800"
+                  : "border-blue-200 bg-blue-50 text-blue-800"
+            }`}
+          >
+            <p className="leading-5">{toast.message}</p>
+            <button
+              type="button"
+              onClick={() =>
+                setToasts((current) =>
+                  current.filter((item) => item.id !== toast.id),
+                )
+              }
+              className="rounded px-1 text-xs font-medium opacity-70 hover:opacity-100"
+            >
+              Close
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div>
         <p className="text-gray-500">{todayLabel}</p>
         <h1 className="text-3xl font-bold">Interview Session Operations</h1>
+        {isLoadingData && (
+          <p className="mt-1 text-sm text-gray-500">Loading session data...</p>
+        )}
         {statusMessage && (
           <p className="mt-2 text-sm text-gray-500">{statusMessage}</p>
         )}
@@ -1422,20 +1279,22 @@ export default function SessionsPage() {
       <section className="rounded-2xl border bg-white p-6 shadow-sm">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold">Sessions</h2>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowCreateSessionModal(true)}
-              className="rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
-            >
-              Create Session
-            </button>
-            <button
-              onClick={() => setShowContainer1TemplateModal(true)}
-              className="rounded-lg border border-[#5D20B3] px-4 py-2 text-sm font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
-            >
-              Edit Predefined Email
-            </button>
-          </div>
+          {!isInterviewer && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowCreateSessionModal(true)}
+                className="rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
+              >
+                Create Session
+              </button>
+              <button
+                onClick={() => setShowContainer1TemplateModal(true)}
+                className="rounded-lg border border-[#5D20B3] px-4 py-2 text-sm font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
+              >
+                Edit Predefined Email
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="max-h-[500px] overflow-auto rounded-xl border border-gray-200">
@@ -1452,7 +1311,7 @@ export default function SessionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y bg-white">
-              {sessions.map((session) => {
+              {scopedSessions.map((session) => {
                 const interviewer = interviewerLookup[session.interviewerId];
                 const job = jobLookup[session.jobId];
 
@@ -1497,9 +1356,11 @@ export default function SessionsPage() {
             </tbody>
           </table>
 
-          {sessions.length === 0 && (
+          {scopedSessions.length === 0 && (
             <div className="py-8 text-center text-sm text-gray-500">
-              No sessions created yet.
+              {isInterviewer
+                ? "No sessions assigned to you yet."
+                : "No sessions created yet."}
             </div>
           )}
         </div>
@@ -1522,7 +1383,7 @@ export default function SessionsPage() {
               onChange={(event) => setCandidateJobFilter(event.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              {JOB_FORMS.map((job) => (
+              {candidateJobOptions.map((job) => (
                 <option key={job.id} value={job.id}>
                   {job.title}
                 </option>
@@ -1561,11 +1422,12 @@ export default function SessionsPage() {
                   event.target.value as AssignmentFilter,
                 )
               }
+              disabled={isInterviewer}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="all">All</option>
+              {!isInterviewer && <option value="all">All</option>}
               <option value="assigned">Assigned</option>
-              <option value="unassigned">Unassigned</option>
+              {!isInterviewer && <option value="unassigned">Unassigned</option>}
             </select>
           </div>
         </div>
@@ -1666,7 +1528,7 @@ export default function SessionsPage() {
               onChange={(event) => setInterviewJobFilter(event.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              {JOB_FORMS.map((job) => (
+              {interviewJobOptions.map((job) => (
                 <option key={job.id} value={job.id}>
                   {job.title}
                 </option>
@@ -1710,157 +1572,165 @@ export default function SessionsPage() {
           </div>
         </div>
 
-        {activeInterviewSession ? (
-          <>
-            <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {statCard(
-                "Active Session",
-                activeInterviewSession.name,
-                jobLookup[activeInterviewSession.jobId]?.position ?? "",
-              )}
-              {statCard(
-                "Candidates",
-                activeInterviewSession.candidates.length,
-                "Assigned to this session",
-              )}
-              {statCard(
-                "Pending",
-                activeBreakdown.pending,
-                "Still waiting for final decision",
-              )}
-              {statCard(
-                "Reviewed",
-                activeBreakdown.passed +
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {statCard(
+            "Active Session",
+            activeInterviewSession?.name ?? "No session selected",
+            activeInterviewSession
+              ? (jobLookup[activeInterviewSession.jobId]?.position ?? "")
+              : "Select a session to view details",
+          )}
+          {statCard(
+            "Candidates",
+            activeInterviewSession?.candidates.length ?? 0,
+            "Assigned to this session",
+          )}
+          {statCard(
+            "Pending",
+            activeInterviewSession ? activeBreakdown.pending : 0,
+            "Still waiting for final decision",
+          )}
+          {statCard(
+            "Reviewed",
+            activeInterviewSession
+              ? activeBreakdown.passed +
                   activeBreakdown.failed +
-                  activeBreakdown.onHold,
-                "Passed, failed, or on hold",
-              )}
-            </div>
+                  activeBreakdown.onHold
+              : 0,
+            "Passed, failed, or on hold",
+          )}
+        </div>
 
-            <div className="mb-4 flex flex-wrap gap-2">
-              <button
-                onClick={handleConductSession}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Conduct Session
-              </button>
-              <button
-                onClick={handleSendScheduleEmails}
-                className="rounded-lg border border-[#5D20B3] px-4 py-2 text-xs font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
-              >
-                Send Schedule Emails
-              </button>
-              <button
-                onClick={handleSendResultEmails}
-                className="rounded-lg bg-[#5D20B3] px-4 py-2 text-xs font-medium text-white hover:bg-[#4a1a8a]"
-              >
-                Send Result Emails
-              </button>
-              <button
-                onClick={() => setShowContainer3TemplateModal(true)}
-                className="rounded-lg border border-[#5D20B3] px-4 py-2 text-xs font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
-              >
-                Manage Email Templates
-              </button>
-            </div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            onClick={handleConductSession}
+            disabled={!activeInterviewSession}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+          >
+            Conduct Session
+          </button>
+          <button
+            onClick={handleSendScheduleEmails}
+            disabled={!activeInterviewSession}
+            className="rounded-lg border border-[#5D20B3] px-4 py-2 text-xs font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+          >
+            Send Schedule Emails
+          </button>
+          <button
+            onClick={handleSendResultEmails}
+            disabled={!activeInterviewSession}
+            className="rounded-lg bg-[#5D20B3] px-4 py-2 text-xs font-medium text-white hover:bg-[#4a1a8a] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#5D20B3]"
+          >
+            Send Result Emails
+          </button>
+          <button
+            onClick={() => setShowContainer3TemplateModal(true)}
+            className="rounded-lg border border-[#5D20B3] px-4 py-2 text-xs font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
+          >
+            Manage Email Templates
+          </button>
+          <button
+            onClick={() => setShowContainer3SessionInfoModal(true)}
+            disabled={!activeInterviewSession}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+          >
+            See Session Info
+          </button>
+        </div>
 
-            <div className="max-h-[560px] overflow-auto rounded-xl border border-gray-200">
-              <table className="min-w-full text-left text-sm">
-                <thead className="sticky top-0 bg-gray-50">
-                  <tr className="text-gray-600">
-                    <th className="px-3 py-3 font-medium">Candidate</th>
-                    <th className="px-3 py-3 font-medium">Email</th>
-                    <th className="px-3 py-3 font-medium">Time</th>
-                    <th className="px-3 py-3 font-medium">Result</th>
-                    <th className="px-3 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y bg-white">
-                  {activeInterviewRows.map(({ candidate, slot }) => (
-                    <tr key={candidate.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-3">
-                        <p className="font-medium text-gray-900">
-                          {candidate.name}
-                        </p>
-                        <p className="text-xs text-gray-500">{candidate.id}</p>
-                      </td>
-                      <td className="px-3 py-3 text-gray-700">
-                        {candidate.email}
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="time"
-                          value={slot.slotTime}
-                          onChange={(event) =>
-                            handleUpdateActiveCandidate(candidate.id, {
-                              slotTime: event.target.value,
-                            })
-                          }
-                          className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <select
-                          value={slot.result}
-                          onChange={(event) =>
-                            handleUpdateActiveCandidate(candidate.id, {
-                              result: event.target.value as CandidateResult,
-                            })
-                          }
-                          className={`rounded-lg border border-gray-300 px-2 py-1 text-sm ${RESULT_STYLES[slot.result]}`}
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Passed">Passed</option>
-                          <option value="Failed">Failed</option>
-                          <option value="On Hold">On Hold</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() =>
-                              handleOpenContainer3Details(candidate.id)
-                            }
-                            className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDownloadCandidateDetails(candidate, slot)
-                            }
-                            className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                          >
-                            Download
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleOpenContainer3EmailModal(candidate.id)
-                            }
-                            className="rounded-lg border border-[#5D20B3] px-2 py-1 text-xs font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
-                          >
-                            Email
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="max-h-[560px] overflow-auto rounded-xl border border-gray-200">
+          <table className="min-w-full text-left text-sm">
+            <thead className="sticky top-0 bg-gray-50">
+              <tr className="text-gray-600">
+                <th className="px-3 py-3 font-medium">Candidate</th>
+                <th className="px-3 py-3 font-medium">Email</th>
+                <th className="px-3 py-3 font-medium">Time</th>
+                <th className="px-3 py-3 font-medium">Result</th>
+                <th className="px-3 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y bg-white">
+              {activeInterviewRows.map(({ candidate, slot }) => (
+                <tr key={candidate.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-3">
+                    <p className="font-medium text-gray-900">
+                      {candidate.name}
+                    </p>
+                    <p className="text-xs text-gray-500">{candidate.id}</p>
+                  </td>
+                  <td className="px-3 py-3 text-gray-700">{candidate.email}</td>
+                  <td className="px-3 py-3">
+                    <input
+                      type="time"
+                      value={slot.slotTime}
+                      onChange={(event) =>
+                        handleUpdateActiveCandidate(candidate.id, {
+                          slotTime: event.target.value,
+                        })
+                      }
+                      className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                    />
+                  </td>
+                  <td className="px-3 py-3">
+                    <select
+                      value={slot.result}
+                      onChange={(event) =>
+                        handleUpdateActiveCandidate(candidate.id, {
+                          result: event.target.value as CandidateResult,
+                        })
+                      }
+                      className={`rounded-lg border border-gray-300 px-2 py-1 text-sm ${RESULT_STYLES[slot.result]}`}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Passed">Passed</option>
+                      <option value="Failed">Failed</option>
+                      <option value="On Hold">On Hold</option>
+                    </select>
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() =>
+                          handleOpenContainer3Details(candidate.id)
+                        }
+                        className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleDownloadCandidateDetails(candidate)
+                        }
+                        className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Download
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleOpenContainer3EmailModal(candidate.id)
+                        }
+                        className="rounded-lg border border-[#5D20B3] px-2 py-1 text-xs font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
+                      >
+                        Email
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-              {activeInterviewRows.length === 0 && (
-                <div className="py-8 text-center text-sm text-gray-500">
-                  No candidates found in this session for your current filter.
-                </div>
-              )}
+          {!activeInterviewSession ? (
+            <div className="py-8 text-center text-sm text-gray-500">
+              No sessions are available for this job filter. Create one in
+              container 1 first.
             </div>
-          </>
-        ) : (
-          <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
-            No sessions are available for this job filter. Create one in
-            container 1 first.
-          </div>
-        )}
+          ) : activeInterviewRows.length === 0 ? (
+            <div className="py-8 text-center text-sm text-gray-500">
+              No candidates found in this session for your current filter.
+            </div>
+          ) : null}
+        </div>
       </section>
 
       {showSessionDetailsModal && selectedSession && (
@@ -1965,6 +1835,14 @@ export default function SessionsPage() {
             </div>
 
             <div className="mt-6 flex gap-3">
+              {!isInterviewer && (
+                <button
+                  onClick={handleOpenEditSession}
+                  className="flex-1 rounded-lg border border-[#5D20B3] px-4 py-2 text-sm font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
+                >
+                  Edit Session
+                </button>
+              )}
               <button
                 onClick={handleOpenSessionCandidates}
                 className="flex-1 rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
@@ -1979,6 +1857,98 @@ export default function SessionsPage() {
                 className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditSessionModal && selectedSession && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4"
+          onClick={() => setShowEditSessionModal(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="mb-4 text-2xl font-bold">Edit Session</h3>
+
+            <div className="grid gap-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Interviewer
+                </label>
+                <select
+                  value={editSessionForm.interviewerId}
+                  onChange={(event) =>
+                    setEditSessionForm((current) => ({
+                      ...current,
+                      interviewerId: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Select interviewer</option>
+                  {interviewers.map((interviewer) => (
+                    <option key={interviewer.id} value={interviewer.id}>
+                      {interviewer.name} (
+                      {interviewer.role === "admin"
+                        ? "Admin"
+                        : interviewer.specialty}
+                      )
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Requirements
+                </label>
+                <textarea
+                  rows={3}
+                  value={editSessionForm.requirements}
+                  onChange={(event) =>
+                    setEditSessionForm((current) => ({
+                      ...current,
+                      requirements: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Remarks for Interviewer
+                </label>
+                <textarea
+                  rows={3}
+                  value={editSessionForm.remarks}
+                  onChange={(event) =>
+                    setEditSessionForm((current) => ({
+                      ...current,
+                      remarks: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleSaveSessionEdits}
+                className="flex-1 rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={() => setShowEditSessionModal(false)}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
               </button>
             </div>
           </div>
@@ -2097,7 +2067,7 @@ export default function SessionsPage() {
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
-                  {JOB_FORMS.map((job) => (
+                  {jobs.map((job) => (
                     <option key={job.id} value={job.id}>
                       {job.title}
                     </option>
@@ -2136,12 +2106,22 @@ export default function SessionsPage() {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
                   <option value="">Select interviewer</option>
-                  {INTERVIEWERS.map((interviewer) => (
+                  {interviewers.map((interviewer) => (
                     <option key={interviewer.id} value={interviewer.id}>
-                      {interviewer.name} ({interviewer.specialty})
+                      {interviewer.name} (
+                      {interviewer.role === "admin"
+                        ? "Admin"
+                        : interviewer.specialty}
+                      )
                     </option>
                   ))}
                 </select>
+                {interviewers.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    No active interviewer/admin found in User & Roles for your
+                    company.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -2285,9 +2265,14 @@ export default function SessionsPage() {
               </h3>
               <button
                 onClick={() => handleSaveTemplate("container1")}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                disabled={!hasUnsavedTemplate("container1")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  hasUnsavedTemplate("container1")
+                    ? "border border-[#5D20B3] bg-[#5D20B3] text-white hover:bg-[#4a1a8a]"
+                    : "border border-gray-300 bg-white text-gray-500"
+                } disabled:cursor-not-allowed disabled:opacity-70`}
               >
-                Save Template
+                {hasUnsavedTemplate("container1") ? "Save Edits" : "Saved"}
               </button>
             </div>
             <p className="mb-2 text-xs text-gray-500">
@@ -2329,9 +2314,14 @@ export default function SessionsPage() {
               </h3>
               <button
                 onClick={() => handleSaveTemplate("container2")}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                disabled={!hasUnsavedTemplate("container2")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  hasUnsavedTemplate("container2")
+                    ? "border border-[#5D20B3] bg-[#5D20B3] text-white hover:bg-[#4a1a8a]"
+                    : "border border-gray-300 bg-white text-gray-500"
+                } disabled:cursor-not-allowed disabled:opacity-70`}
               >
-                Save Template
+                {hasUnsavedTemplate("container2") ? "Save Edits" : "Saved"}
               </button>
             </div>
             <p className="mb-2 text-xs text-gray-500">
@@ -2373,9 +2363,14 @@ export default function SessionsPage() {
               </h3>
               <button
                 onClick={() => handleSaveTemplate(activeContainer3TemplateKey)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                disabled={!activeContainer3HasUnsaved}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  activeContainer3HasUnsaved
+                    ? "border border-[#5D20B3] bg-[#5D20B3] text-white hover:bg-[#4a1a8a]"
+                    : "border border-gray-300 bg-white text-gray-500"
+                } disabled:cursor-not-allowed disabled:opacity-70`}
               >
-                Save Template
+                {activeContainer3HasUnsaved ? "Save Edits" : "Saved"}
               </button>
             </div>
 
@@ -2570,16 +2565,18 @@ export default function SessionsPage() {
 
               <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 Clicking assign will place the candidate into the selected
-                session.
+                session and auto-fill a slot time based on the session start
+                time and duration. You can edit the slot later before sending
+                emails.
               </p>
             </div>
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={handleConfirmAssignAndSendEmail}
+                onClick={handleConfirmAssignCandidate}
                 className="flex-1 rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
               >
-                Assign and Send Email
+                Assign Candidate
               </button>
               <button
                 onClick={() => {
@@ -2722,6 +2719,160 @@ export default function SessionsPage() {
                   setContainer3DetailsCandidateId(null);
                 }}
                 className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showContainer3SessionInfoModal && activeInterviewSession && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4"
+          onClick={() => setShowContainer3SessionInfoModal(false)}
+        >
+          <div
+            className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-900">Session Info</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Use these credentials to join this interview session.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Meeting ID
+                </p>
+                <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+                  {activeInterviewSession.meetingId}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Meeting Password
+                </p>
+                <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
+                  {activeInterviewSession.meetingPassword}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Session Name
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewSession.name}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Job Form
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewJob?.title ?? "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Interviewer
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewInterviewer?.name ?? "Unassigned"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Session Date
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {formatHumanDate(activeInterviewSession.sessionDate)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Start Time
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewSession.startTime}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Job Role
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewJob?.jobRole ||
+                    activeInterviewJob?.position ||
+                    "Not specified"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Duration
+                </p>
+                <p className="mt-1 text-sm text-gray-900">
+                  {activeInterviewSession.durationMinutes} minutes
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Job Form Description
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                {activeInterviewJob?.description?.trim() ||
+                  "No job form description available."}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Session Requirements
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                {activeInterviewSession.requirements ||
+                  "No requirements recorded."}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Session Remarks
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700">
+                {activeInterviewSession.remarks || "No remarks recorded."}
+              </p>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                Job Form Fields
+              </p>
+              {activeInterviewJob?.fields?.length ? (
+                <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                  {activeInterviewJob.fields
+                    .slice()
+                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                    .map((field, index) => (
+                      <li key={`${field.label}-${index}`}>
+                        {field.label} ({field.type}) {field.required ? "*" : ""}
+                      </li>
+                    ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-sm text-gray-700">
+                  No custom form fields found.
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() => setShowContainer3SessionInfoModal(false)}
+                className="w-full rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
               >
                 Close
               </button>
