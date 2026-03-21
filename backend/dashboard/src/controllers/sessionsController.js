@@ -24,6 +24,19 @@ const SESSION_INTERVIEWER_ROLES = [
 
 const DEFAULT_EMAIL_TEMPLATES = {
   container1:
+    "Dear {{interviewerName}},\n\nThis is to confirm that you have been assigned to the interview session \"{{sessionName}}\" for the {{jobTitle}} position.\n\nSession details:\n- Submission deadline: {{deadline}}\n- Interview date: {{sessionDate}}\n- Key requirements: {{requirements}}\n- Additional interviewer notes: {{remarks}}\n\nPlease review these details and prepare accordingly.\n\nBest regards,\nReqruita Interview Operations",
+  container2:
+    "Dear {{candidateName}},\n\nWe are pleased to inform you that you have been scheduled for \"{{sessionName}}\" as part of your application for the {{jobTitle}} role.\n\nInterview details:\n- Interviewer: {{interviewerName}}\n- Date: {{sessionDate}}\n- Expected duration: {{durationMinutes}} minutes\n\nPlease note: your exact time slot will be announced soon in a follow-up update.\n\nKind regards,\nReqruita Recruitment Team",
+  container3Schedule:
+    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
+  container3Result:
+    "Dear {{recipientName}},\n\nThis is the final outcome update for \"{{sessionName}}\" ({{jobTitle}}).\n\nInterview outcome: {{resultSummary}}\n\nThank you for your time and participation in the interview process.\n\nSincerely,\nReqruita Interview Operations",
+  container3Reminder:
+    "Dear {{recipientName}},\n\nThis is a professional reminder that you have an interview related to \"{{sessionName}}\" ({{jobTitle}}).\n\nInterview schedule:\n- Time slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease be prepared and ensure timely participation.\n\nBest regards,\nReqruita Interview Operations",
+};
+
+const LEGACY_DEFAULT_EMAIL_TEMPLATES = {
+  container1:
     "Dear {{interviewerName}},\n\nYou have been assigned to conduct {{sessionName}} for {{jobTitle}}.\nDeadline: {{deadline}}\nSession date: {{sessionDate}}\nRequirements: {{requirements}}\nRemarks: {{remarks}}\n\nRegards,\nReqruita Admin",
   container2:
     "Dear {{candidateName}},\n\nYou have been assigned to {{sessionName}} for {{jobTitle}}.\nInterviewer: {{interviewerName}}\nInterview date: {{sessionDate}}\nExpected duration: {{durationMinutes}} minutes\n\nRegards,\nReqruita Team",
@@ -33,6 +46,19 @@ const DEFAULT_EMAIL_TEMPLATES = {
     "Dear {{recipientName}},\n\nResult update for {{sessionName}} ({{jobTitle}}).\nAction: {{action}}\nSlot time: {{slotTime}}\nDuration: {{durationMinutes}} minutes\nSummary: {{resultSummary}}\n\nRegards,\nReqruita Interview Ops",
   container3Reminder:
     "Dear {{recipientName}},\n\nFriendly reminder for {{sessionName}} ({{jobTitle}}).\nAction: {{action}}\nSlot time: {{slotTime}}\nDuration: {{durationMinutes}} minutes\nSummary: {{resultSummary}}\n\nRegards,\nReqruita Interview Ops",
+};
+
+const PREVIOUS_DEFAULT_EMAIL_TEMPLATES = {
+  container1:
+    "Dear {{interviewerName}},\n\nThis is to confirm that you have been assigned to the interview session \"{{sessionName}}\" for the {{jobTitle}} position.\n\nSession details:\n- Submission deadline: {{deadline}}\n- Interview date: {{sessionDate}}\n- Key requirements: {{requirements}}\n- Additional interviewer notes: {{remarks}}\n\nPlease review these details and prepare accordingly.\n\nBest regards,\nReqruita Interview Operations",
+  container2:
+    "Dear {{candidateName}},\n\nWe are pleased to inform you that you have been scheduled for \"{{sessionName}}\" as part of your application for the {{jobTitle}} role.\n\nInterview details:\n- Interviewer: {{interviewerName}}\n- Date: {{sessionDate}}\n- Expected duration: {{durationMinutes}} minutes\n\nPlease ensure you are available at the scheduled time and join promptly.\n\nKind regards,\nReqruita Recruitment Team",
+  container3Schedule:
+    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdate details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Current summary: {{resultSummary}}\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
+  container3Result:
+    "Dear {{recipientName}},\n\nThis is a result update for \"{{sessionName}}\" ({{jobTitle}}).\n\nResult details:\n- Action taken: {{action}}\n- Interview slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Outcome summary: {{resultSummary}}\n\nPlease review the result and continue with the appropriate follow-up actions.\n\nSincerely,\nReqruita Interview Operations",
+  container3Reminder:
+    "Dear {{recipientName}},\n\nThis is a friendly reminder regarding \"{{sessionName}}\" ({{jobTitle}}).\n\nReminder details:\n- Action required: {{action}}\n- Interview slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Current summary: {{resultSummary}}\n\nPlease complete the pending action at your earliest convenience.\n\nBest regards,\nReqruita Interview Operations",
 };
 
 const CONTAINER3_TEMPLATE_KEYS = {
@@ -495,6 +521,24 @@ const ensureSessionSeedData = async () => {
         }),
       );
       await SessionEmailTemplate.insertMany(templateRows);
+    } else {
+      await Promise.all(
+        Object.keys(DEFAULT_EMAIL_TEMPLATES).map(async (templateKey) => {
+          const updatableContents = [
+            LEGACY_DEFAULT_EMAIL_TEMPLATES[templateKey],
+            PREVIOUS_DEFAULT_EMAIL_TEMPLATES[templateKey],
+          ].filter(Boolean);
+
+          if (updatableContents.length === 0) {
+            return;
+          }
+
+            await SessionEmailTemplate.updateOne(
+              { templateKey, content: { $in: updatableContents } },
+              { $set: { content: DEFAULT_EMAIL_TEMPLATES[templateKey] } },
+            );
+        }),
+      );
     }
 
     hasSeededSessionData = true;
