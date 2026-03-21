@@ -1068,6 +1068,180 @@ exports.createSession = async (req, res) => {
   }
 };
 
+exports.updateSession = async (req, res) => {
+  try {
+    if (!hasSessionPermission(req, res)) return;
+
+    await ensureSessionSeedData();
+
+    const sessionId = String(req.params.sessionId || "").trim();
+    const session = await fetchSessionById(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    const ownedJob = await fetchOwnedJobForSession(req.user.id, session);
+    if (!ownedJob) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    const nextRequirements =
+      req.body.requirements !== undefined
+        ? String(req.body.requirements || "").trim()
+        : null;
+    const nextRemarks =
+      req.body.remarks !== undefined
+        ? String(req.body.remarks || "").trim()
+        : null;
+    const nextInterviewerId =
+      req.body.interviewerId !== undefined
+        ? String(req.body.interviewerId || "").trim()
+        : null;
+
+    if (
+      nextRequirements === null &&
+      nextRemarks === null &&
+      nextInterviewerId === null
+    ) {
+      return res.status(400).json({
+        message: "Provide at least one of interviewerId, requirements, or remarks",
+      });
+    }
+
+    if (nextRequirements !== null && !nextRequirements) {
+      return res.status(400).json({ message: "Requirements cannot be empty" });
+    }
+
+    if (nextRemarks !== null && !nextRemarks) {
+      return res.status(400).json({ message: "Remarks cannot be empty" });
+    }
+
+    const previousInterviewerId = String(session.interviewerId || "");
+    const shouldChangeInterviewer =
+      nextInterviewerId !== null && nextInterviewerId !== previousInterviewerId;
+
+    let nextInterviewer = null;
+    if (nextInterviewerId !== null) {
+      if (!isValidObjectId(nextInterviewerId)) {
+        return res.status(400).json({ message: "interviewerId is invalid" });
+      }
+
+      nextInterviewer = await fetchScopedInterviewerById(req.user, nextInterviewerId);
+      if (!nextInterviewer) {
+        return res.status(404).json({ message: "Selected interviewer was not found" });
+      }
+    }
+
+    if (nextRequirements !== null) {
+      session.requirements = nextRequirements;
+    }
+
+    if (nextRemarks !== null) {
+      session.remarks = nextRemarks;
+    }
+
+    if (nextInterviewerId !== null) {
+      session.interviewerId = nextInterviewerId;
+    }
+
+    session.lastEmailAt = new Date();
+    await session.save();
+
+    const emailLogEntries = [];
+    const updatedSession = serializeSession(session.toObject());
+
+    if (shouldChangeInterviewer) {
+      const [previousInterviewer, emailTemplates] = await Promise.all([
+        fetchScopedInterviewerById(req.user, previousInterviewerId),
+        buildTemplateMap(),
+      ]);
+
+      const cancelSubject = `${session.name} assignment canceled`;
+      const cancelDetails = [
+        `Dear ${previousInterviewer ? buildUserFullName(previousInterviewer) : "Interviewer"},`,
+        "",
+        `This is to inform you that your assignment for session \"${session.name}\" (${ownedJob.title}) has been canceled.`,
+        "",
+        "No further action is required from your side for this session.",
+        "",
+        "Best regards,",
+        "Reqruita Interview Operations",
+      ].join("\n");
+
+      const cancellationEmailResult = await sendSessionEmail({
+        to: previousInterviewer ? previousInterviewer.email : "",
+        subject: cancelSubject,
+        details: cancelDetails,
+      });
+
+      emailLogEntries.push({
+        category: "Session",
+        recipient: cancellationEmailResult.recipient,
+        subject: cancelSubject,
+        details: cancelDetails,
+        metadata: {
+          sessionId: session.sessionId,
+          jobId: String(ownedJob._id),
+          action: "interviewer-reassignment-cancel",
+          deliveryStatus: cancellationEmailResult.sent ? "sent" : "failed",
+          ...(cancellationEmailResult.sent
+            ? {}
+            : { deliveryReason: cancellationEmailResult.reason }),
+        },
+      });
+
+      const scheduledDetails = applyEmailTemplate(emailTemplates.container1, {
+        interviewerName: nextInterviewer
+          ? buildUserFullName(nextInterviewer)
+          : "Interviewer",
+        sessionName: session.name,
+        jobTitle: ownedJob.title,
+        deadline: formatHumanDate(session.deadline),
+        sessionDate: formatHumanDate(session.sessionDate),
+        requirements: session.requirements,
+        remarks: session.remarks,
+      });
+
+      const scheduledSubject = `${session.name} scheduled for ${ownedJob.title}`;
+      const scheduledEmailResult = await sendSessionEmail({
+        to: nextInterviewer ? nextInterviewer.email : "",
+        subject: scheduledSubject,
+        details: scheduledDetails,
+      });
+
+      emailLogEntries.push({
+        category: "Session",
+        recipient: scheduledEmailResult.recipient,
+        subject: scheduledSubject,
+        details: scheduledDetails,
+        metadata: {
+          sessionId: session.sessionId,
+          jobId: String(ownedJob._id),
+          action: "interviewer-reassignment-scheduled",
+          deliveryStatus: scheduledEmailResult.sent ? "sent" : "failed",
+          ...(scheduledEmailResult.sent
+            ? {}
+            : { deliveryReason: scheduledEmailResult.reason }),
+        },
+      });
+    }
+
+    if (emailLogEntries.length > 0) {
+      await appendEmailLogs(emailLogEntries);
+    }
+
+    return res.json({
+      message: shouldChangeInterviewer
+        ? "Session updated. Previous interviewer cancellation and new interviewer schedule emails were processed."
+        : "Session updated successfully.",
+      session: updatedSession,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 exports.assignCandidate = async (req, res) => {
   try {
     if (!hasSessionPermission(req, res)) return;
