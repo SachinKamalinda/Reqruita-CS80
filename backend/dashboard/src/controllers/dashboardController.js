@@ -11,6 +11,8 @@ const toNumericSuffix = (value, size = 6) =>
     .slice(-size)
     .padStart(size, "0");
 
+const ALLOWED_DASHBOARD_ROLES = ["admin", "interviewer"];
+
 const mapUserResponse = (user) => ({
   id: user._id,
   userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
@@ -206,8 +208,7 @@ exports.addUser = async (req, res) => {
         }
 
         const { email, role, firstName, lastName } = req.body;
-        const validRoles = ["admin", "interviewer", "recruiter", "hr manager", "candidate"];
-        if (!validRoles.includes(role)) {
+        if (!ALLOWED_DASHBOARD_ROLES.includes(role)) {
             return res.status(400).json({ message: "Invalid role selected" });
         }
 
@@ -298,8 +299,7 @@ exports.updateUser = async (req, res) => {
         const { role, status } = req.body;
         const targetUserId = req.params.id;
 
-        const validRoles = ["admin", "interviewer", "recruiter", "hr manager", "candidate"];
-        if (role && !validRoles.includes(role)) {
+        if (role && !ALLOWED_DASHBOARD_ROLES.includes(role)) {
             return res.status(400).json({ message: "Invalid role selected" });
         }
 
