@@ -9,7 +9,7 @@ export default function SessionTimer({ timerStartedAt, isActive = true }) {
     const [elapsed, setElapsed] = useState(0);
 
     useEffect(() => {
-        if (!timerStartedAt || !isActive) return;
+        if (!timerStartedAt) return;
 
         // Calculate initial elapsed time
         const calculateElapsed = () => {
@@ -28,7 +28,7 @@ export default function SessionTimer({ timerStartedAt, isActive = true }) {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [timerStartedAt, isActive]);
+    }, [timerStartedAt]);
 
     // Format seconds to MM:SS
     const formatTime = (seconds) => {
@@ -37,13 +37,13 @@ export default function SessionTimer({ timerStartedAt, isActive = true }) {
         return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
     };
 
-    if (!timerStartedAt || !isActive) {
+    if (!timerStartedAt) {
         return null;
     }
 
     return (
         <div style={timerContainerStyle}>
-            <div style={timerLabelStyle}>Session Time</div>
+            <div style={timerLabelStyle}>SESSION TIME</div>
             <div style={timerDisplayStyle}>{formatTime(elapsed)}</div>
         </div>
     );
@@ -54,25 +54,28 @@ const timerContainerStyle = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    padding: "12px 16px",
+    padding: "14px 20px",
     background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    borderRadius: "8px",
-    minWidth: "100px",
-    boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+    borderRadius: "10px",
+    minWidth: "110px",
+    boxShadow: "0 8px 24px rgba(102, 126, 234, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+    border: "1px solid rgba(255, 255, 255, 0.3)",
 };
 
 const timerLabelStyle = {
-    fontSize: "11px",
-    fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.75)",
+    fontSize: "10px",
+    fontWeight: "700",
+    color: "rgba(255, 255, 255, 0.85)",
     textTransform: "uppercase",
-    letterSpacing: "0.5px",
-    marginBottom: "4px",
+    letterSpacing: "1px",
+    marginBottom: "6px",
 };
 
 const timerDisplayStyle = {
-    fontSize: "24px",
-    fontWeight: "700",
+    fontSize: "32px",
+    fontWeight: "900",
     color: "#ffffff",
     fontFamily: "monospace",
+    letterSpacing: "2px",
+    lineHeight: "1",
 };

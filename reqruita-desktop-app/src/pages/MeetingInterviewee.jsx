@@ -396,18 +396,31 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
             {/* Connection status */}
             {showConnStatus && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="mt-conn-status" style={{ margin: 0 }}>
-                        <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                        <span className="mt-conn-text">
-                            {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
-                        </span>
-                        <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                <div style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "space-between", 
+                    padding: "12px 16px", 
+                    background: "linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4))",
+                    borderBottom: "1px solid rgba(255,255,255,0.1)",
+                    minHeight: "60px"
+                }}>
+                    {/* Left: Connection Status */}
+                    <div style={{ flex: 1 }}>
+                        <div className="mt-conn-status" style={{ margin: 0 }}>
+                            <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                            <span className="mt-conn-text">
+                                {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
+                            </span>
+                            <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                        </div>
                     </div>
-                    <div>
+                    
+                    {/* Right: Session Timer */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginLeft: "16px" }}>
                         <SessionTimer 
                             timerStartedAt={currentParticipant?.timerStartedAt} 
-                            isActive={currentParticipant?.status === "interviewing"}
+                            isActive={true}
                         />
                     </div>
                 </div>
