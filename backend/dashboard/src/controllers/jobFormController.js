@@ -79,6 +79,7 @@ const getJobFormById = async (req, res) => {
       description: form.description,
       jobRole: form.jobRole,
       fields: form.fields,
+      isActive: form.isActive,
       company: form.createdBy?.companyName || "Our Company",
     };
 
@@ -93,7 +94,7 @@ const getJobFormById = async (req, res) => {
 const updateJobForm = async (req, res) => {
   try {
     const { formId } = req.params;
-    const { title, description, fields, jobRole } = req.body;
+    const { title, description, fields, jobRole, isActive } = req.body;
     const userId = req.user?.id;
 
     const form = await JobForm.findById(formId);
@@ -109,6 +110,7 @@ const updateJobForm = async (req, res) => {
     if (title) form.title = title.trim();
     if (description !== undefined) form.description = description.trim();
     if (jobRole !== undefined) form.jobRole = jobRole.trim();
+    if (typeof isActive === "boolean") form.isActive = isActive;
 
     if (fields && Array.isArray(fields)) {
       form.fields = fields

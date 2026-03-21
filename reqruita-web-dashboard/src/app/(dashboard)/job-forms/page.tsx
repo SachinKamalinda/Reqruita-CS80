@@ -121,6 +121,7 @@ export default function JobFormsPage() {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"latest" | "oldest">("latest");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [togglingFormId, setTogglingFormId] = useState<string | null>(null);
 
   // Form creation state
   const [newFormTitle, setNewFormTitle] = useState("");
@@ -317,6 +318,23 @@ export default function JobFormsPage() {
       alert(
         `Failed to delete form: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    }
+  };
+
+  const handleToggleFormStatus = async (form: JobForm) => {
+    try {
+      setTogglingFormId(form._id);
+      await updateJobForm(form._id, { isActive: !form.isActive });
+      await fetchAllForms();
+      if (selectedFormId === form._id) {
+        await fetchSubmissions(form._id);
+      }
+    } catch (error) {
+      alert(
+        `Failed to update form status: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    } finally {
+      setTogglingFormId(null);
     }
   };
 
@@ -688,11 +706,11 @@ export default function JobFormsPage() {
                   </span>
                   {form.isActive ? (
                     <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium text-xs">
-                      ● Active
+                      ● Open
                     </span>
                   ) : (
                     <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full font-medium text-xs">
-                      ● Inactive
+                      ● Closed
                     </span>
                   )}
                 </div>
@@ -716,6 +734,21 @@ export default function JobFormsPage() {
                   </button>
 
                   <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => handleToggleFormStatus(form)}
+                      disabled={togglingFormId === form._id}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition border ${
+                        form.isActive
+                          ? "text-amber-700 hover:bg-amber-50 border-amber-200"
+                          : "text-green-700 hover:bg-green-50 border-green-200"
+                      } disabled:opacity-60 disabled:cursor-not-allowed`}
+                    >
+                      {togglingFormId === form._id
+                        ? "Updating..."
+                        : form.isActive
+                          ? "Close Form"
+                          : "Reopen Form"}
+                    </button>
                     <button
                       onClick={() => handleEditForm(form)}
                       className="flex-1 text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm font-medium transition border border-purple-200"
