@@ -79,6 +79,18 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     const waiting = useMemo(() => participants.filter((p) => p.status === "waiting"), [participants]);
     const completed = useMemo(() => participants.filter((p) => p.status === "completed"), [participants]);
 
+    // Log current candidate for debugging timer
+    useEffect(() => {
+        if (currentCandidate) {
+            console.log("✓ Current Candidate:", {
+                id: currentCandidate.id,
+                name: currentCandidate.name,
+                status: currentCandidate.status,
+                timerStartedAt: currentCandidate.timerStartedAt,
+            });
+        }
+    }, [currentCandidate]);
+
     const API_URL = `${BACKEND_URL}/api/participants`;
 
     // Load remarks for current candidate
