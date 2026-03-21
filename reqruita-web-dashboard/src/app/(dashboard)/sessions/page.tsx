@@ -12,6 +12,7 @@ import {
   sendSessionCandidateEmail,
   sendSessionResultEmails,
   sendSessionScheduleEmails,
+  updateInterviewSession,
   updateSessionCandidateDetails,
   updateSessionEmailTemplate,
 } from "@/lib/api";
@@ -116,6 +117,12 @@ interface CreateSessionForm {
   sessionDate: string;
   startTime: string;
   durationMinutes: number;
+  requirements: string;
+  remarks: string;
+}
+
+interface EditSessionForm {
+  interviewerId: string;
   requirements: string;
   remarks: string;
 }
@@ -324,9 +331,16 @@ export default function SessionsPage() {
     useState<boolean>(false);
   const [showSessionCandidatesModal, setShowSessionCandidatesModal] =
     useState<boolean>(false);
+  const [showEditSessionModal, setShowEditSessionModal] =
+    useState<boolean>(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
+  const [editSessionForm, setEditSessionForm] = useState<EditSessionForm>({
+    interviewerId: "",
+    requirements: "",
+    remarks: "",
+  });
 
   const [candidateJobFilter, setCandidateJobFilter] = useState<string>("");
   const [candidateSessionFilterId, setCandidateSessionFilterId] =
@@ -857,6 +871,52 @@ export default function SessionsPage() {
   const handleOpenSessionDetails = (sessionId: string) => {
     setSelectedSessionId(sessionId);
     setShowSessionDetailsModal(true);
+  };
+
+  const handleOpenEditSession = () => {
+    if (!selectedSession) return;
+
+    setEditSessionForm({
+      interviewerId: selectedSession.interviewerId,
+      requirements: selectedSession.requirements,
+      remarks: selectedSession.remarks,
+    });
+    setShowEditSessionModal(true);
+  };
+
+  const handleSaveSessionEdits = async () => {
+    if (!selectedSession) {
+      setStatusMessage("Select a valid session first.");
+      return;
+    }
+
+    const nextRequirements = editSessionForm.requirements.trim();
+    const nextRemarks = editSessionForm.remarks.trim();
+
+    if (!editSessionForm.interviewerId) {
+      setStatusMessage("Select an interviewer for this session.");
+      return;
+    }
+
+    if (!nextRequirements || !nextRemarks) {
+      setStatusMessage("Requirements and remarks are required.");
+      return;
+    }
+
+    try {
+      const response = await updateInterviewSession(selectedSession.id, {
+        interviewerId: editSessionForm.interviewerId,
+        requirements: nextRequirements,
+        remarks: nextRemarks,
+      });
+
+      replaceSession(response.session as InterviewSession);
+      setStatusMessage(response.message);
+      setShowEditSessionModal(false);
+      await refreshSessionsData();
+    } catch (error) {
+      setStatusMessage(getErrorMessage(error));
+    }
   };
 
   const handleOpenSessionCandidates = () => {
@@ -1775,6 +1835,14 @@ export default function SessionsPage() {
             </div>
 
             <div className="mt-6 flex gap-3">
+              {!isInterviewer && (
+                <button
+                  onClick={handleOpenEditSession}
+                  className="flex-1 rounded-lg border border-[#5D20B3] px-4 py-2 text-sm font-medium text-[#5D20B3] hover:bg-[#5D20B3]/10"
+                >
+                  Edit Session
+                </button>
+              )}
               <button
                 onClick={handleOpenSessionCandidates}
                 className="flex-1 rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
@@ -1789,6 +1857,98 @@ export default function SessionsPage() {
                 className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditSessionModal && selectedSession && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 p-4"
+          onClick={() => setShowEditSessionModal(false)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="mb-4 text-2xl font-bold">Edit Session</h3>
+
+            <div className="grid gap-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Interviewer
+                </label>
+                <select
+                  value={editSessionForm.interviewerId}
+                  onChange={(event) =>
+                    setEditSessionForm((current) => ({
+                      ...current,
+                      interviewerId: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Select interviewer</option>
+                  {interviewers.map((interviewer) => (
+                    <option key={interviewer.id} value={interviewer.id}>
+                      {interviewer.name} (
+                      {interviewer.role === "admin"
+                        ? "Admin"
+                        : interviewer.specialty}
+                      )
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Requirements
+                </label>
+                <textarea
+                  rows={3}
+                  value={editSessionForm.requirements}
+                  onChange={(event) =>
+                    setEditSessionForm((current) => ({
+                      ...current,
+                      requirements: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Remarks for Interviewer
+                </label>
+                <textarea
+                  rows={3}
+                  value={editSessionForm.remarks}
+                  onChange={(event) =>
+                    setEditSessionForm((current) => ({
+                      ...current,
+                      remarks: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleSaveSessionEdits}
+                className="flex-1 rounded-lg bg-[#5D20B3] px-4 py-2 text-sm font-medium text-white hover:bg-[#4a1a8a]"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={() => setShowEditSessionModal(false)}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
               </button>
             </div>
           </div>

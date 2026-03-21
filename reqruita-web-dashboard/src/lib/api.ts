@@ -166,6 +166,12 @@ export interface UpdateSessionCandidatePayload {
   notes?: string;
 }
 
+export interface UpdateSessionPayload {
+  interviewerId?: string;
+  requirements?: string;
+  remarks?: string;
+}
+
 export interface SessionCandidatePacket {
   generatedAt: string;
   candidate: SessionCandidate;
@@ -522,6 +528,19 @@ export async function updateSessionCandidateDetails(
     `/api/sessions/${encodeURIComponent(sessionId)}/candidates/${encodeURIComponent(candidateId)}`,
     {
       method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function updateInterviewSession(
+  sessionId: string,
+  payload: UpdateSessionPayload,
+): Promise<SessionWithMessageResponse> {
+  return authedJsonRequest<SessionWithMessageResponse>(
+    `/api/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      method: 'PUT',
       body: JSON.stringify(payload),
     },
   );
