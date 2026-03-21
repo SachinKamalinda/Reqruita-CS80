@@ -174,6 +174,11 @@ export default function DashboardLayout({
 
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
+  const filteredNavItems =
+    currentUser?.role === "interviewer"
+      ? navItems.filter((item) => item.href !== "/job-forms")
+      : navItems;
+
   useEffect(() => {
     const initAuth = async () => {
       // Check for token in URL (passed from landing page)
@@ -200,6 +205,9 @@ export default function DashboardLayout({
           storedUser = user;
         } catch (err) {
           console.error("Failed to fetch current user profile:", err);
+          removeToken();
+          router.replace("/signin");
+          return;
         }
       }
 
@@ -312,7 +320,7 @@ export default function DashboardLayout({
         </div>
 
         <nav className="relative z-10 flex-1 px-4 py-2 space-y-1">
-          {navItems.map((item) => (
+          {filteredNavItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
@@ -411,7 +419,9 @@ export default function DashboardLayout({
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-gray-800">
-                    {currentUser ? (currentUser.fullName || currentUser.email) : "Not Connected"}
+                    {currentUser
+                      ? currentUser.fullName || currentUser.email
+                      : "Not Connected"}
                   </p>
                   <p className="text-xs text-gray-500 capitalize">
                     {currentUser?.role ?? "No Connection"}
