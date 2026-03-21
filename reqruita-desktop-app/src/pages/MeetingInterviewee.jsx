@@ -6,6 +6,7 @@ import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
 import FileExplorer from "../components/FileExplorer";
 import ConfirmationModal from "../components/ConfirmationModal";
+import SessionTimer from "../components/SessionTimer";
 
 
 /**
@@ -41,6 +42,7 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
     const [participantId, setParticipantId] = useState(null);
+    const [currentParticipant, setCurrentParticipant] = useState(null);
 
     // Modal state
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -236,6 +238,30 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
         return () => controller.abort();
     }, [candidateName]);
 
+    // 3.5) Fetch current participant data periodically (for timer)
+    useEffect(() => {
+        if (!participantId) return;
+
+        const fetchParticipant = async () => {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/participants`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const participants = Array.isArray(data) ? data : (data?.participants || []);
+                const current = participants.find(p => p.id === participantId);
+                if (current) {
+                    setCurrentParticipant(current);
+                }
+            } catch (e) {
+                console.log("Fetch participant data failed:", e);
+            }
+        };
+
+        fetchParticipant();
+        const interval = setInterval(fetchParticipant, 2000);
+        return () => clearInterval(interval);
+    }, [participantId]);
+
     // 4) Attach local stream
     useEffect(() => {
         if (localCamRef.current && localCamStream) {
@@ -370,12 +396,20 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
             {/* Connection status */}
             {showConnStatus && (
-                <div className="mt-conn-status">
-                    <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                    <span className="mt-conn-text">
-                        {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
-                    </span>
-                    <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="mt-conn-status" style={{ margin: 0 }}>
+                        <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                        <span className="mt-conn-text">
+                            {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
+                        </span>
+                        <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                    </div>
+                    <div>
+                        <SessionTimer 
+                            timerStartedAt={currentParticipant?.timerStartedAt} 
+                            isActive={currentParticipant?.status === "interviewing"}
+                        />
+                    </div>
                 </div>
             )}
 
