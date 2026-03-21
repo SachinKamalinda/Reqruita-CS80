@@ -267,6 +267,12 @@ async function authedJsonRequest<T>(
 
   const data = await res.json();
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      removeToken();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/signin')) {
+        window.location.href = '/signin';
+      }
+    }
     throw new Error((data as ApiError).message || 'Request failed');
   }
 

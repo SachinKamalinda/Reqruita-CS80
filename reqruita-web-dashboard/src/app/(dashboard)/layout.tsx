@@ -205,6 +205,9 @@ export default function DashboardLayout({
           storedUser = user;
         } catch (err) {
           console.error("Failed to fetch current user profile:", err);
+          removeToken();
+          router.replace("/signin");
+          return;
         }
       }
 
