@@ -575,6 +575,21 @@ const fetchScopedSessions = async (formIds) => {
     .lean();
 };
 
+const fetchAssignedSessionsForInterviewer = async (userId, requestedJobId = "") => {
+  const filter = { interviewerId: String(userId || "") };
+
+  if (requestedJobId) {
+    if (!isValidObjectId(requestedJobId)) {
+      return [];
+    }
+    filter.jobId = requestedJobId;
+  }
+
+  return InterviewSession.find(filter)
+    .sort({ sessionDate: 1, sessionId: 1 })
+    .lean();
+};
+
 const fetchOwnedJobForSession = async (userId, session) => {
   if (!session || !isValidObjectId(session.jobId)) {
     return null;
@@ -617,6 +632,37 @@ exports.getBootstrap = async (req, res) => {
 
     const requestedJobId = String(req.query.jobId || "").trim();
     const userId = req.user.id;
+
+    if (req.user.role === "interviewer") {
+      const sessions = await fetchAssignedSessionsForInterviewer(
+        userId,
+        requestedJobId,
+      );
+
+      const scopedJobIds = [...new Set(sessions.map((session) => String(session.jobId)))];
+      const jobs =
+        scopedJobIds.length > 0
+          ? await JobForm.find({ _id: { $in: scopedJobIds } })
+              .sort({ createdAt: -1 })
+              .lean()
+          : [];
+
+      const [interviewers, candidates, templates, emailLogs] = await Promise.all([
+        fetchScopedInterviewers(req.user),
+        fetchScopedSubmissions(scopedJobIds),
+        buildTemplateMap(),
+        SessionEmailLog.find({}).sort({ sentAt: -1 }).limit(250).lean(),
+      ]);
+
+      return res.json({
+        jobs: jobs.map(serializeJob),
+        interviewers: interviewers.map(serializeInterviewer),
+        candidates: candidates.map(serializeCandidate),
+        sessions: sessions.map(serializeSession),
+        emailTemplates: templates,
+        emailLogs: emailLogs.map(serializeEmailLog),
+      });
+    }
 
     const jobs = await fetchScopedJobForms(userId, requestedJobId);
     const jobIds = jobs.map((job) => String(job._id));
