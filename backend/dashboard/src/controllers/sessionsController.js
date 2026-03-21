@@ -28,7 +28,7 @@ const DEFAULT_EMAIL_TEMPLATES = {
   container2:
     "Dear {{candidateName}},\n\nWe are pleased to inform you that you have been scheduled for \"{{sessionName}}\" as part of your application for the {{jobTitle}} role.\n\nInterview details:\n- Interviewer: {{interviewerName}}\n- Date: {{sessionDate}}\n- Expected duration: {{durationMinutes}} minutes\n\nPlease note: your exact time slot will be announced soon in a follow-up update.\n\nKind regards,\nReqruita Recruitment Team",
   container3Schedule:
-    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
+    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Meeting ID: {{meetingId}}\n- Meeting password: {{meetingPassword}}\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
   container3Result:
     "Dear {{recipientName}},\n\nThis is the final outcome update for \"{{sessionName}}\" ({{jobTitle}}).\n\nInterview outcome: {{resultSummary}}\n\nThank you for your time and participation in the interview process.\n\nSincerely,\nReqruita Interview Operations",
   container3Reminder:
@@ -54,7 +54,7 @@ const PREVIOUS_DEFAULT_EMAIL_TEMPLATES = {
   container2:
     "Dear {{candidateName}},\n\nWe are pleased to inform you that you have been scheduled for \"{{sessionName}}\" as part of your application for the {{jobTitle}} role.\n\nInterview details:\n- Interviewer: {{interviewerName}}\n- Date: {{sessionDate}}\n- Expected duration: {{durationMinutes}} minutes\n\nPlease ensure you are available at the scheduled time and join promptly.\n\nKind regards,\nReqruita Recruitment Team",
   container3Schedule:
-    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdate details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Current summary: {{resultSummary}}\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
+    "Dear {{recipientName}},\n\nThis is an interview schedule update for \"{{sessionName}}\" ({{jobTitle}}).\n\nUpdated schedule details:\n- Action taken: {{action}}\n- Scheduled slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n\nPlease review this update and proceed with the next required step.\n\nBest regards,\nReqruita Interview Operations",
   container3Result:
     "Dear {{recipientName}},\n\nThis is a result update for \"{{sessionName}}\" ({{jobTitle}}).\n\nResult details:\n- Action taken: {{action}}\n- Interview slot: {{slotTime}}\n- Duration: {{durationMinutes}} minutes\n- Outcome summary: {{resultSummary}}\n\nPlease review the result and continue with the appropriate follow-up actions.\n\nSincerely,\nReqruita Interview Operations",
   container3Reminder:
@@ -496,8 +496,117 @@ const hasSessionPermission = (req, res) => {
   return true;
 };
 
-const buildTemplateMap = async () => {
-  const templates = await SessionEmailTemplate.find({}).lean();
+const resolveCompanyId = (reqUser) => {
+  if (!reqUser || !isValidObjectId(reqUser.companyId)) {
+    return "";
+  }
+
+  return String(reqUser.companyId);
+};
+
+const requireCompanyId = (req, res) => {
+  const companyId = resolveCompanyId(req.user);
+  if (!companyId) {
+    res.status(400).json({ message: "Valid company context is required" });
+    return null;
+  }
+
+  return companyId;
+};
+
+let hasVerifiedTemplateTenantIndexes = false;
+
+const ensureTemplateTenantIndexes = async () => {
+  if (hasVerifiedTemplateTenantIndexes) {
+    return;
+  }
+
+  const collection = SessionEmailTemplate.collection;
+  const indexes = await collection.indexes();
+  const legacyUniqueTemplateKeyIndex = indexes.find(
+    (index) =>
+      index &&
+      index.unique &&
+      index.key &&
+      index.key.templateKey === 1 &&
+      Object.keys(index.key).length === 1,
+  );
+
+  if (legacyUniqueTemplateKeyIndex) {
+    await collection.dropIndex(legacyUniqueTemplateKeyIndex.name);
+  }
+
+  hasVerifiedTemplateTenantIndexes = true;
+};
+
+const ensureCompanyEmailTemplateSeed = async (companyId) => {
+  await ensureTemplateTenantIndexes();
+
+  const companyObjectId = toObjectId(companyId);
+  const templateCount = await SessionEmailTemplate.countDocuments({
+    companyId: companyObjectId,
+  });
+
+  if (templateCount === 0) {
+    const seededTemplateMap = { ...DEFAULT_EMAIL_TEMPLATES };
+
+    const legacyTemplates = await SessionEmailTemplate.find({
+      $or: [{ companyId: { $exists: false } }, { companyId: null }],
+    })
+      .select("templateKey content")
+      .lean();
+
+    legacyTemplates.forEach((template) => {
+      if (
+        template &&
+        template.templateKey &&
+        Object.prototype.hasOwnProperty.call(seededTemplateMap, template.templateKey)
+      ) {
+        seededTemplateMap[template.templateKey] = template.content;
+      }
+    });
+
+    const templateRows = Object.entries(seededTemplateMap).map(
+      ([templateKey, content]) => ({
+        companyId: companyObjectId,
+        templateKey,
+        content,
+      }),
+    );
+
+    await SessionEmailTemplate.insertMany(templateRows);
+    return;
+  }
+
+  await Promise.all(
+    Object.keys(DEFAULT_EMAIL_TEMPLATES).map(async (templateKey) => {
+      const updatableContents = [
+        LEGACY_DEFAULT_EMAIL_TEMPLATES[templateKey],
+        PREVIOUS_DEFAULT_EMAIL_TEMPLATES[templateKey],
+      ].filter(Boolean);
+
+      if (updatableContents.length === 0) {
+        return;
+      }
+
+      await SessionEmailTemplate.updateOne(
+        {
+          companyId: companyObjectId,
+          templateKey,
+          content: { $in: updatableContents },
+        },
+        { $set: { content: DEFAULT_EMAIL_TEMPLATES[templateKey] } },
+      );
+    }),
+  );
+};
+
+const buildTemplateMap = async (companyId) => {
+  await ensureCompanyEmailTemplateSeed(companyId);
+
+  const templates = await SessionEmailTemplate.find({
+    companyId: toObjectId(companyId),
+  }).lean();
   const map = { ...DEFAULT_EMAIL_TEMPLATES };
 
   templates.forEach((template) => {
@@ -507,12 +616,14 @@ const buildTemplateMap = async () => {
   return map;
 };
 
-const appendEmailLogs = async (entries) => {
+const appendEmailLogs = async (companyId, entries) => {
   if (!entries || entries.length === 0) return [];
 
+  const companyObjectId = toObjectId(companyId);
   const now = new Date();
   const created = await SessionEmailLog.insertMany(
     entries.map((entry) => ({
+      companyId: companyObjectId,
       sentAt: now,
       category: entry.category,
       recipient: entry.recipient,
@@ -522,14 +633,17 @@ const appendEmailLogs = async (entries) => {
     })),
   );
 
-  const stale = await SessionEmailLog.find({})
+  const stale = await SessionEmailLog.find({ companyId: companyObjectId })
     .sort({ sentAt: -1 })
     .skip(250)
     .select("_id")
     .lean();
 
   if (stale.length > 0) {
-    await SessionEmailLog.deleteMany({ _id: { $in: stale.map((item) => item._id) } });
+    await SessionEmailLog.deleteMany({
+      companyId: companyObjectId,
+      _id: { $in: stale.map((item) => item._id) },
+    });
   }
 
   return created;
@@ -583,35 +697,6 @@ const ensureSessionSeedData = async () => {
         },
       },
     );
-
-    const templateCount = await SessionEmailTemplate.countDocuments();
-    if (templateCount === 0) {
-      const templateRows = Object.entries(DEFAULT_EMAIL_TEMPLATES).map(
-        ([templateKey, content]) => ({
-          templateKey,
-          content,
-        }),
-      );
-      await SessionEmailTemplate.insertMany(templateRows);
-    } else {
-      await Promise.all(
-        Object.keys(DEFAULT_EMAIL_TEMPLATES).map(async (templateKey) => {
-          const updatableContents = [
-            LEGACY_DEFAULT_EMAIL_TEMPLATES[templateKey],
-            PREVIOUS_DEFAULT_EMAIL_TEMPLATES[templateKey],
-          ].filter(Boolean);
-
-          if (updatableContents.length === 0) {
-            return;
-          }
-
-            await SessionEmailTemplate.updateOne(
-              { templateKey, content: { $in: updatableContents } },
-              { $set: { content: DEFAULT_EMAIL_TEMPLATES[templateKey] } },
-            );
-        }),
-      );
-    }
 
     hasSeededSessionData = true;
   })();
@@ -745,6 +830,8 @@ exports.getBootstrap = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const requestedJobId = String(req.query.jobId || "").trim();
     const userId = req.user.id;
@@ -766,8 +853,11 @@ exports.getBootstrap = async (req, res) => {
       const [interviewers, candidates, templates, emailLogs] = await Promise.all([
         fetchScopedInterviewers(req.user),
         fetchScopedSubmissions(scopedJobIds),
-        buildTemplateMap(),
-        SessionEmailLog.find({}).sort({ sentAt: -1 }).limit(250).lean(),
+        buildTemplateMap(companyId),
+        SessionEmailLog.find({ companyId: toObjectId(companyId) })
+          .sort({ sentAt: -1 })
+          .limit(250)
+          .lean(),
       ]);
 
       return res.json({
@@ -787,8 +877,11 @@ exports.getBootstrap = async (req, res) => {
       fetchScopedInterviewers(req.user),
       fetchScopedSessions(jobIds),
       fetchScopedSubmissions(jobIds),
-      buildTemplateMap(),
-      SessionEmailLog.find({}).sort({ sentAt: -1 }).limit(250).lean(),
+      buildTemplateMap(companyId),
+      SessionEmailLog.find({ companyId: toObjectId(companyId) })
+        .sort({ sentAt: -1 })
+        .limit(250)
+        .lean(),
     ]);
 
     res.json({
@@ -891,7 +984,10 @@ exports.getEmailTemplates = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
-    const templateMap = await buildTemplateMap();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
+
+    const templateMap = await buildTemplateMap(companyId);
     res.json(templateMap);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -903,6 +999,8 @@ exports.updateEmailTemplate = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const templateKey = String(req.params.templateKey || "").trim();
     const content = String(req.body.content || "");
@@ -916,9 +1014,12 @@ exports.updateEmailTemplate = async (req, res) => {
       return res.status(400).json({ message: "Template content cannot be empty" });
     }
 
-    const existingTemplate = await SessionEmailTemplate.findOne({ templateKey }).lean();
+    const existingTemplate = await SessionEmailTemplate.findOne({
+      companyId: toObjectId(companyId),
+      templateKey,
+    }).lean();
     if (existingTemplate && existingTemplate.content === normalizedContent) {
-      const templateMap = await buildTemplateMap();
+      const templateMap = await buildTemplateMap(companyId);
       return res.json({
         message: `No changes detected for ${templateKey}.`,
         emailTemplates: templateMap,
@@ -927,8 +1028,14 @@ exports.updateEmailTemplate = async (req, res) => {
     }
 
     await SessionEmailTemplate.findOneAndUpdate(
-      { templateKey },
-      { content: normalizedContent },
+      {
+        companyId: toObjectId(companyId),
+        templateKey,
+      },
+      {
+        companyId: toObjectId(companyId),
+        content: normalizedContent,
+      },
       {
         upsert: true,
         new: true,
@@ -936,7 +1043,7 @@ exports.updateEmailTemplate = async (req, res) => {
       },
     );
 
-    const templateMap = await buildTemplateMap();
+    const templateMap = await buildTemplateMap(companyId);
     return res.json({
       message: `Automated email template saved for ${templateKey}.`,
       emailTemplates: templateMap,
@@ -952,13 +1059,15 @@ exports.getEmailLogs = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const requestedLimit = Number.parseInt(String(req.query.limit || "250"), 10);
     const limit = Number.isNaN(requestedLimit)
       ? 250
       : clamp(requestedLimit, 1, 500);
 
-    const logs = await SessionEmailLog.find({})
+    const logs = await SessionEmailLog.find({ companyId: toObjectId(companyId) })
       .sort({ sentAt: -1 })
       .limit(limit)
       .lean();
@@ -974,6 +1083,8 @@ exports.createSession = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const {
       jobId,
@@ -1075,7 +1186,7 @@ exports.createSession = async (req, res) => {
       lastEmailAt: new Date(),
     });
 
-    const emailTemplates = await buildTemplateMap();
+    const emailTemplates = await buildTemplateMap(companyId);
     const sessionEmailMessage = applyEmailTemplate(emailTemplates.container1, {
       interviewerName: buildUserFullName(interviewer),
       sessionName: generatedSessionName,
@@ -1093,7 +1204,7 @@ exports.createSession = async (req, res) => {
       details: sessionEmailMessage,
     });
 
-    await appendEmailLogs([
+    await appendEmailLogs(companyId, [
       {
         category: "Session",
         recipient: sessionEmailResult.recipient,
@@ -1128,6 +1239,8 @@ exports.updateSession = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const sessionId = String(req.params.sessionId || "").trim();
     const session = await fetchSessionById(sessionId);
@@ -1209,7 +1322,7 @@ exports.updateSession = async (req, res) => {
     if (shouldChangeInterviewer) {
       const [previousInterviewer, emailTemplates] = await Promise.all([
         fetchScopedInterviewerById(req.user, previousInterviewerId),
-        buildTemplateMap(),
+        buildTemplateMap(companyId),
       ]);
 
       const cancelSubject = `${session.name} assignment canceled`;
@@ -1283,7 +1396,7 @@ exports.updateSession = async (req, res) => {
     }
 
     if (emailLogEntries.length > 0) {
-      await appendEmailLogs(emailLogEntries);
+      await appendEmailLogs(companyId, emailLogEntries);
     }
 
     return res.json({
@@ -1385,6 +1498,8 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const candidateId = String(req.body.candidateId || "").trim();
     if (!candidateId) {
@@ -1411,7 +1526,7 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
     const [interviewer, job, emailTemplates] = await Promise.all([
       fetchScopedInterviewerById(req.user, session.interviewerId),
       fetchOwnedJobForSession(req.user.id, session),
-      buildTemplateMap(),
+      buildTemplateMap(companyId),
     ]);
 
     if (!job) {
@@ -1440,7 +1555,7 @@ exports.sendAssignmentEmailToCandidate = async (req, res) => {
       details: assignmentMessage,
     });
 
-    const emailLogs = await appendEmailLogs([
+    const emailLogs = await appendEmailLogs(companyId, [
       {
         category: "Assignment",
         recipient: assignmentEmailResult.recipient,
@@ -1599,6 +1714,8 @@ exports.sendScheduleEmails = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const sessionId = String(req.params.sessionId || "").trim();
     const session = await fetchSessionById(sessionId);
@@ -1620,7 +1737,7 @@ exports.sendScheduleEmails = async (req, res) => {
 
     const [interviewer, emailTemplates] = await Promise.all([
       fetchScopedInterviewerById(req.user, session.interviewerId),
-      buildTemplateMap(),
+      buildTemplateMap(companyId),
     ]);
 
     const candidateSubmissions = await fetchCandidateSubmissionsByIds(
@@ -1633,6 +1750,12 @@ exports.sendScheduleEmails = async (req, res) => {
       }),
     );
 
+    const sessionMeetingId =
+      session.meetingId || generateSessionMeetingId(session.sessionId);
+    const sessionMeetingPassword =
+      session.meetingPassword ||
+      generateSessionMeetingPassword(session.sessionId);
+
     const scheduleForInterviewer = applyEmailTemplate(
       emailTemplates.container3Schedule,
       {
@@ -1642,6 +1765,8 @@ exports.sendScheduleEmails = async (req, res) => {
         action: "Schedule confirmed",
         slotTime: formatTimeWithMeridiem(session.startTime),
         durationMinutes: session.durationMinutes,
+        meetingId: sessionMeetingId,
+        meetingPassword: sessionMeetingPassword,
         resultSummary: `${session.candidates.length} candidates notified`,
       },
     );
@@ -1674,6 +1799,8 @@ exports.sendScheduleEmails = async (req, res) => {
           action: "Interview schedule",
           slotTime: formatTimeWithMeridiem(slot.slotTime || session.startTime),
           durationMinutes: slot.durationMinutes || session.durationMinutes,
+          meetingId: sessionMeetingId,
+          meetingPassword: sessionMeetingPassword,
           resultSummary: "Please be ready before your assigned slot.",
         });
 
@@ -1695,7 +1822,7 @@ exports.sendScheduleEmails = async (req, res) => {
       }),
     );
 
-    const emailLogs = await appendEmailLogs([
+    const emailLogs = await appendEmailLogs(companyId, [
       {
         category: "Schedule",
         recipient: interviewerEmailResult.recipient,
@@ -1753,6 +1880,8 @@ exports.sendResultEmails = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const sessionId = String(req.params.sessionId || "").trim();
     const session = await fetchSessionById(sessionId);
@@ -1777,7 +1906,7 @@ exports.sendResultEmails = async (req, res) => {
 
     const [interviewer, emailTemplates] = await Promise.all([
       fetchScopedInterviewerById(req.user, session.interviewerId),
-      buildTemplateMap(),
+      buildTemplateMap(companyId),
     ]);
 
     const reviewedSlots = (session.candidates || []).filter(
@@ -1858,7 +1987,7 @@ exports.sendResultEmails = async (req, res) => {
       }),
     );
 
-    const emailLogs = await appendEmailLogs([
+    const emailLogs = await appendEmailLogs(companyId, [
       {
         category: "Result",
         recipient: interviewerEmailResult.recipient,
@@ -1920,6 +2049,8 @@ exports.sendCandidateEmail = async (req, res) => {
     if (!hasSessionPermission(req, res)) return;
 
     await ensureSessionSeedData();
+    const companyId = requireCompanyId(req, res);
+    if (!companyId) return;
 
     const sessionId = String(req.params.sessionId || "").trim();
     const candidateId = String(req.body.candidateId || "").trim();
@@ -1954,7 +2085,7 @@ exports.sendCandidateEmail = async (req, res) => {
 
     const [candidateSubmission, emailTemplates] = await Promise.all([
       fetchCandidateSubmission(candidateId),
-      buildTemplateMap(),
+      buildTemplateMap(companyId),
     ]);
 
     const candidate = candidateSubmission ? serializeCandidate(candidateSubmission) : null;
@@ -1990,6 +2121,10 @@ exports.sendCandidateEmail = async (req, res) => {
       action,
       slotTime: formatTimeWithMeridiem(slot.slotTime || session.startTime),
       durationMinutes: slot.durationMinutes,
+      meetingId: session.meetingId || generateSessionMeetingId(session.sessionId),
+      meetingPassword:
+        session.meetingPassword ||
+        generateSessionMeetingPassword(session.sessionId),
       resultSummary: slot.result,
     });
 
@@ -1999,7 +2134,7 @@ exports.sendCandidateEmail = async (req, res) => {
       details,
     });
 
-    const emailLog = await appendEmailLogs([
+    const emailLog = await appendEmailLogs(companyId, [
       {
         category: EMAIL_OPTION_TO_CATEGORY[emailOption],
         recipient: delivery.recipient,
