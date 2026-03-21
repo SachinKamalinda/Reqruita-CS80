@@ -162,13 +162,17 @@ exports.changePassword = async (req, res) => {
 // GET /api/dashboard/users
 exports.getUsers = async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
+    if (!["admin", "interviewer"].includes(req.user.role)) {
       return res
         .status(403)
-        .json({ message: "Access Denied: Requires Admin Role" });
+        .json({ message: "Access Denied: Requires Admin or Interviewer Role" });
     }
 
     const filter = { companyId: req.user.companyId };
+    if (req.user.role === "interviewer") {
+      filter.role = "admin";
+    }
+
     const users = await User.find(filter, "-password").sort({ createdAt: -1 });
     res.status(200).json(users);
   } catch (error) {
@@ -201,6 +205,21 @@ exports.addUser = async (req, res) => {
         const finalLastName = lastName || "User";
         const fullName = `${finalFirstName} ${finalLastName}`;
 
+        const inviter = await User.findById(req.user.id).select("companyId companyName");
+        if (!inviter) {
+          return res.status(404).json({ message: "Inviter account not found" });
+        }
+
+        const companyContext = await User.findOne({
+          companyId: inviter.companyId,
+          role: "admin",
+          isMainAdmin: true,
+        }).select("companyId companyName");
+
+        const companyId = companyContext?.companyId || inviter.companyId;
+        const companyName =
+          (companyContext?.companyName || inviter.companyName || "").trim();
+
         const newUser = new User({
             firstName: finalFirstName,
             lastName: finalLastName,
@@ -212,7 +231,8 @@ exports.addUser = async (req, res) => {
             isInvited: true,
             inviteToken,
             inviteExpires,
-            companyId: req.user.companyId
+            companyId,
+            companyName
         });
 
         await newUser.save();
