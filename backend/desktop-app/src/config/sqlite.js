@@ -14,23 +14,52 @@ const initSqlite = () => {
         console.log("Connected to the SQLite database (reqruita.db).");
 
         db.serialize(() => {
-            // 1) Create table
+            // 1) Create table with all columns including timerStartedAt
             db.run(
                 `CREATE TABLE IF NOT EXISTS participants (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
-            status TEXT NOT NULL
-          )`
+            status TEXT NOT NULL,
+            timerStartedAt TEXT
+          )`, (err) => {
+                    if (err) {
+                        console.error("Create table error:", err.message);
+                        return;
+                    }
+                    console.log("Participants table ready");
+                }
             );
 
-            // 2) Seed if empty
+            // 2) Check and add timerStartedAt column if it doesn't exist (for existing databases)
+            db.all("PRAGMA table_info(participants)", [], (err, columns) => {
+                if (err) {
+                    console.error("PRAGMA error:", err.message);
+                    return;
+                }
+                if (columns && Array.isArray(columns)) {
+                    const hasTimerColumn = columns.some(col => col.name === 'timerStartedAt');
+                    if (!hasTimerColumn) {
+                        db.run("ALTER TABLE participants ADD COLUMN timerStartedAt TEXT", (err) => {
+                            if (err) {
+                                console.log("timerStartedAt column already exists or error:", err.message);
+                            } else {
+                                console.log("✓ Successfully added timerStartedAt column");
+                            }
+                        });
+                    } else {
+                        console.log("✓ timerStartedAt column already exists");
+                    }
+                }
+            });
+
+            // 3) Seed if empty (after table is created)
             db.get("SELECT COUNT(*) as count FROM participants", (err, row) => {
                 if (err) {
                     console.error("Error checking table:", err.message);
                     return;
                 }
 
-                if (row.count === 0) {
+                if (row && row.count === 0) {
                     console.log("Database is empty. Seeding with mock data...");
                     const seedData = [
                         { id: "p1", name: "Mas Rover", status: "interviewing" },
