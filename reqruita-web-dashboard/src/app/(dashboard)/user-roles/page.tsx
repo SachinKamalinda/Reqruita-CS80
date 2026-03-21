@@ -255,6 +255,20 @@ export default function UserRolesPage() {
     }
   };
 
+  const getSimpleUserId = (user: any) =>
+    user.userId ||
+    `USR-${String(user._id || "")
+      .replace(/\D/g, "")
+      .slice(-6)
+      .padStart(6, "0")}`;
+
+  const getSimpleCompanyId = (user: any) =>
+    user.companyCode ||
+    `COM-${String(user.companyId || "")
+      .replace(/\D/g, "")
+      .slice(-6)
+      .padStart(6, "0")}`;
+
   return (
     <div className="space-y-8">
       <div>
@@ -324,9 +338,17 @@ export default function UserRolesPage() {
                         className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="py-4 font-medium">
-                          {user.fullName || "Admin User"}
+                          <div>{user.fullName || "Admin User"}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            User ID: {getSimpleUserId(user)}
+                          </div>
                         </td>
-                        <td className="py-4 text-gray-600">{user.email}</td>
+                        <td className="py-4 text-gray-600">
+                          <div>{user.email}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Company ID: {getSimpleCompanyId(user)}
+                          </div>
+                        </td>
                         <td className="py-4">
                           <div className="flex flex-col items-start gap-1">
                             {user.isMainAdmin ? (
@@ -399,8 +421,18 @@ export default function UserRolesPage() {
                           key={user._id}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          <td className="py-4 font-medium">{user.fullName}</td>
-                          <td className="py-4 text-gray-600">{user.email}</td>
+                          <td className="py-4 font-medium">
+                            <div>{user.fullName}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              User ID: {getSimpleUserId(user)}
+                            </div>
+                          </td>
+                          <td className="py-4 text-gray-600">
+                            <div>{user.email}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Company ID: {getSimpleCompanyId(user)}
+                            </div>
+                          </td>
                           <td className="py-4">
                             <span
                               className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getRoleColor(user.role)}`}
