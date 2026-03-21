@@ -5,6 +5,7 @@ import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
 import ConfirmationModal from "../components/ConfirmationModal";
+import SessionTimer from "../components/SessionTimer";
 
 /**
  * MeetingInterviewer.jsx (FINAL - WebRTC + Participants Panel)
@@ -483,16 +484,26 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         <div className="mt-wrap">
             {error && <div className="mt-err">{error}</div>}
 
-            {/* Connection status indicator */}
-            {showConnStatus && (
-                <div className="mt-conn-status">
-                    <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                    <span className="mt-conn-text">
-                        {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
-                    </span>
-                    <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+            {/* Connection status indicator + Session Timer */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(0,0,0,0.4)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                <div>
+                    {showConnStatus && (
+                        <div className="mt-conn-status" style={{ margin: 0 }}>
+                            <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                            <span className="mt-conn-text">
+                                {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
+                            </span>
+                            <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                        </div>
+                    )}
                 </div>
-            )}
+                <div>
+                    <SessionTimer 
+                        timerStartedAt={currentCandidate?.timerStartedAt} 
+                        isActive={currentCandidate?.status === "interviewing"}
+                    />
+                </div>
+            </div>
 
             {/* Stage + Right Panel */}
             <div className={`mt-mainrow ${panel ? "withSide" : ""}`}>

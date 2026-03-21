@@ -27,12 +27,13 @@ exports.allowParticipant = (req, res) => {
         }
 
         console.log(`[ALLOW] Proceeding to admit participant ID: ${id}`);
+        const now = new Date().toISOString();
         db.serialize(() => {
             db.run("BEGIN TRANSACTION");
 
             db.run(
-                "UPDATE participants SET status = 'interviewing' WHERE id = ? AND status = 'waiting'",
-                [id],
+                "UPDATE participants SET status = 'interviewing', timerStartedAt = ? WHERE id = ? AND status = 'waiting'",
+                [now, id],
                 function (err) {
                     if (err) {
                         console.error(`[ALLOW] Update error for ${id}:`, err.message);
@@ -52,7 +53,7 @@ exports.allowParticipant = (req, res) => {
                             db.run("ROLLBACK");
                             return res.status(500).json({ error: "Failed to commit transaction" });
                         }
-                        console.log(`[ALLOW] Participant ${id} is now interviewing.`);
+                        console.log(`[ALLOW] Participant ${id} is now interviewing. Timer started at ${now}`);
                         getAllParticipants(res, "Success");
                     });
                 }
@@ -94,7 +95,7 @@ exports.completeParticipant = (req, res) => {
     if (!id) return res.status(400).json({ error: "Participant ID is required" });
 
     const db = getDb();
-    db.run("UPDATE participants SET status = 'completed' WHERE id = ?", [id], function (err) {
+    db.run("UPDATE participants SET status = 'completed', timerStartedAt = NULL WHERE id = ?", [id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: "Participant not found" });
         getAllParticipants(res, "Participant moved to completed");
