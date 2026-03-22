@@ -32,6 +32,112 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   link: "Link",
 };
 
+const PERMANENT_FIELDS: FormField[] = [
+  { label: "Full Name", type: "text", required: true },
+  { label: "Email", type: "email", required: true },
+];
+
+const normalizeFieldLabel = (value: string): string =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const isPermanentField = (field: FormField): boolean => {
+  const normalizedLabel = normalizeFieldLabel(field.label);
+
+  if (field.type === "email" && normalizedLabel === "email") {
+    return true;
+  }
+
+  if (
+    field.type === "text" &&
+    (normalizedLabel === "name" || normalizedLabel === "fullname")
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+const ensurePermanentFields = (fields: FormField[]): FormField[] => {
+  const customFields = (fields || []).filter(
+    (field) => !isPermanentField(field),
+  );
+
+  return [...PERMANENT_FIELDS, ...customFields].map((field, index) => ({
+    ...field,
+    required: true,
+    order: index,
+  }));
+};
+
+const DEFAULT_UNKNOWN_EMAIL = "unknown@example.com";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+const getSubmissionEntries = (
+  submittedData: unknown,
+): Array<[string, unknown]> => {
+  if (submittedData instanceof Map) {
+    return Array.from(submittedData.entries());
+  }
+
+  if (submittedData && typeof submittedData === "object") {
+    return Object.entries(submittedData as Record<string, unknown>);
+  }
+
+  return [];
+};
+
+const normalizePotentialEmail = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || !EMAIL_PATTERN.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+};
+
+const resolveSubmissionEmail = (submission: FormSubmission): string => {
+  const directEmail = normalizePotentialEmail(submission.submitterEmail);
+  if (directEmail && directEmail !== DEFAULT_UNKNOWN_EMAIL) {
+    return directEmail;
+  }
+
+  const submittedEntries = getSubmissionEntries(submission.submittedData);
+
+  const fromNamedEmailField = submittedEntries
+    .map(([key, value]) => ({
+      key: key.toLowerCase(),
+      email: normalizePotentialEmail(value),
+    }))
+    .find(
+      (entry) =>
+        !!entry.email &&
+        entry.key.includes("email") &&
+        entry.email !== DEFAULT_UNKNOWN_EMAIL,
+    )?.email;
+
+  if (fromNamedEmailField) {
+    return fromNamedEmailField;
+  }
+
+  const inferredEmail = submittedEntries
+    .map(([, value]) => normalizePotentialEmail(value))
+    .find(
+      (email): email is string => !!email && email !== DEFAULT_UNKNOWN_EMAIL,
+    );
+
+  if (inferredEmail) {
+    return inferredEmail;
+  }
+
+  return directEmail || DEFAULT_UNKNOWN_EMAIL;
+};
+
 export default function JobFormsPage() {
   const [templates, setTemplates] = useState<JobForm[]>([]);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
@@ -54,18 +160,23 @@ export default function JobFormsPage() {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"latest" | "oldest">("latest");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [togglingFormId, setTogglingFormId] = useState<string | null>(null);
 
   // Form creation state
   const [newFormTitle, setNewFormTitle] = useState("");
   const [newFormDescription, setNewFormDescription] = useState("");
   const [newFormJobRole, setNewFormJobRole] = useState("");
-  const [newFormFields, setNewFormFields] = useState<FormField[]>([]);
+  const [newFormFields, setNewFormFields] = useState<FormField[]>(
+    ensurePermanentFields([]),
+  );
 
   // Form editing state
   const [editFormTitle, setEditFormTitle] = useState("");
   const [editFormDescription, setEditFormDescription] = useState("");
   const [editFormJobRole, setEditFormJobRole] = useState("");
-  const [editFormFields, setEditFormFields] = useState<FormField[]>([]);
+  const [editFormFields, setEditFormFields] = useState<FormField[]>(
+    ensurePermanentFields([]),
+  );
 
   // Load all forms on mount
   useEffect(() => {
@@ -119,6 +230,7 @@ export default function JobFormsPage() {
 
           return formSubmissions.map((submission) => ({
             ...submission,
+            submitterEmail: resolveSubmissionEmail(submission),
             formTitle: form.title,
           }));
         }),
@@ -146,7 +258,12 @@ export default function JobFormsPage() {
         sortBy,
         status: filterStatus === "all" ? undefined : filterStatus,
       });
-      setSubmissions(data);
+      setSubmissions(
+        data.map((submission) => ({
+          ...submission,
+          submitterEmail: resolveSubmissionEmail(submission),
+        })),
+      );
       setSelectedFormId(formId);
     } catch (error) {
       console.error("Failed to load submissions:", error);
@@ -161,9 +278,11 @@ export default function JobFormsPage() {
       return;
     }
 
-    const sanitizedFields = newFormFields
-      .map((f) => ({ ...f, label: f.label.trim() }))
-      .filter((f) => f.label.length > 0);
+    const sanitizedFields = ensurePermanentFields(
+      newFormFields
+        .map((f) => ({ ...f, label: f.label.trim() }))
+        .filter((f) => f.label.length > 0),
+    );
 
     try {
       await createJobForm({
@@ -177,7 +296,7 @@ export default function JobFormsPage() {
       setNewFormTitle("");
       setNewFormDescription("");
       setNewFormJobRole("");
-      setNewFormFields([]);
+      setNewFormFields(ensurePermanentFields([]));
       setShowCreateModal(false);
       await fetchAllForms();
     } catch (error) {
@@ -192,7 +311,7 @@ export default function JobFormsPage() {
     setEditFormTitle(form.title);
     setEditFormDescription(form.description);
     setEditFormJobRole(form.jobRole);
-    setEditFormFields([...form.fields]);
+    setEditFormFields(ensurePermanentFields([...form.fields]));
     setShowEditModal(true);
   };
 
@@ -202,9 +321,11 @@ export default function JobFormsPage() {
       return;
     }
 
-    const sanitizedFields = editFormFields
-      .map((f) => ({ ...f, label: f.label.trim() }))
-      .filter((f) => f.label.length > 0);
+    const sanitizedFields = ensurePermanentFields(
+      editFormFields
+        .map((f) => ({ ...f, label: f.label.trim() }))
+        .filter((f) => f.label.length > 0),
+    );
 
     try {
       await updateJobForm(selectedTemplate._id, {
@@ -247,6 +368,23 @@ export default function JobFormsPage() {
     }
   };
 
+  const handleToggleFormStatus = async (form: JobForm) => {
+    try {
+      setTogglingFormId(form._id);
+      await updateJobForm(form._id, { isActive: !form.isActive });
+      await fetchAllForms();
+      if (selectedFormId === form._id) {
+        await fetchSubmissions(form._id);
+      }
+    } catch (error) {
+      alert(
+        `Failed to update form status: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    } finally {
+      setTogglingFormId(null);
+    }
+  };
+
   const handleUpdateSubmissionStatus = async (
     submissionId: string,
     status: "submitted" | "reviewed" | "rejected" | "accepted",
@@ -278,6 +416,12 @@ export default function JobFormsPage() {
     value: string,
     isEdit: boolean,
   ) => {
+    const isLockedField = index < PERMANENT_FIELDS.length;
+
+    if (isLockedField) {
+      return;
+    }
+
     if (isEdit) {
       setEditFormFields((prev) =>
         prev.map((f, i) => (i === index ? { ...f, [key]: value } : f)),
@@ -298,6 +442,10 @@ export default function JobFormsPage() {
   };
 
   const handleRemoveField = (index: number, isEdit: boolean) => {
+    if (index < PERMANENT_FIELDS.length) {
+      return;
+    }
+
     if (isEdit) {
       setEditFormFields((prev) => prev.filter((_, i) => i !== index));
     } else {
@@ -310,6 +458,11 @@ export default function JobFormsPage() {
     index: number,
     isEdit: boolean,
   ) => {
+    if (index < PERMANENT_FIELDS.length) {
+      e.preventDefault();
+      return;
+    }
+
     e.dataTransfer.setData("text/plain", JSON.stringify({ index, isEdit }));
   };
 
@@ -325,6 +478,13 @@ export default function JobFormsPage() {
   ) => {
     e.preventDefault();
     const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+
+    if (
+      data.index < PERMANENT_FIELDS.length ||
+      targetIndex < PERMANENT_FIELDS.length
+    ) {
+      return;
+    }
 
     if (data.isEdit !== isEdit || data.index === targetIndex) return;
 
@@ -403,7 +563,7 @@ export default function JobFormsPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Job Role{" "}
@@ -418,14 +578,6 @@ export default function JobFormsPage() {
                       placeholder="e.g., Engineering"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-600 focus:bg-purple-50 transition text-gray-900"
                     />
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 block mb-2">
-                      Department
-                    </label>
-                    <div className="text-xs text-gray-500 px-4 py-3 border-2 border-gray-100 rounded-xl bg-gray-50">
-                      Auto-filled from job role
-                    </div>
                   </div>
                 </div>
 
@@ -462,6 +614,10 @@ export default function JobFormsPage() {
                 Customize the fields candidates need to fill out. Drag to
                 reorder.
               </p>
+              <p className="text-xs text-gray-500 mb-4">
+                Full Name and Email are permanent required fields for every job
+                form and cannot be removed.
+              </p>
 
               <div className="space-y-3 mb-6 bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-xl border-2 border-dashed border-gray-300">
                 {fields.length === 0 ? (
@@ -475,14 +631,18 @@ export default function JobFormsPage() {
                   fields.map((field, idx) => (
                     <div
                       key={idx}
-                      draggable
+                      draggable={idx >= PERMANENT_FIELDS.length}
                       onDragStart={(e) => handleDragStart(e, idx, isEdit)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, idx, isEdit)}
-                      className="flex items-center gap-3 p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:shadow-lg transition cursor-move group"
+                      className={`flex items-center gap-3 p-4 bg-white rounded-xl border-2 transition group ${
+                        idx < PERMANENT_FIELDS.length
+                          ? "border-purple-200 bg-purple-50/40"
+                          : "border-gray-200 hover:border-purple-400 hover:shadow-lg cursor-move"
+                      }`}
                     >
                       <div className="text-gray-400 group-hover:text-purple-600 text-xl font-bold transition">
-                        ⋮
+                        {idx < PERMANENT_FIELDS.length ? "*" : "⋮"}
                       </div>
                       <input
                         type="text"
@@ -496,14 +656,16 @@ export default function JobFormsPage() {
                           )
                         }
                         placeholder="Field label (e.g., Full Name, Portfolio URL)"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white"
+                        disabled={idx < PERMANENT_FIELDS.length}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-600"
                       />
                       <select
                         value={field.type}
                         onChange={(e) =>
                           handleFieldChange(idx, "type", e.target.value, isEdit)
                         }
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-xs font-semibold bg-white text-gray-700 cursor-pointer"
+                        disabled={idx < PERMANENT_FIELDS.length}
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-xs font-semibold bg-white text-gray-700 cursor-pointer disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                       >
                         {Object.entries(FIELD_TYPE_LABELS).map(
                           ([val, label]) => (
@@ -513,23 +675,29 @@ export default function JobFormsPage() {
                           ),
                         )}
                       </select>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveField(idx, isEdit)}
-                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
+                      {idx < PERMANENT_FIELDS.length ? (
+                        <span className="px-2 py-1 rounded-md bg-purple-100 text-purple-700 text-[11px] font-semibold">
+                          Required
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveField(idx, isEdit)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                         >
-                          <path
-                            fillRule="evenodd"
-                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </button>
+                          <svg
+                            className="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
@@ -615,11 +783,11 @@ export default function JobFormsPage() {
                   </span>
                   {form.isActive ? (
                     <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium text-xs">
-                      ● Active
+                      ● Open
                     </span>
                   ) : (
                     <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full font-medium text-xs">
-                      ● Inactive
+                      ● Closed
                     </span>
                   )}
                 </div>
@@ -643,6 +811,21 @@ export default function JobFormsPage() {
                   </button>
 
                   <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => handleToggleFormStatus(form)}
+                      disabled={togglingFormId === form._id}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition border ${
+                        form.isActive
+                          ? "text-amber-700 hover:bg-amber-50 border-amber-200"
+                          : "text-green-700 hover:bg-green-50 border-green-200"
+                      } disabled:opacity-60 disabled:cursor-not-allowed`}
+                    >
+                      {togglingFormId === form._id
+                        ? "Updating..."
+                        : form.isActive
+                          ? "Close Form"
+                          : "Reopen Form"}
+                    </button>
                     <button
                       onClick={() => handleEditForm(form)}
                       className="flex-1 text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm font-medium transition border border-purple-200"

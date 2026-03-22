@@ -5,6 +5,7 @@ import { io } from "socket.io-client";
 import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
 import ConfirmationModal from "../components/ConfirmationModal";
+import SessionTimer from "../components/SessionTimer";
 
 /**
  * MeetingInterviewer.jsx (FINAL - WebRTC + Participants Panel)
@@ -77,6 +78,13 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
     const currentCandidate = interviewing[0];
     const waiting = useMemo(() => participants.filter((p) => p.status === "waiting"), [participants]);
     const completed = useMemo(() => participants.filter((p) => p.status === "completed"), [participants]);
+
+    // Timer source: show session time as soon as candidate joins (waiting/interviewing)
+    const timerParticipant = useMemo(() => {
+        const withTimer = participants.filter((p) => p.timerStartedAt);
+        if (!withTimer.length) return null;
+        return [...withTimer].sort((a, b) => new Date(b.timerStartedAt) - new Date(a.timerStartedAt))[0];
+    }, [participants]);
 
     const API_URL = `${BACKEND_URL}/api/participants`;
 
@@ -483,16 +491,31 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
         <div className="mt-wrap">
             {error && <div className="mt-err">{error}</div>}
 
-            {/* Connection status indicator */}
-            {showConnStatus && (
-                <div className="mt-conn-status">
-                    <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                    <span className="mt-conn-text">
-                        {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
-                    </span>
-                    <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+            {/* Top Bar: Connection Status + Session Timer */}
+            <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                padding: "12px 16px", 
+                background: "linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4))",
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                minHeight: "60px"
+            }}>
+                {/* Left: Connection Status */}
+                <div style={{ flex: 1 }}>
+                    {showConnStatus && (
+                        <div className="mt-conn-status" style={{ margin: 0 }}>
+                            <span className={`mt-conn-dot ${hasRemoteCam ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                            <span className="mt-conn-text">
+                                {hasRemoteCam ? "Candidate connected" : "Waiting for candidate…"}
+                            </span>
+                            <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                        </div>
+                    )}
                 </div>
-            )}
+                
+                <div style={{ width: 1 }} />
+            </div>
 
             {/* Stage + Right Panel */}
             <div className={`mt-mainrow ${panel ? "withSide" : ""}`}>
@@ -692,9 +715,6 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                         <button className={`nt-tab ${notesTab === "remarks" ? "active" : ""}`} onClick={() => setNotesTab("remarks")}>
                                             Remarks
                                         </button>
-                                        <button className={`nt-tab ${notesTab === "details" ? "active" : ""}`} onClick={() => setNotesTab("details")}>
-                                            Details
-                                        </button>
                                     </div>
 
                                     <div className="nt-interviewerRow">
@@ -733,54 +753,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                             </div>
                                         )}
 
-                                        {notesTab === "details" && (
-                                            <div className="nt-profileCard">
-                                                <div className="nt-h1">{currentCandidate?.name || "Robert Nachino"}</div>
-                                                <div className="nt-small">Software Engineer</div>
 
-                                                <div className="nt-h2">Contact</div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">📍</div>
-                                                    <div className="nt-small">San Francisco, CA</div>
-                                                </div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">📞</div>
-                                                    <div className="nt-small">+1 (555) 123-4567</div>
-                                                </div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">✉️</div>
-                                                    <div className="nt-small">robert.nachino@email.com</div>
-                                                </div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">🔗</div>
-                                                    <div className="nt-small">
-                                                        <a className="nt-link" href="#" onClick={(e) => e.preventDefault()}>
-                                                            github.com/robertnachino
-                                                        </a>{" "}
-                                                        •{" "}
-                                                        <a className="nt-link" href="#" onClick={(e) => e.preventDefault()}>
-                                                            linkedin.com/in/robertnachino
-                                                        </a>
-                                                    </div>
-                                                </div>
-
-                                                <div className="nt-h2">Professional Summary</div>
-                                                <div className="nt-small">
-                                                    Results-driven Software Engineer with 5+ years of experience designing, developing, and maintaining scalable web and backend applications.
-                                                    Strong background in full-stack development, cloud technologies, and agile methodologies.
-                                                </div>
-
-                                                <div className="nt-h2">Technical Skills</div>
-                                                <ul className="nt-list">
-                                                    <li>Languages: Java, Python, JavaScript, TypeScript</li>
-                                                    <li>Frameworks: React, Node.js, Spring Boot, Express</li>
-                                                    <li>Databases: PostgreSQL, MySQL, MongoDB, Redis</li>
-                                                    <li>Cloud/DevOps: AWS (EC2, S3, RDS), Docker, Kubernetes, CI/CD</li>
-                                                    <li>Tools: Git, GitHub, Jira, Jenkins</li>
-                                                    <li>Other: REST APIs, Microservices, Agile/Scrum, Unit Testing</li>
-                                                </ul>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             )}
@@ -864,6 +837,11 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                 </div>
 
                 <div className="mt-right">
+                    <SessionTimer
+                        timerStartedAt={timerParticipant?.timerStartedAt}
+                        isActive={true}
+                        compact={true}
+                    />
                     <button className="mt-end" onClick={endInterview}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />

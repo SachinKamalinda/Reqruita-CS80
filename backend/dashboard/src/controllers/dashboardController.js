@@ -1,18 +1,29 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const { sendEmail } = require("../config/resend");
+const { sendEmail, sendCustomEmail } = require("../config/resend");
+const { generateUniqueCode } = require("../utils/codeGenerator");
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const toNumericSuffix = (value, size = 6) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(-size)
+    .padStart(size, "0");
+
+const ALLOWED_DASHBOARD_ROLES = ["admin", "interviewer"];
 
 const mapUserResponse = (user) => ({
   id: user._id,
+  userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
   fullName: `${user.firstName} ${user.lastName}`,
   firstName: user.firstName,
   lastName: user.lastName,
   email: user.email,
   role: user.role,
   isMainAdmin: user.isMainAdmin,
+  companyId: user.companyId,
+  companyCode: user.companyCode || `COM-${toNumericSuffix(user.companyId)}`,
   companyName: user.companyName,
   jobTitle: user.jobTitle,
   industry: user.industry,
@@ -163,13 +174,27 @@ exports.changePassword = async (req, res) => {
 // GET /api/dashboard/users
 exports.getUsers = async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
+    if (!["admin", "interviewer"].includes(req.user.role)) {
       return res
         .status(403)
-        .json({ message: "Access Denied: Requires Admin Role" });
+        .json({ message: "Access Denied: Requires Admin or Interviewer Role" });
     }
-    const users = await User.find({ companyId: req.user.companyId }, "-password").sort({ createdAt: -1 });
-    res.status(200).json(users);
+
+    const filter = { companyId: req.user.companyId };
+    if (req.user.role === "interviewer") {
+      filter.role = "admin";
+    }
+
+    const users = await User.find(filter, "-password").sort({ createdAt: -1 });
+    res.status(200).json(
+      users.map((user) => ({
+        ...user.toObject(),
+        userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
+        companyCode:
+          user.companyCode ||
+          `COM-${toNumericSuffix(user.companyId)}`,
+      })),
+    );
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -183,8 +208,7 @@ exports.addUser = async (req, res) => {
         }
 
         const { email, role, firstName, lastName } = req.body;
-        const validRoles = ["admin", "interviewer"];
-        if (!validRoles.includes(role)) {
+        if (!ALLOWED_DASHBOARD_ROLES.includes(role)) {
             return res.status(400).json({ message: "Invalid role selected" });
         }
 
@@ -200,6 +224,25 @@ exports.addUser = async (req, res) => {
         const finalLastName = lastName || "User";
         const fullName = `${finalFirstName} ${finalLastName}`;
 
+        const inviter = await User.findById(req.user.id).select("companyId companyName companyCode");
+        if (!inviter) {
+          return res.status(404).json({ message: "Inviter account not found" });
+        }
+
+        const companyContext = await User.findOne({
+          companyId: inviter.companyId,
+          role: "admin",
+          isMainAdmin: true,
+        }).select("companyId companyName companyCode");
+
+        const companyId = companyContext?.companyId || inviter.companyId;
+        const companyName =
+          (companyContext?.companyName || inviter.companyName || "").trim();
+        const companyCode =
+          (companyContext?.companyCode || inviter.companyCode || "").trim() ||
+          `COM-${toNumericSuffix(companyId)}`;
+        const userCode = await generateUniqueCode(User, "userCode", "USR");
+
         const newUser = new User({
             firstName: finalFirstName,
             lastName: finalLastName,
@@ -211,7 +254,10 @@ exports.addUser = async (req, res) => {
             isInvited: true,
             inviteToken,
             inviteExpires,
-            companyId: req.user.companyId
+            companyId,
+            companyName,
+            companyCode,
+            userCode,
         });
 
         await newUser.save();
@@ -227,7 +273,17 @@ exports.addUser = async (req, res) => {
             resetUrl: setupLink
         });
 
-        res.status(201).json({ message: "Invitation sent successfully!", user: { id: newUser._id, email: newUser.email, role: newUser.role, fullName: newUser.fullName } });
+        res.status(201).json({
+          message: "Invitation sent successfully!",
+          user: {
+            id: newUser._id,
+            userId: newUser.userCode,
+            companyCode: newUser.companyCode,
+            email: newUser.email,
+            role: newUser.role,
+            fullName: newUser.fullName,
+          },
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -243,8 +299,7 @@ exports.updateUser = async (req, res) => {
         const { role, status } = req.body;
         const targetUserId = req.params.id;
 
-        const validRoles = ["admin", "interviewer"];
-        if (role && !validRoles.includes(role)) {
+        if (role && !ALLOWED_DASHBOARD_ROLES.includes(role)) {
             return res.status(400).json({ message: "Invalid role selected" });
         }
 
@@ -301,6 +356,23 @@ exports.deleteUser = async (req, res) => {
             return res.status(400).json({ message: "Cannot remove yourself" });
 
         await User.findOneAndDelete({ _id: targetUserId, companyId: req.user.companyId });
+
+        // Best-effort notification for removed users; deletion should still succeed
+        const recipientName =
+          `${String(userToDelete.firstName || "").trim()} ${String(userToDelete.lastName || "").trim()}`.trim() ||
+          String(userToDelete.fullName || "").trim() ||
+          "User";
+
+        await sendCustomEmail({
+          to: userToDelete.email,
+          subject: "Your Reqruita dashboard access has been removed",
+          text:
+            `Dear ${recipientName},\n\n` +
+            "This is to inform you that your access to the Reqruita dashboard has been removed by your company administrator.\n\n" +
+            "If you believe this was done in error, please contact your administrator.\n\n" +
+            "Regards,\nReqruita Team",
+        });
+
         res.status(200).json({ message: "User successfully removed" });
     } catch (error) {
         res.status(500).json({ error: error.message });

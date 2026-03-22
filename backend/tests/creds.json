@@ -1,0 +1,47 @@
+[
+  {
+    "id": "join_69be203261f4cb5c2fae96f7_69be1fb161f4cb5c2fae96dc",
+    "email": "unknown@example.com",
+    "meetingId": "MEET-JOB-AE96C8-S01",
+    "password": "RQ6C8S01",
+    "role": "join",
+    "participantId": "69be1fb161f4cb5c2fae96dc",
+    "name": "unknown@example.com"
+  },
+  {
+    "id": "cond_69be38d13ac704c250466202_69be2bc4bebafa50529a0df9",
+    "email": "amer.20231461@iit.ac.lk",
+    "meetingId": "MEET-JOB-4661B9-S01",
+    "password": "RQ1B9S01",
+    "role": "conduct",
+    "participantId": "69be2bc4bebafa50529a0df9",
+    "name": "Amer"
+  },
+  {
+    "id": "join_69be38d13ac704c250466202_69be38c03ac704c2504661e5",
+    "email": "unknown@example.com",
+    "meetingId": "MEET-JOB-4661B9-S01",
+    "password": "RQ1B9S01",
+    "role": "join",
+    "participantId": "69be38c03ac704c2504661e5",
+    "name": "unknown@example.com"
+  },
+  {
+    "id": "join_69be38d13ac704c250466202_69be38fc3ac704c25046624d",
+    "email": "unknown@example.com",
+    "meetingId": "MEET-JOB-4661B9-S01",
+    "password": "RQ1B9S01",
+    "role": "join",
+    "participantId": "69be38fc3ac704c25046624d",
+    "name": "unknown@example.com"
+  },
+  {
+    "id": "cond_69be38d43ac704c25046620e_69be2bc4bebafa50529a0df9",
+    "email": "amer.20231461@iit.ac.lk",
+    "meetingId": "MEET-JOB-4661B9-S02",
+    "password": "RQ1B9S02",
+    "role": "conduct",
+    "participantId": "69be2bc4bebafa50529a0df9",
+    "name": "Amer"
+  }
+]

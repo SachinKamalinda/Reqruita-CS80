@@ -13,6 +13,21 @@ const userSchema = new mongoose.Schema(
     industry: { type: String, trim: true, default: "" },
     country: { type: String, trim: true, default: "" },
     address: { type: String, trim: true, default: "" },
+    userCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    companyCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      index: true,
+      default: "",
+    },
     notificationPreferences: {
       weeklyDigest: { type: Boolean, default: true },
       interviewReminders: { type: Boolean, default: true },
