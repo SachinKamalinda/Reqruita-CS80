@@ -104,7 +104,7 @@ exports.login = async (req, res) => {
             });
         }
 
-        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId }, JWT_SECRET, { expiresIn: "24h" });
+        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId, isMainAdmin: user.isMainAdmin }, JWT_SECRET, { expiresIn: "24h" });
 
         res.json({
             message: "Login successful", token,
@@ -141,7 +141,7 @@ exports.verifyEmail = async (req, res) => {
         user.emailVerificationOtpHash = null; user.emailVerificationOtpExpiresAt = null; user.emailVerificationOtpSentAt = null;
         await user.save();
 
-        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId }, JWT_SECRET, { expiresIn: "24h" });
+        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId, isMainAdmin: user.isMainAdmin }, JWT_SECRET, { expiresIn: "24h" });
 
         res.json({
             message: "Email verified successfully!", token,
