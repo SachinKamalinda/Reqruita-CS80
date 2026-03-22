@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getToken } from '@/lib/api';
+import { getToken, fetchMe } from '@/lib/api';
 
 const PRICE_PER_ADMIN = 75;
 const PRICE_PER_INTERVIEWER = 45;
@@ -16,9 +16,26 @@ export default function PaymentPage() {
 
   // Auth guard — redirect to /signin if not logged in
   useEffect(() => {
-    if (!getToken()) {
-      router.replace('/signin');
-    }
+    const checkPaymentAccess = async () => {
+      const token = getToken();
+      if (!token) {
+        router.replace('/signin');
+        return;
+      }
+
+      try {
+        const user = await fetchMe();
+        if (!user.isMainAdmin) {
+          console.error("Access Denied: Only Main Admins can access the payment page.");
+          router.replace('/home');
+        }
+      } catch (err) {
+        console.error("Failed to verify payment access", err);
+        router.replace('/signin');
+      }
+    };
+
+    checkPaymentAccess();
   }, [router]);
 
   const [cardNumber, setCardNumber] = useState('');
