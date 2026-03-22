@@ -715,9 +715,6 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                         <button className={`nt-tab ${notesTab === "remarks" ? "active" : ""}`} onClick={() => setNotesTab("remarks")}>
                                             Remarks
                                         </button>
-                                        <button className={`nt-tab ${notesTab === "details" ? "active" : ""}`} onClick={() => setNotesTab("details")}>
-                                            Details
-                                        </button>
                                     </div>
 
                                     <div className="nt-interviewerRow">
@@ -756,54 +753,7 @@ export default function MeetingInterviewer({ session, onEnd, addToast }) {
                                             </div>
                                         )}
 
-                                        {notesTab === "details" && (
-                                            <div className="nt-profileCard">
-                                                <div className="nt-h1">{currentCandidate?.name || "Robert Nachino"}</div>
-                                                <div className="nt-small">Software Engineer</div>
 
-                                                <div className="nt-h2">Contact</div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">📍</div>
-                                                    <div className="nt-small">San Francisco, CA</div>
-                                                </div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">📞</div>
-                                                    <div className="nt-small">+1 (555) 123-4567</div>
-                                                </div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">✉️</div>
-                                                    <div className="nt-small">robert.nachino@email.com</div>
-                                                </div>
-                                                <div className="nt-kv">
-                                                    <div className="nt-ico">🔗</div>
-                                                    <div className="nt-small">
-                                                        <a className="nt-link" href="#" onClick={(e) => e.preventDefault()}>
-                                                            github.com/robertnachino
-                                                        </a>{" "}
-                                                        •{" "}
-                                                        <a className="nt-link" href="#" onClick={(e) => e.preventDefault()}>
-                                                            linkedin.com/in/robertnachino
-                                                        </a>
-                                                    </div>
-                                                </div>
-
-                                                <div className="nt-h2">Professional Summary</div>
-                                                <div className="nt-small">
-                                                    Results-driven Software Engineer with 5+ years of experience designing, developing, and maintaining scalable web and backend applications.
-                                                    Strong background in full-stack development, cloud technologies, and agile methodologies.
-                                                </div>
-
-                                                <div className="nt-h2">Technical Skills</div>
-                                                <ul className="nt-list">
-                                                    <li>Languages: Java, Python, JavaScript, TypeScript</li>
-                                                    <li>Frameworks: React, Node.js, Spring Boot, Express</li>
-                                                    <li>Databases: PostgreSQL, MySQL, MongoDB, Redis</li>
-                                                    <li>Cloud/DevOps: AWS (EC2, S3, RDS), Docker, Kubernetes, CI/CD</li>
-                                                    <li>Tools: Git, GitHub, Jira, Jenkins</li>
-                                                    <li>Other: REST APIs, Microservices, Agile/Scrum, Unit Testing</li>
-                                                </ul>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             )}

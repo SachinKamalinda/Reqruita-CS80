@@ -1,8 +1,8 @@
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 
-// Put the DB file in the root backend directory as before
-const DB_PATH = path.join(__dirname, "../../../../reqruita.db");
+// Put the DB file in the root backend directory
+const DB_PATH = path.join(__dirname, "../../../reqruita.db");
 
 const initSqlite = () => {
     const db = new sqlite3.Database(DB_PATH, (err) => {

@@ -2,7 +2,7 @@ const http = require("http");
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 
-const DB_PATH = path.join(__dirname, "../../reqruita.db");
+const DB_PATH = path.join(__dirname, "../reqruita.db");
 
 console.log("Connecting to SQLite database at:", DB_PATH);
 const db = new sqlite3.Database(DB_PATH, (err) => {

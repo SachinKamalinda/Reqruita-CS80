@@ -1,0 +1,60 @@
+================================================================
+REQRUITA COMPREHENSIVE TESTING BLUEPRINT
+================================================================
+This file contains the exhaustive testing strategy covering every major component of the Reqruita ecosystem (Web Dashboard + Desktop Application).
+
+2.2 Testing Criteria - Criteria Selected for Testing
+    - Test Environments: Local Development, Web Browsers (Chrome, Edge), Desktop OS (Windows 11).
+    - Pass/Fail Criteria definition for various components.
+    - Test execution methods (Automated Unit Tests vs Manual QA).
+
+2.3 Testing Functional Requirements - Test results for all functional requirements
+    [Web Dashboard Features]
+      - FR1: Company/Admin Registration and Login.
+      - FR2: Dynamic Job Form Creation and Custom Fields.
+      - FR3: Candidate Application Submission (Public links).
+      - FR4: Interview Session Creation & Candidate Assignment.
+      - FR5: Automated Email Scheduling via Nodemailer.
+    [Desktop App Features]
+      - FR6: Desktop App Login (MongoDB -> SQLite Offline Sync).
+      - FR7: Fallback "123" Offline Login Logic.
+      - FR8: Device Checks (Camera, Microphone, Screen permissions).
+      - FR9: P2P Socket Signaling and WebRTC Video/Audio connectivity.
+      - FR10: Waiting Room Mechanics (Dynamic status: waiting -> interviewing).
+      - FR11: Split-pane Workspace (Local File System Explorer integration).
+      - FR12: Real-time Interview Chat & Remarks syncing.
+      - FR13: Exam Mode Kiosk Security (Explorer.exe suspension, shortcut blocking).
+      - FR14: End of Session Feedback Modal.
+
+2.4 Testing Non-Functional Requirements
+    - NFR1: Security (JWT integrity, Desktop file isolation, Kiosk mode restrictions blocking OS access).
+    - NFR2: Reliability (Sync Service surviving MongoDB restarts, WebRTC reconnecting on dropout).
+    - NFR3: Availability (Desktop app functions partially even if MongoDB API lags due to SQLite caching).
+    - NFR4: Data Integrity (Accurate database schemas across independent Mongoose models).
+
+2.5 Unit Testing - Proof of unit testing (Screenshots/Snippets/Results/Justifications)
+    - UT1: Session Authentication Logic (`test_auth_api.js`) - Validates role enforcement and correct responses.
+    - UT2: SQLite Sync Engine (`test_sqlite_sync.js`) - Mocks MongoDB data to prove local cache seeding works without errors.
+    - UT3: API Endpoints Validation - Tests for `/api/sessions/bootstrap` handling.
+    *(We will document code snippets, assert results, and screenshot terminal outputs for these).*
+
+2.6 Performance Testing - Proof of performance (Screenshots/Justifications)
+    - PT1: Desktop Login Latency - Compare MongoDB network request latency vs Local SQLite instantaneous lookup.
+    - PT2: Video Encoding - Monitor CPU/RAM spikes in the Electron app when rendering remote video streams.
+    - PT3: Sync Overhead - Measure the exact milliseconds taken to download MongoDB data to SQLite during the app launch.
+    *(Screenshots of Chrome DevTools / Electron process monitor).*
+
+2.7 Usability Testing - Proof of usability (Screenshots/Justifications)
+    - U1: Role Validation - Demonstrating clear error toasts when the user puts in incorrect credentials ("Invalid Email...").
+    - U2: Interviewer Waiting Room - UI responsiveness when admitting a candidate to the stream.
+    - U3: Feedback Collection - Showing the detached pop-up nature of the end-session feedback collection UI.
+    *(Screenshots of the fully rendered UI interfaces handling state changes).*
+
+2.8 Compatibility Testing - Proof of compatibility (Screenshots/Justifications)
+    - CT1: OS Compatibility - Proving the custom `explorer.exe` suspension script works precisely on Windows environments.
+    - CT2: Browser Compatibility - Validating the Web Dashboard candidate application form renders identically on Firefox and Chrome.
+    - CT3: WebRTC Protocol Support - Checking if media stream API binds correctly on different hardware profiles.
+
+================================================================
+Wait for my instruction to tackle these specific tasks. I recommend we go section by section.
+If this looks complete, just type: "Let's start collecting data for 2.x"
