@@ -3,13 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import {
-  getToken,
-  removeToken,
-  getStoredUser,
-  USER_UPDATED_EVENT,
-  type AuthUser,
-} from "@/lib/api";
+import { getToken, removeToken, getStoredUser } from "@/lib/api";
 
 type NotificationItem = {
   id: number;
@@ -67,6 +61,8 @@ export default function DashboardLayout({
   const hasUnreadNotifications = notifications.some(
     (notification) => notification.unread,
   );
+
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const navItems = [
     {
@@ -129,6 +125,7 @@ export default function DashboardLayout({
     {
       label: "User & Roles",
       href: "/user-roles",
+      roleRestricted: "admin",
       icon: (
         <svg
           className="w-5 h-5"
@@ -146,8 +143,9 @@ export default function DashboardLayout({
       ),
     },
     {
-      label: "Settings",
-      href: "/settings",
+      label: "Subscriptions",
+      href: "/payment",
+      mainAdminOnly: true,
       icon: (
         <svg
           className="w-5 h-5"
@@ -159,32 +157,29 @@ export default function DashboardLayout({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.314 2.314 1.724 1.724 0 001.066 2.573 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.066 2.573 1.724 1.724 0 01-2.314 2.314 1.724 1.724 0 00-2.573 1.066 1.724 1.724 0 01-3.35 0 1.724 1.724 0 00-2.573-1.066 1.724 1.724 0 01-2.314-2.314 1.724 1.724 0 00-1.066-2.573 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 012.314-2.314 1.724 1.724 0 002.573-1.066z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
           />
         </svg>
       ),
     },
   ];
 
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-
+  const filteredNavItems = navItems.filter((item: any) => {
+    if (item.mainAdminOnly && !currentUser?.isMainAdmin) return false;
+    if (item.roleRestricted && currentUser?.role !== item.roleRestricted) return false;
+    return true;
+  });
   useEffect(() => {
     const initAuth = async () => {
       // Check for token in URL (passed from landing page)
-      if (typeof window !== "undefined") {
+      if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
-        const urlToken = params.get("token");
+        const urlToken = params.get('token');
 
         if (urlToken) {
-          localStorage.setItem("reqruita_token", urlToken);
+          localStorage.setItem('reqruita_token', urlToken);
           const newUrl = window.location.pathname;
-          window.history.replaceState({}, "", newUrl);
+          window.history.replaceState({}, '', newUrl);
         }
       }
 
@@ -207,30 +202,6 @@ export default function DashboardLayout({
     };
 
     initAuth();
-  }, []);
-
-  useEffect(() => {
-    const syncCurrentUser = () => {
-      setCurrentUser(getStoredUser());
-    };
-
-    const handleUserUpdated = () => {
-      syncCurrentUser();
-    };
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === "reqruita_user") {
-        syncCurrentUser();
-      }
-    };
-
-    window.addEventListener(USER_UPDATED_EVENT, handleUserUpdated);
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener(USER_UPDATED_EVENT, handleUserUpdated);
-      window.removeEventListener("storage", handleStorage);
-    };
   }, []);
 
   const isActive = (href: string) => {
@@ -312,20 +283,18 @@ export default function DashboardLayout({
         </div>
 
         <nav className="relative z-10 flex-1 px-4 py-2 space-y-1">
-          {navItems.map((item) => (
+          {filteredNavItems.map((item: any) => (
             <Link
               key={item.label}
               href={item.href}
-              className={`group w-full flex items-center gap-3 text-left py-3.5 px-4 rounded-xl transition-all duration-200 ${
-                isActive(item.href)
-                  ? "bg-white text-[#5D20B3] font-semibold shadow-lg transform scale-[1.02]"
-                  : "text-white/90 hover:bg-white/15 hover:text-white hover:translate-x-1"
-              }`}
+              className={`group w-full flex items-center gap-3 text-left py-3.5 px-4 rounded-xl transition-all duration-200 ${isActive(item.href)
+                ? "bg-white text-[#5D20B3] font-semibold shadow-lg transform scale-[1.02]"
+                : "text-white/90 hover:bg-white/15 hover:text-white hover:translate-x-1"
+                }`}
             >
               <span
-                className={`transition-transform duration-200 ${
-                  isActive(item.href) ? "" : "group-hover:scale-110"
-                }`}
+                className={`transition-transform duration-200 ${isActive(item.href) ? "" : "group-hover:scale-110"
+                  }`}
               >
                 {item.icon}
               </span>
@@ -399,28 +368,20 @@ export default function DashboardLayout({
               >
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center font-bold text-white shadow-md">
                   {currentUser
-                    ? (
-                        currentUser.firstName ||
-                        currentUser.fullName ||
-                        currentUser.email ||
-                        "U"
-                      )
-                        .charAt(0)
-                        .toUpperCase()
+                    ? (currentUser.firstName || currentUser.fullName || currentUser.email || "U").charAt(0).toUpperCase()
                     : "U"}
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-gray-800">
-                    {currentUser ? (currentUser.fullName || currentUser.email) : "Not Connected"}
+                    {currentUser ? (currentUser.fullName || currentUser.email) : "Admin User"}
                   </p>
                   <p className="text-xs text-gray-500 capitalize">
-                    {currentUser?.role ?? "No Connection"}
+                    {currentUser?.role ?? "Administrator"}
                   </p>
                 </div>
                 <svg
-                  className={`w-4 h-4 text-gray-400 transition-transform ${
-                    isProfileMenuOpen ? "rotate-180" : ""
-                  }`}
+                  className={`w-4 h-4 text-gray-400 transition-transform ${isProfileMenuOpen ? "rotate-180" : ""
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -524,11 +485,10 @@ export default function DashboardLayout({
                 {notifications.map((notification) => (
                   <button
                     key={notification.id}
-                    className={`w-full text-left px-5 py-4 border-b border-gray-100 last:border-b-0 transition-colors ${
-                      selectedNotification?.id === notification.id
-                        ? "bg-purple-50"
-                        : "hover:bg-gray-50"
-                    }`}
+                    className={`w-full text-left px-5 py-4 border-b border-gray-100 last:border-b-0 transition-colors ${selectedNotification?.id === notification.id
+                      ? "bg-purple-50"
+                      : "hover:bg-gray-50"
+                      }`}
                     onClick={() => handleSelectNotification(notification)}
                   >
                     <div className="flex items-start justify-between gap-3">

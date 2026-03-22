@@ -25,6 +25,7 @@ export default function UserRolesPage() {
 
   // Current User State
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [isMainAdmin, setIsMainAdmin] = useState<boolean>(false);
 
   // Status State
   const [error, setError] = useState("");
@@ -49,6 +50,7 @@ export default function UserRolesPage() {
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         setCurrentUserRole(payload.role);
+        setIsMainAdmin(!!payload.isMainAdmin);
         
         if (payload.role !== 'admin') {
           setLoading(false);
@@ -222,8 +224,6 @@ export default function UserRolesPage() {
     switch (roleStr) {
       case 'admin': return 'bg-purple-100 text-purple-800';
       case 'interviewer': return 'bg-blue-100 text-blue-800';
-      case 'recruiter': return 'bg-orange-100 text-orange-800';
-      case 'hr manager': return 'bg-teal-100 text-teal-800';
       case 'candidate': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -240,11 +240,13 @@ export default function UserRolesPage() {
       <div className="bg-white rounded-2xl border p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Users</h2>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#5D20B3] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#4a1a8a] transition-colors shadow-sm">
-            Invite New User
-          </button>
+          {currentUserRole === 'admin' && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-[#5D20B3] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#4a1a8a] transition-colors shadow-sm">
+              Invite New User
+            </button>
+          )}
         </div>
 
         {error && (
@@ -311,11 +313,11 @@ export default function UserRolesPage() {
                         </span>
                       </td>
                       <td className="py-4 flex gap-3">
-                        {!user.isMainAdmin && (
-                          <button onClick={() => handleEditUserClick(user)} className="text-[#5D20B3] text-sm hover:underline font-medium">Edit</button>
-                        )}
-                        {!user.isMainAdmin && (
-                          <button onClick={() => handleDeleteUserClick(user._id)} className="text-red-600 text-sm hover:underline font-medium">Remove</button>
+                        {isMainAdmin && !user.isMainAdmin && (
+                          <>
+                            <button onClick={() => handleEditUserClick(user)} className="text-[#5D20B3] text-sm hover:underline font-medium">Edit</button>
+                            <button onClick={() => handleDeleteUserClick(user._id)} className="text-red-600 text-sm hover:underline font-medium">Remove</button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -353,8 +355,12 @@ export default function UserRolesPage() {
                         </span>
                       </td>
                       <td className="py-4 flex gap-3">
-                        <button onClick={() => handleEditUserClick(user)} className="text-[#5D20B3] text-sm hover:underline font-medium">Edit</button>
-                        <button onClick={() => handleDeleteUserClick(user._id)} className="text-red-600 text-sm hover:underline font-medium">Remove</button>
+                        {currentUserRole === 'admin' && (
+                          <>
+                            <button onClick={() => handleEditUserClick(user)} className="text-[#5D20B3] text-sm hover:underline font-medium">Edit</button>
+                            <button onClick={() => handleDeleteUserClick(user._id)} className="text-red-600 text-sm hover:underline font-medium">Remove</button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -425,8 +431,6 @@ export default function UserRolesPage() {
                 >
                   <option value="admin">Administrator</option>
                   <option value="interviewer">Interviewer</option>
-                  <option value="recruiter">Recruiter</option>
-                  <option value="hr manager">HR Manager</option>
                 </select>
               </div>
 
