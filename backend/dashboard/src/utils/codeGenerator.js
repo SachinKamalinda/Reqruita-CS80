@@ -9,6 +9,17 @@ const randomChunk = (size = 6) => {
   return out;
 };
 
+/**
+ * HUMAN-READABLE ID GENERATOR: generateUniqueCode
+ * Creates unique, branded IDs like USR-123456 or COM-987654.
+ * 
+ * Logic:
+ * 1. Generates a random numeric chunk.
+ * 2. Checks against the database to avoid collisions.
+ * 3. Returns the unique ID for the specific model and field.
+ * 
+ * Important: This depends on a unique index in MongoDB for ultimate safety.
+ */
 const generateUniqueCode = async (
   model,
   field,
@@ -18,15 +29,17 @@ const generateUniqueCode = async (
 ) => {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const candidate = `${prefix}-${randomChunk(size)}`;
-    // Keep generation optimistic and fast; uniqueness is still enforced by DB index.
+    
+    // Check if the generated code is already taken in the provided database model.
     // eslint-disable-next-line no-await-in-loop
     const exists = await model.exists({ [field]: candidate });
+    
     if (!exists) {
       return candidate;
     }
   }
 
-  throw new Error(`Unable to generate unique ${field}`);
+  throw new Error(`Critical Error: Unable to generate a unique ${field} after ${maxAttempts} attempts.`);
 };
 
 module.exports = {

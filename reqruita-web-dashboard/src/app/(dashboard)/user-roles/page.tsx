@@ -23,8 +23,13 @@ export default function UserRolesPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
-  // Current User State
+  // -- Permissions logic --
+  // currentUserRole: helps hide/show core UI elements (Admins see manage, Interviewers see read-only)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  
+  // isMainAdmin: True only for the person who created the company account.
+  // They are the ONLY ones who can edit or remove OTHER administrators.
+  const [isMainAdmin, setIsMainAdmin] = useState<boolean>(false);
 
   // Status State
   const [error, setError] = useState("");
@@ -47,18 +52,25 @@ export default function UserRolesPage() {
         return;
       }
 
-      // decode token to get role
+      /**
+       * JWT DECODING:
+       * We decode the payload (2nd part of JWT) locally to check user's roles
+       * before we even make a network request. This allows for immediate UI 
+       * adaptation (e.g. hiding the 'Invite' button).
+       */
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserRole(payload.role);
-
-        if (!["admin", "interviewer"].includes(payload.role)) {
-          setError("You do not have permission to access this page.");
+        setIsMainAdmin(!!payload.isMainAdmin);
+        
+        // Safety: If they aren't an admin, we don't fetch the user list
+        // (Server would block it anyway, but this saves a request).
+        if (payload.role !== 'admin') {
           setLoading(false);
           return;
         }
       } catch (e) {
-        console.error("Error decoding token");
+        console.error("Error decoding token - possibly malformed");
       }
 
       const res = await fetch(`${AUTH_API_BASE}/api/dashboard/users`, {
@@ -264,18 +276,10 @@ export default function UserRolesPage() {
 
   const getRoleColor = (roleStr: string) => {
     switch (roleStr) {
-      case "admin":
-        return "bg-purple-100 text-purple-800";
-      case "interviewer":
-        return "bg-blue-100 text-blue-800";
-      case "recruiter":
-        return "bg-orange-100 text-orange-800";
-      case "hr manager":
-        return "bg-teal-100 text-teal-800";
-      case "candidate":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case 'admin': return 'bg-purple-100 text-purple-800';
+      case 'interviewer': return 'bg-blue-100 text-blue-800';
+      case 'candidate': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -304,6 +308,11 @@ export default function UserRolesPage() {
       <div className="bg-white rounded-2xl border p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Users</h2>
+          
+          {/** 
+            * ONLY Admins can see the 'Invite' button. 
+            * Normal 'Interviewers' see a list of colleagues but cannot invite new ones.
+            */}
           {isAdmin && (
             <button
               onClick={() => setIsModalOpen(true)}
@@ -395,23 +404,28 @@ export default function UserRolesPage() {
                             {user.status || "Active"}
                           </span>
                         </td>
+                        {/**
+                          * HIERARCHY LOGIC:
+                          * - A Main Admin can edit/remove anyone (except themselves).
+                          * - A normal Admin can edit/remove Interviewers, but CANNOT modify other Admins.
+                          */}
                         {isAdmin && (
                           <td className="py-4 flex gap-3">
-                            {!user.isMainAdmin && (
-                              <button
-                                onClick={() => handleEditUserClick(user)}
-                                className="text-[#5D20B3] text-sm hover:underline font-medium"
-                              >
-                                Edit
-                              </button>
-                            )}
-                            {!user.isMainAdmin && (
-                              <button
-                                onClick={() => handleDeleteUserClick(user._id)}
-                                className="text-red-600 text-sm hover:underline font-medium"
-                              >
-                                Remove
-                              </button>
+                            {isMainAdmin && !user.isMainAdmin && (
+                              <>
+                                <button
+                                  onClick={() => handleEditUserClick(user)}
+                                  className="text-[#5D20B3] text-sm hover:underline font-medium"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUserClick(user._id)}
+                                  className="text-red-600 text-sm hover:underline font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </>
                             )}
                           </td>
                         )}
@@ -491,7 +505,7 @@ export default function UserRolesPage() {
                       0 && (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={5}
                           className="py-4 text-center text-gray-500 text-sm"
                         >
                           No interviewers found
@@ -502,6 +516,21 @@ export default function UserRolesPage() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Admin/Interviewer Overlay */}
+        {currentUserRole !== 'admin' && (
+          <div className="absolute inset-x-0 inset-y-0 z-10 backdrop-blur-md bg-white/40 flex flex-col items-center justify-center rounded-xl border border-white/50 shadow-sm p-8 text-center animate-in fade-in duration-500">
+            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-[#5D20B3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Administrative Restricted Area</h3>
+            <p className="text-gray-600 max-w-sm">
+              You don't have permission to manage roles. Please contact an administrator to upgrade your account access.
+            </p>
           </div>
         )}
       </div>
@@ -704,52 +733,30 @@ export default function UserRolesPage() {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
-          <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200 text-center">
-            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-8 h-8"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-            </div>
-            <h2 className="text-xl font-bold mb-2 text-slate-800">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-2xl font-bold mb-1 text-slate-800">
               Remove User
             </h2>
-            <p className="text-sm text-slate-500 mb-6">
-              Are you sure you want to completely remove this user? This action
-              cannot be undone.
+            <p className="text-sm text-slate-500 mb-6 font-semibold">
+              Are you sure you want to remove this user from your dashboard? This action cannot be undone.
             </p>
-
-            {error && (
-              <div className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
-                {error}
-              </div>
-            )}
-
-            <div className="flex justify-center gap-3">
+            <div className="pt-4 flex justify-end gap-3 border-t mt-6">
               <button
+                type="button"
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setUserToDelete(null);
-                  setError("");
                 }}
-                className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-all w-full"
+                className="px-5 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-all"
               >
-                Cancel
+                Keep User
               </button>
               <button
+                type="button"
                 onClick={confirmDeleteUser}
-                className="px-5 py-2.5 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg transition-all shadow-sm w-full"
+                className="px-5 py-2 bg-red-600 text-white font-medium hover:bg-red-700 rounded-lg transition-all shadow-sm"
               >
-                Yes, Remove
+                Yes, Remove User
               </button>
             </div>
           </div>

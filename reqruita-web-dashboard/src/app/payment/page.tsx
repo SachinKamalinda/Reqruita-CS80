@@ -2,23 +2,55 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getToken } from '@/lib/api';
+import { getToken, fetchMe } from '@/lib/api';
 
 const PRICE_PER_ADMIN = 75;
 const PRICE_PER_INTERVIEWER = 45;
 const PRICE_PER_INTERVIEWEE = 25;
 
+/**
+ * PAYMENT PAGE: PaymentPage
+ * Handles subscription configuration and billing.
+ * 
+ * SECURITY NOTE:
+ * This page is strictly restricted to the 'Main Admin' (the account owner).
+ * Normal admins or interviewers cannot configure billing or see payment details.
+ */
 export default function PaymentPage() {
   const router = useRouter();
+  
+  // Seat Configuration State
   const [numAdmins, setNumAdmins] = useState('');
   const [numInterviewers, setNumInterviewers] = useState('');
   const [numInterviews, setNumInterviews] = useState('');
 
-  // Auth guard — redirect to /signin if not logged in
+  /**
+   * ACCESS GUARD:
+   * Verifies that the current user is not just an admin, but the 'Main Admin'.
+   */
   useEffect(() => {
-    if (!getToken()) {
-      router.replace('/signin');
-    }
+    const checkPaymentAccess = async () => {
+      const token = getToken();
+      if (!token) {
+        router.replace('/signin');
+        return;
+      }
+
+      try {
+        const user = await fetchMe();
+        
+        // Final Gate: Main Admin check
+        if (!user.isMainAdmin) {
+          console.error("Access Denied: Only Main Admins can access the payment page.");
+          router.replace('/home'); 
+        }
+      } catch (err) {
+        console.error("Failed to verify payment access", err);
+        router.replace('/signin');
+      }
+    };
+
+    checkPaymentAccess();
   }, [router]);
 
   const [cardNumber, setCardNumber] = useState('');

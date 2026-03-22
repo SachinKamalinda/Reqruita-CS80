@@ -39,29 +39,38 @@ exports.register = async (req, res) => {
         const verificationOtp = crypto.randomInt(100000, 1000000).toString();
         const otpHash = await bcrypt.hash(verificationOtp, 10);
         const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+        /**
+         * MULTI-TENANCY INITIALIZATION:
+         * In Reqruita, every new user registration creates a fresh 'Company' container.
+         * The registering user becomes the 'Main Admin' (billing owner) of that company.
+         */
         const companyCode = await generateUniqueCode(Company, "companyCode", "COM");
         const userCode = await generateUniqueCode(User, "userCode", "USR");
 
-        // 0) Create Company first
+        // 1) Initialize Company first to get its ID
         const newCompany = new Company({
             name: companyName || "My New Company",
             companyCode,
-            mainAdminId: new mongoose.Types.ObjectId() // temp ID
+            mainAdminId: new mongoose.Types.ObjectId() // Temporary placeholder
         });
 
+        // 2) Create User and link to the Company
         const newUser = new User({
             firstName, lastName, email: normalizedEmail, password: hashedPassword,
             phoneNumber: phoneNumber || "", companyName: companyName || "", 
             industry: industry || "", country: country || "", address: address || "",
             role: "admin", isEmailVerified: false,
             emailVerificationOtpHash: otpHash, emailVerificationOtpExpiresAt: otpExpiresAt,
-            emailVerificationOtpSentAt: new Date(), isMainAdmin: true,
-            companyId: newCompany._id,
+            emailVerificationOtpSentAt: new Date(), 
+            isMainAdmin: true,        // Mark as the primary account holder
+            companyId: newCompany._id, // LINK: Establish the multi-tenancy bond
             companyCode,
             userCode,
         });
 
+        // 3) Update Company with the actual Admin ID
         newCompany.mainAdminId = newUser._id;
+        
         await newCompany.save();
         await newUser.save();
 
@@ -115,7 +124,7 @@ exports.login = async (req, res) => {
             });
         }
 
-        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId }, JWT_SECRET, { expiresIn: "24h" });
+        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId, isMainAdmin: user.isMainAdmin }, JWT_SECRET, { expiresIn: "24h" });
 
         res.json({
             message: "Login successful", token,
@@ -163,7 +172,7 @@ exports.verifyEmail = async (req, res) => {
         user.emailVerificationOtpHash = null; user.emailVerificationOtpExpiresAt = null; user.emailVerificationOtpSentAt = null;
         await user.save();
 
-        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId }, JWT_SECRET, { expiresIn: "24h" });
+        const token = jwt.sign({ id: user._id, role: user.role, companyId: user.companyId, isMainAdmin: user.isMainAdmin }, JWT_SECRET, { expiresIn: "24h" });
 
         res.json({
             message: "Email verified successfully!", token,
