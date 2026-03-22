@@ -17,36 +17,54 @@ const { syncAuthData } = require("./services/syncService");
 
 const socketHandler = require("./sockets/socketHandler");
 
+/**
+ * DESKTOP APP BACKEND SERVER
+ * Port: 3001
+ * 
+ * This server handles real-time interview operations, local data 
+ * synchronization with the main dashboard, and WebRTC signaling.
+ */
 const app = express();
 const PORT = 3001;
 
 // Middlewares
 app.use(express.json());
 app.use(cors());
+
+// Global Request Logger: Tracks incoming desktop client requests.
 app.use((req, res, next) => {
     console.log(`[Desktop App Backend] ${new Date().toISOString()} - ${req.method} ${req.url}`);
     next();
 });
 
-// Database Init
+/**
+ * DUAL-DATABASE ARCHITECTURE:
+ * 1. MongoDB: Used to sync with the main dashboard (Users, Company data).
+ * 2. SQLite: Used for persistent local storage of chats and interview history 
+ *    even when offline or during the meeting session.
+ */
 connectMongo().then(() => {
-    // Sync credentials after mongodb is ready
+    // Background Service: Synchronizes credentials from the Dashboard DB to this instance.
     syncAuthData();
 });
-getDb(); // Initializes SQLite
+getDb(); // SQLite Initialization
 
-// Routes
-app.use("/api/participants", participantRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/remarks", remarkRoutes);
-app.use("/api/auth", authRoutes);
+// Routing Modules
+app.use("/api/participants", participantRoutes); // Manage meeting attendees
+app.use("/api/chat", chatRoutes);                 // Message history
+app.use("/api/remarks", remarkRoutes);           // Interviewer notes
+app.use("/api/auth", authRoutes);                 // Local auth / Token verification
 
-// Server & Socket.IO
+/**
+ * REAL-TIME COMMUNICATION:
+ * Orchestrates Socket.IO for signaling and live interactions (Chat, Whiteboard).
+ */
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
+// Attach the socket event handler logic
 socketHandler(io, getDb);
 
 // Start
