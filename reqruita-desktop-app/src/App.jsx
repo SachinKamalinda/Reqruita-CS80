@@ -174,11 +174,6 @@ export default function App() {
           feedback: data?.feedback || "",
         };
 
-        if (!payload.meetingId || !payload.candidateId) {
-          addToast("Missing meeting or candidate context for feedback", "error");
-          return;
-        }
-
         const res = await fetch(`${BACKEND_URL}/api/session-feedback`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
