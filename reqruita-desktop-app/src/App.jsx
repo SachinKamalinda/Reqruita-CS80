@@ -9,6 +9,7 @@ import MeetingInterviewer from "./pages/MeetingInterviewer.jsx";
 import MeetingInterviewee from "./pages/MeetingInterviewee.jsx";
 import MeetingWorkspace from "./pages/MeetingWorkspace.jsx";
 import FeedbackModal from "./components/FeedbackModal.jsx";
+import { BACKEND_URL } from "./config";
 
 import ToastContainer from "./components/Toast.jsx";
 import useToast from "./hooks/useToast.js";
@@ -40,9 +41,32 @@ export default function App() {
   const [step, setStep] = useState("role"); // role | login | devices | meeting | workspace
   const [role, setRole] = useState(null); // "join" | "conduct"
   const [session, setSession] = useState(null);
+  const [feedbackMeta, setFeedbackMeta] = useState({ meetingId: "", candidateId: "" });
   const [transitioning, setTransitioning] = useState(false);
 
   const { toasts, addToast, removeToast } = useToast();
+
+  function readStoredFeedbackMeta() {
+    try {
+      const raw = window.localStorage.getItem("rq_feedback_meta");
+      if (!raw) return { meetingId: "", candidateId: "" };
+      const parsed = JSON.parse(raw);
+      return {
+        meetingId: String(parsed?.meetingId || ""),
+        candidateId: String(parsed?.candidateId || ""),
+      };
+    } catch {
+      return { meetingId: "", candidateId: "" };
+    }
+  }
+
+  function writeStoredFeedbackMeta(meta) {
+    try {
+      window.localStorage.setItem("rq_feedback_meta", JSON.stringify(meta));
+    } catch {
+      // Ignore storage failures (private mode / restricted env)
+    }
+  }
 
   // Removed legacy users array
   useEffect(() => {
@@ -53,6 +77,11 @@ export default function App() {
     } else if (params.get("view") === "feedback") {
       setStep("feedback");
       setRole(params.get("role"));
+      const storedMeta = readStoredFeedbackMeta();
+      setFeedbackMeta({
+        meetingId: params.get("meetingId") || storedMeta.meetingId || "",
+        candidateId: params.get("candidateId") || storedMeta.candidateId || "",
+      });
     }
 
     document.documentElement.style.background = "transparent";
@@ -112,24 +141,67 @@ export default function App() {
     goTo("meeting");
   }
 
-  function onEnd() {
+  function onEnd(meta = {}) {
     addToast("You left the meeting.", "info");
+    const payload = {
+      role,
+      meetingId: meta.meetingId || session?.meetingId || "",
+      candidateId: meta.candidateId || "",
+    };
+
+    writeStoredFeedbackMeta(payload);
+
     // Open the dedicated feedback window and close this one
     if (window.reqruita?.openFeedback) {
-      window.reqruita.openFeedback(role);
+      window.reqruita.openFeedback(payload);
     } else {
       // Fallback for browser testing
+      setFeedbackMeta({
+        meetingId: payload.meetingId,
+        candidateId: payload.candidateId,
+      });
       goTo("feedback");
     }
   }
 
-  function onFeedbackSubmit(data) {
-    // Here you could send data to backend
-    console.log("Feedback submitted:", data);
-    if (window.reqruita) {
-      window.close(); // Close the feedback pop-up
-    } else {
-      resetAll();
+  async function onFeedbackSubmit(data) {
+    try {
+      if (role === "conduct") {
+        const payload = {
+          meetingId: feedbackMeta.meetingId,
+          candidateId: feedbackMeta.candidateId,
+          status: data?.status || "",
+          feedback: data?.feedback || "",
+        };
+
+        if (!payload.meetingId || !payload.candidateId) {
+          addToast("Missing meeting or candidate context for feedback", "error");
+          return;
+        }
+
+        const res = await fetch(`${BACKEND_URL}/api/session-feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const result = await res.json();
+
+        if (!res.ok) {
+          throw new Error(result.error || "Failed to save feedback");
+        }
+
+        addToast("Session feedback saved", "success");
+        writeStoredFeedbackMeta({ meetingId: "", candidateId: "" });
+      }
+
+      if (window.reqruita) {
+        window.close(); // Close the feedback pop-up
+      } else {
+        resetAll();
+      }
+    } catch (error) {
+      console.error("Feedback submit failed:", error);
+      addToast(error.message || "Failed to submit feedback", "error");
     }
   }
 

@@ -13,6 +13,7 @@ const participantRoutes = require("./routes/participantRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const remarkRoutes = require("./routes/remarkRoutes");
 const authRoutes = require("./routes/authRoutes");
+const sessionFeedbackRoutes = require("./routes/sessionFeedbackRoutes");
 const { syncAuthData } = require("./services/syncService");
 
 const socketHandler = require("./sockets/socketHandler");
@@ -40,6 +41,7 @@ app.use("/api/participants", participantRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/remarks", remarkRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/session-feedback", sessionFeedbackRoutes);
 
 // Server & Socket.IO
 const server = http.createServer(app);
