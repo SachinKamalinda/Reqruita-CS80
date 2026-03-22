@@ -6,6 +6,7 @@ import { BACKEND_URL } from "../config";
 import { useWebRTC } from "../webrtc/useWebRTC";
 import FileExplorer from "../components/FileExplorer";
 import ConfirmationModal from "../components/ConfirmationModal";
+import SessionTimer from "../components/SessionTimer";
 
 
 /**
@@ -41,6 +42,8 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
     const [pdfSrc, setPdfSrc] = useState(null);
     const [pdfName, setPdfName] = useState("");
     const [participantId, setParticipantId] = useState(null);
+    const [currentParticipant, setCurrentParticipant] = useState(null);
+    const [candidateTimerStartedAt, setCandidateTimerStartedAt] = useState(null);
 
     // Modal state
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -225,6 +228,9 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 const data = await res.json();
                 if (data.id) {
                     setParticipantId(data.id);
+                    const participants = Array.isArray(data?.participants) ? data.participants : [];
+                    const joined = participants.find((p) => p.id === data.id);
+                    setCandidateTimerStartedAt(joined?.timerStartedAt || new Date().toISOString());
                 }
             } catch (e) {
                 if (e.name === "AbortError") return; // normal cleanup
@@ -235,6 +241,36 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
 
         return () => controller.abort();
     }, [candidateName]);
+
+    // 3.5) Fetch current participant data periodically (for timer)
+    useEffect(() => {
+        if (!participantId) return;
+
+        const fetchParticipant = async () => {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/participants`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const participants = Array.isArray(data) ? data : (data?.participants || []);
+                const current = participants.find(p => p.id === participantId);
+                if (current) {
+                    console.log("✓ Current participant data:", current);
+                    setCurrentParticipant(current);
+                    if (current.timerStartedAt) {
+                        setCandidateTimerStartedAt(current.timerStartedAt);
+                    }
+                } else {
+                    console.log("⚠ Participant not found in list. ID:", participantId, "Available:", participants.map(p => p.id));
+                }
+            } catch (e) {
+                console.error("✗ Fetch participant data failed:", e);
+            }
+        };
+
+        fetchParticipant();
+        const interval = setInterval(fetchParticipant, 2000);
+        return () => clearInterval(interval);
+    }, [participantId]);
 
     // 4) Attach local stream
     useEffect(() => {
@@ -368,16 +404,31 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 </div>
             )}
 
-            {/* Connection status */}
-            {showConnStatus && (
-                <div className="mt-conn-status">
-                    <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
-                    <span className="mt-conn-text">
-                        {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
-                    </span>
-                    <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+            {/* Top Bar: Connection status + Session Timer */}
+            <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                padding: "12px 16px", 
+                background: "linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0.4))",
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                minHeight: "60px"
+            }}>
+                {/* Left: Connection Status */}
+                <div style={{ flex: 1 }}>
+                    {showConnStatus && (
+                        <div className="mt-conn-status" style={{ margin: 0 }}>
+                            <span className={`mt-conn-dot ${hasRemote ? "mt-conn-on" : "mt-conn-pulse"}`} />
+                            <span className="mt-conn-text">
+                                {hasRemote ? "Interviewer connected" : "Waiting for interviewer…"}
+                            </span>
+                            <span className="mt-conn-id">Meeting: {meetingId || "—"}</span>
+                        </div>
+                    )}
                 </div>
-            )}
+
+                <div style={{ width: 1 }} />
+            </div>
 
             <div className={`jm-row ${chatOpen ? "jm-chat-open" : ""}`}>
                 {/* Main area */}
@@ -653,6 +704,11 @@ export default function MeetingInterviewee({ session, onLeave, addToast }) {
                 </div>
 
                 <div className="jm-right">
+                    <SessionTimer
+                        timerStartedAt={currentParticipant?.timerStartedAt || candidateTimerStartedAt}
+                        isActive={true}
+                        compact={true}
+                    />
                     <button className="mt-end" onClick={leave}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />

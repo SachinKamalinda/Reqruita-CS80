@@ -5,12 +5,18 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { sendEmail } = require("../config/resend");
+const { generateUniqueCode } = require("../utils/codeGenerator");
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_super_secret_jwt_key_here";
 const RESET_OTP_EXPIRES_MINUTES = 10;
 const RESET_PASSWORD_WEB_URL = "http://localhost:3000/forgot-password";
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const toNumericSuffix = (value, size = 6) =>
+    String(value || "")
+        .replace(/\D/g, "")
+        .slice(-size)
+        .padStart(size, "0");
 
 exports.register = async (req, res) => {
     try {
@@ -33,10 +39,13 @@ exports.register = async (req, res) => {
         const verificationOtp = crypto.randomInt(100000, 1000000).toString();
         const otpHash = await bcrypt.hash(verificationOtp, 10);
         const otpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+        const companyCode = await generateUniqueCode(Company, "companyCode", "COM");
+        const userCode = await generateUniqueCode(User, "userCode", "USR");
 
         // 0) Create Company first
         const newCompany = new Company({
             name: companyName || "My New Company",
+            companyCode,
             mainAdminId: new mongoose.Types.ObjectId() // temp ID
         });
 
@@ -47,7 +56,9 @@ exports.register = async (req, res) => {
             role: "admin", isEmailVerified: false,
             emailVerificationOtpHash: otpHash, emailVerificationOtpExpiresAt: otpExpiresAt,
             emailVerificationOtpSentAt: new Date(), isMainAdmin: true,
-            companyId: newCompany._id
+            companyId: newCompany._id,
+            companyCode,
+            userCode,
         });
 
         newCompany.mainAdminId = newUser._id;
@@ -108,7 +119,18 @@ exports.login = async (req, res) => {
 
         res.json({
             message: "Login successful", token,
-            user: { id: user._id, fullName: `${user.firstName} ${user.lastName}`, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, companyId: user.companyId }
+            user: {
+                id: user._id,
+                userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
+                fullName: `${user.firstName} ${user.lastName}`,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                role: user.role,
+                companyId: user.companyId,
+                companyCode:
+                                    user.companyCode || `COM-${toNumericSuffix(user.companyId)}`,
+            }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -145,7 +167,18 @@ exports.verifyEmail = async (req, res) => {
 
         res.json({
             message: "Email verified successfully!", token,
-            user: { id: user._id, fullName: `${user.firstName} ${user.lastName}`, firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role, companyId: user.companyId }
+            user: {
+                id: user._id,
+                userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
+                fullName: `${user.firstName} ${user.lastName}`,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                role: user.role,
+                companyId: user.companyId,
+                companyCode:
+                                    user.companyCode || `COM-${toNumericSuffix(user.companyId)}`,
+            }
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

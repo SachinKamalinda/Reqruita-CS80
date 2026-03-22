@@ -65,9 +65,10 @@ exports.joinParticipant = (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: "Name is required" });
     const id = "p_" + Math.random().toString(36).substr(2, 9);
+    const now = new Date().toISOString();
     
     const db = getDb();
-    db.run("INSERT INTO participants (id, name, status) VALUES (?, ?, ?)", [id, name, "waiting"], function (err) {
+    db.run("INSERT INTO participants (id, name, status, timerStartedAt) VALUES (?, ?, ?, ?)", [id, name, "waiting", now], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         
         db.all("SELECT * FROM participants", [], (err, rows) => {
@@ -94,7 +95,7 @@ exports.completeParticipant = (req, res) => {
     if (!id) return res.status(400).json({ error: "Participant ID is required" });
 
     const db = getDb();
-    db.run("UPDATE participants SET status = 'completed' WHERE id = ?", [id], function (err) {
+    db.run("UPDATE participants SET status = 'completed', timerStartedAt = NULL WHERE id = ?", [id], function (err) {
         if (err) return res.status(500).json({ error: err.message });
         if (this.changes === 0) return res.status(404).json({ error: "Participant not found" });
         getAllParticipants(res, "Participant moved to completed");

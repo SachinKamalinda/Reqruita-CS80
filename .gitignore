@@ -7,3 +7,4 @@ build/
 backend/node_modules/
 reqruita-desktop-app/node_modules/
 # *.db
+.txt
