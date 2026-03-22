@@ -10,6 +10,7 @@ export interface AuthUser {
   lastName: string;
   email: string;
   role: string;
+  isMainAdmin?: boolean;
   companyName?: string;
   jobTitle?: string;
   industry?: string;

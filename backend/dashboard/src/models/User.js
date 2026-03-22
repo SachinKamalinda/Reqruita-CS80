@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema(
       securityAlerts: { type: Boolean, default: true },
     },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: "Company", required: true },
-    role: { type: String, enum: ["admin", "interviewer", "recruiter", "hr manager", "candidate"], required: true },
+    role: { type: String, enum: ["admin", "interviewer", "candidate"], required: true },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     isEmailVerified: { type: Boolean, default: false },
     isInvited: { type: Boolean, default: false },

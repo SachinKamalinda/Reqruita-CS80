@@ -12,6 +12,7 @@ const mapUserResponse = (user) => ({
   lastName: user.lastName,
   email: user.email,
   role: user.role,
+  isMainAdmin: user.isMainAdmin,
   companyName: user.companyName,
   jobTitle: user.jobTitle,
   industry: user.industry,
@@ -167,7 +168,7 @@ exports.getUsers = async (req, res) => {
         .status(403)
         .json({ message: "Access Denied: Requires Admin Role" });
     }
-    const users = await User.find({}, "-password").sort({ createdAt: -1 });
+    const users = await User.find({ companyId: req.user.companyId }, "-password").sort({ createdAt: -1 });
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -182,7 +183,7 @@ exports.addUser = async (req, res) => {
         }
 
         const { email, role, firstName, lastName } = req.body;
-        const validRoles = ["admin", "interviewer", "recruiter", "hr manager", "candidate"];
+        const validRoles = ["admin", "interviewer"];
         if (!validRoles.includes(role)) {
             return res.status(400).json({ message: "Invalid role selected" });
         }
@@ -242,7 +243,7 @@ exports.updateUser = async (req, res) => {
         const { role, status } = req.body;
         const targetUserId = req.params.id;
 
-        const validRoles = ["admin", "interviewer", "recruiter", "hr manager", "candidate"];
+        const validRoles = ["admin", "interviewer"];
         if (role && !validRoles.includes(role)) {
             return res.status(400).json({ message: "Invalid role selected" });
         }
@@ -253,6 +254,11 @@ exports.updateUser = async (req, res) => {
 
         const userToUpdate = await User.findOne({ _id: targetUserId, companyId: req.user.companyId });
         if (!userToUpdate) return res.status(404).json({ message: "User not found" });
+
+        // Normal admins can't edit other admins or the main admin
+        if (userToUpdate.role === "admin" && !req.user.isMainAdmin) {
+            return res.status(403).json({ message: "Only Main Admin can edit other administrators" });
+        }
 
         if (userToUpdate.isMainAdmin && role && role !== "admin") {
             return res.status(403).json({ message: "Cannot change the role of a Main Admin" });
@@ -280,12 +286,19 @@ exports.deleteUser = async (req, res) => {
         const targetUserId = req.params.id;
         const userToDelete = await User.findOne({ _id: targetUserId, companyId: req.user.companyId });
 
-    if (!userToDelete)
-      return res.status(404).json({ message: "User not found" });
-    if (userToDelete.isMainAdmin)
-      return res.status(403).json({ message: "Cannot remove a Main Admin" });
-    if (targetUserId === req.user.id)
-      return res.status(400).json({ message: "Cannot remove yourself" });
+        if (!userToDelete)
+            return res.status(404).json({ message: "User not found" });
+
+        // Normal admins can't remove other admins or the main admin
+        if (userToDelete.role === "admin" && !req.user.isMainAdmin) {
+            return res.status(403).json({ message: "Only Main Admin can remove other administrators" });
+        }
+
+        if (userToDelete.isMainAdmin)
+            return res.status(403).json({ message: "Cannot remove a Main Admin" });
+        
+        if (targetUserId === req.user.id)
+            return res.status(400).json({ message: "Cannot remove yourself" });
 
         await User.findOneAndDelete({ _id: targetUserId, companyId: req.user.companyId });
         res.status(200).json({ message: "User successfully removed" });
