@@ -1,4 +1,5 @@
 const InterviewSession = require("../../../dashboard/src/models/InterviewSession");
+const InterviewerSessionFeedback = require("../models/InterviewerSessionFeedback");
 
 const STATUS_TO_RESULT = {
   positive: "Passed",
@@ -10,9 +11,9 @@ exports.submitInterviewerFeedback = async (req, res) => {
   try {
     const { meetingId, candidateId, status, feedback } = req.body || {};
 
-    if (!meetingId || !candidateId || !status || feedback === undefined) {
+    if (!status || feedback === undefined) {
       return res.status(400).json({
-        error: "meetingId, candidateId, status, and feedback are required",
+        error: "status and feedback are required",
       });
     }
 
@@ -25,40 +26,54 @@ exports.submitInterviewerFeedback = async (req, res) => {
       });
     }
 
-    const normalizedMeetingId = String(meetingId).trim();
-    const normalizedCandidateId = String(candidateId).trim();
+    const normalizedMeetingId = String(meetingId || "").trim();
+    const normalizedCandidateId = String(candidateId || "").trim();
+    const normalizedFeedback = String(feedback || "").trim();
 
-    const session = await InterviewSession.findOne({
-      meetingId: normalizedMeetingId,
-      "candidates.candidateId": normalizedCandidateId,
-    });
+    let linkedSessionId = "";
+    let sessionUpdated = false;
 
-    if (!session) {
-      return res.status(404).json({
-        error: "Session or candidate not found for provided meetingId/candidateId",
+    if (normalizedMeetingId && normalizedCandidateId) {
+      const session = await InterviewSession.findOne({
+        meetingId: normalizedMeetingId,
+        "candidates.candidateId": normalizedCandidateId,
       });
+
+      if (session) {
+        const slotIndex = session.candidates.findIndex(
+          (candidate) => String(candidate.candidateId) === normalizedCandidateId,
+        );
+
+        if (slotIndex >= 0) {
+          session.candidates[slotIndex].result = mappedResult;
+          session.candidates[slotIndex].notes = normalizedFeedback;
+          session.markModified("candidates");
+          await session.save();
+          linkedSessionId = String(session.sessionId || "");
+          sessionUpdated = true;
+        }
+      }
     }
 
-    const slotIndex = session.candidates.findIndex(
-      (candidate) => String(candidate.candidateId) === normalizedCandidateId,
-    );
-
-    if (slotIndex < 0) {
-      return res.status(404).json({ error: "Candidate is not assigned to this session" });
-    }
-
-    session.candidates[slotIndex].result = mappedResult;
-    session.candidates[slotIndex].notes = String(feedback || "").trim();
-    session.markModified("candidates");
-    await session.save();
+    const savedFeedback = await InterviewerSessionFeedback.create({
+      meetingId: normalizedMeetingId,
+      candidateId: normalizedCandidateId,
+      status: normalizedStatus,
+      feedback: normalizedFeedback,
+      source: "desktop-app",
+      linkedSessionId,
+    });
 
     return res.json({
       message: "Interviewer session feedback saved",
       data: {
-        meetingId: session.meetingId,
-        candidateId: session.candidates[slotIndex].candidateId,
-        result: session.candidates[slotIndex].result,
-        notes: session.candidates[slotIndex].notes,
+        feedbackId: savedFeedback._id,
+        meetingId: savedFeedback.meetingId,
+        candidateId: savedFeedback.candidateId,
+        status: savedFeedback.status,
+        feedback: savedFeedback.feedback,
+        linkedSessionId: savedFeedback.linkedSessionId,
+        sessionUpdated,
       },
     });
   } catch (err) {
