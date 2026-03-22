@@ -4,15 +4,26 @@ const crypto = require("crypto");
 const { sendEmail, sendCustomEmail } = require("../config/resend");
 const { generateUniqueCode } = require("../utils/codeGenerator");
 
+/**
+ * Validates email format using regex.
+ */
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+/**
+ * Formats a given value into a numeric suffix for IDs (e.g., USR-000123).
+ */
 const toNumericSuffix = (value, size = 6) =>
   String(value || "")
-    .replace(/\D/g, "")
-    .slice(-size)
-    .padStart(size, "0");
+    .replace(/\D/g, "") // Remove non-numeric characters
+    .slice(-size)       // Take the last N digits
+    .padStart(size, "0"); // Pad with zeros
 
 const ALLOWED_DASHBOARD_ROLES = ["admin", "interviewer"];
 
+/**
+ * Transforms a raw Mongoose user document into a safe, multi-tenant aware JSON object.
+ * This ensures sensitive data like passwords are never accidentally leaked.
+ */
 const mapUserResponse = (user) => ({
   id: user._id,
   userId: user.userCode || `USR-${toNumericSuffix(user._id)}`,
@@ -21,9 +32,9 @@ const mapUserResponse = (user) => ({
   lastName: user.lastName,
   email: user.email,
   role: user.role,
-  companyId: user.companyId,
-  companyCode:
-    user.companyCode || `COM-${toNumericSuffix(user.companyId)}`,
+  isMainAdmin: user.isMainAdmin, // Identifies if this is the primary account for the company
+  companyId: user.companyId,     // The internal UUID for the organization
+  companyCode: user.companyCode || `COM-${toNumericSuffix(user.companyId)}`, // Human-readable company ID
   companyName: user.companyName,
   jobTitle: user.jobTitle,
   industry: user.industry,
@@ -171,16 +182,24 @@ exports.changePassword = async (req, res) => {
   }
 };
 
-// GET /api/dashboard/users
+/**
+ * GET /api/dashboard/users
+ * Returns the list of colleagues within the SAME company.
+ */
 exports.getUsers = async (req, res) => {
   try {
+    // Only allow dashbord users (Admins/Interviewers) access
     if (!["admin", "interviewer"].includes(req.user.role)) {
       return res
         .status(403)
         .json({ message: "Access Denied: Requires Admin or Interviewer Role" });
     }
 
+    // MULTI-TENANCY: Only query users matching the current user's companyId
     const filter = { companyId: req.user.companyId };
+    
+    // Privacy: If an interviewer is viewing, they can only see Admins (colleagues), 
+    // potentially hiding fellow interviewers depending on local rules.
     if (req.user.role === "interviewer") {
       filter.role = "admin";
     }
@@ -289,7 +308,11 @@ exports.addUser = async (req, res) => {
     }
 };
 
-// PUT /api/dashboard/users/:id
+/**
+ * PUT /api/dashboard/users/:id
+ * Updates role or status of a team member.
+ * Contains hierarchy-based security checks.
+ */
 exports.updateUser = async (req, res) => {
     try {
         if (req.user.role !== "admin") {
@@ -307,9 +330,20 @@ exports.updateUser = async (req, res) => {
             return res.status(400).json({ message: "Invalid status selected" });
         }
 
+        // Search within the company only
         const userToUpdate = await User.findOne({ _id: targetUserId, companyId: req.user.companyId });
         if (!userToUpdate) return res.status(404).json({ message: "User not found" });
 
+        /**
+         * SECURITY GATE: Hierarchy check
+         * 1. A normal Admin cannot edit ANY other Admin (prevents lateral privilege escalations).
+         * 2. Only a "Main Admin" (isMainAdmin: true) has full control over the team roster.
+         */
+        if (userToUpdate.role === "admin" && !req.user.isMainAdmin) {
+            return res.status(403).json({ message: "Only Main Admin can edit other administrators" });
+        }
+
+        // Prevent stripping the Main Admin of their role
         if (userToUpdate.isMainAdmin && role && role !== "admin") {
             return res.status(403).json({ message: "Cannot change the role of a Main Admin" });
         }
@@ -336,12 +370,19 @@ exports.deleteUser = async (req, res) => {
         const targetUserId = req.params.id;
         const userToDelete = await User.findOne({ _id: targetUserId, companyId: req.user.companyId });
 
-    if (!userToDelete)
-      return res.status(404).json({ message: "User not found" });
-    if (userToDelete.isMainAdmin)
-      return res.status(403).json({ message: "Cannot remove a Main Admin" });
-    if (targetUserId === req.user.id)
-      return res.status(400).json({ message: "Cannot remove yourself" });
+        if (!userToDelete)
+            return res.status(404).json({ message: "User not found" });
+
+        // Normal admins can't remove other admins or the main admin
+        if (userToDelete.role === "admin" && !req.user.isMainAdmin) {
+            return res.status(403).json({ message: "Only Main Admin can remove other administrators" });
+        }
+
+        if (userToDelete.isMainAdmin)
+            return res.status(403).json({ message: "Cannot remove a Main Admin" });
+        
+        if (targetUserId === req.user.id)
+            return res.status(400).json({ message: "Cannot remove yourself" });
 
         await User.findOneAndDelete({ _id: targetUserId, companyId: req.user.companyId });
 

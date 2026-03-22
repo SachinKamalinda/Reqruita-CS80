@@ -37,14 +37,33 @@ function AppHeader({ isWorkspace, isInterviewer }) {
   );
 }
 
+/**
+ * MAIN APPLICATION COMPONENT: App
+ * This is the root component for the Desktop Application.
+ * It manages the multi-step recruitment workflow from role selection to 
+ * the actual interview meeting and workspace.
+ */
 export default function App() {
-  const [step, setStep] = useState("role"); // role | login | devices | meeting | workspace
-  const [role, setRole] = useState(null); // "join" | "conduct"
+  /**
+   * STEP-BASED NAVIGATION STATE:
+   * Controls which 'page' is currently displayed.
+   * Steps: role | login | devices | meeting | workspace | feedback
+   */
+  const [step, setStep] = useState("role"); 
+  
+  // role: "join" (Candidate) | "conduct" (Interviewer)
+  const [role, setRole] = useState(null); 
+  
+  // session: Stores the active meeting metadata (meetingId, participant info, etc.)
   const [session, setSession] = useState(null);
+
   const [feedbackMeta, setFeedbackMeta] = useState({ meetingId: "", candidateId: "" });
+  
+  // UI Flag for smooth CSS transitions between steps
   const [transitioning, setTransitioning] = useState(false);
 
   const { toasts, addToast, removeToast } = useToast();
+
 
   function readStoredFeedbackMeta() {
     try {
@@ -70,7 +89,11 @@ export default function App() {
 
   // Removed legacy users array
   useEffect(() => {
-    // Check if we are in the workspace view via URL check
+    /**
+     * URL-BASED ENTRY GUARDS:
+     * Specific steps (like 'workspace' or 'feedback') can be triggered directly 
+     * by the Desktop wrapper via window query parameters.
+     */
     const params = new URLSearchParams(window.location.search);
     if (params.get("view") === "workspace") {
       setStep("workspace");
@@ -84,11 +107,16 @@ export default function App() {
       });
     }
 
+    // Ensure the window background is transparent (standard for Electron/Desktop overlays)
     document.documentElement.style.background = "transparent";
     document.body.style.background = "transparent";
   }, []);
 
-  /* ── Smooth page transition helper ── */
+  /**
+   * PAGE TRANSITION WRAPPER:
+   * Adds a brief delay and sets a 'transitioning' flag to allow CSS animations 
+   * to play out before the new step is mounted.
+   */
   const goTo = useCallback((nextStep) => {
     setTransitioning(true);
     setTimeout(() => {
@@ -97,9 +125,10 @@ export default function App() {
     }, 180);
   }, []);
 
+  // Resets the app to the initial state (role selection)
   function resetAll() {
     if (window.reqruita && step === "feedback") {
-      window.close();
+      window.close(); // Close external feedback window if managed by wrapper
       return;
     }
     setStep("role");
