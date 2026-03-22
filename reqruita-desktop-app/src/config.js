@@ -1,3 +1,3 @@
 
 /** Add your own backend URL */
-export const BACKEND_URL = "http://localhost:3001";
+export const BACKEND_URL = "http://192.168.18.12:3001";
