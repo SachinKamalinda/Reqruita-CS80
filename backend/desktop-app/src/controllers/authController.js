@@ -25,6 +25,30 @@ exports.login = async (req, res) => {
                     return res.status(401).json({ success: false, message: "Invalid credentials. Please check Email, Meeting ID, and Password." });
                 }
 
+                if (row.role === "conduct") {
+                    // Populate the local participants waiting room with candidates assigned to this identical session
+                    db.serialize(() => {
+                        db.run("DELETE FROM participants", (err) => {
+                            if (err) console.error("Failed to clear participants table:", err);
+                        });
+                        
+                        db.run(
+                            `INSERT INTO participants (id, name, status, timerStartedAt) 
+                             SELECT participantId, name, 'waiting', NULL 
+                             FROM auth_credentials 
+                             WHERE meetingId = ? AND role = 'join'`,
+                            [meetingId],
+                            (err) => {
+                                if (err) {
+                                    console.error("Failed to dynamically populate waiting room candidates:", err);
+                                } else {
+                                    console.log(`Successfully populated waiting room for session ${meetingId}.`);
+                                }
+                            }
+                        );
+                    });
+                }
+
                 return res.json({
                     success: true,
                     message: "Login successful.",

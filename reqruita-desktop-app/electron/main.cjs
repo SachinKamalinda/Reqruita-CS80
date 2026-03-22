@@ -48,6 +48,10 @@ function createWindow() {
             win.webContents.send("rq:request-close");
         }
     });
+
+    win.on("closed", () => {
+        win = null;
+    });
 }
 
 /**
@@ -156,7 +160,7 @@ function setupInterviewModeIPC() {
 
     ipcMain.on("rq:confirm-close", () => {
         isClosingConfirmed = true;
-        if (win) win.close();
+        if (win && !win.isDestroyed()) win.close();
     });
 
     ipcMain.handle("rq:open-feedback", (event, role) => {
@@ -183,12 +187,12 @@ function setupInterviewModeIPC() {
         // Show when ready to avoid flicker
         feedbackWin.once('ready-to-show', () => {
             feedbackWin.show();
-            if (win) {
+            if (win && !win.isDestroyed()) {
                 win.hide(); // Hide immediately
                 win.setSize(1, 1); // User's suggestion (shrink to 1px)
                 win.close(); 
-                win = null;
             }
+            win = null;
         });
 
         feedbackWin.on("closed", () => {

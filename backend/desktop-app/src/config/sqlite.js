@@ -71,45 +71,8 @@ const initSqlite = () => {
                 }
             });
 
-            // 3) Seed if empty (after table is created)
-            db.get("SELECT COUNT(*) as count FROM participants", (err, row) => {
-                if (err) {
-                    console.error("Error checking table:", err.message);
-                    return;
-                }
-
-                if (row && row.count === 0) {
-                    console.log("Database is empty. Seeding with mock data...");
-                    const seedData = [
-                        { id: "p1", name: "Mas Rover", status: "interviewing" },
-                        { id: "p2", name: "Robert Nachino", status: "waiting" },
-                        { id: "w1", name: "Elaina Kurama", status: "waiting" },
-                        { id: "w2", name: "Navia Fon", status: "waiting" },
-                        { id: "w3", name: "Jack Bron", status: "waiting" },
-                        { id: "w4", name: "Raiden", status: "waiting" },
-                        { id: "c1", name: "Aether", status: "completed" },
-                        { id: "c2", name: "Ananta", status: "completed" },
-                        { id: "c3", name: "Brian Sumo", status: "completed" },
-                        { id: "c4", name: "Mavuika", status: "completed" },
-                    ];
-
-                    const stmt = db.prepare(
-                        "INSERT INTO participants (id, name, status) VALUES (?, ?, ?)"
-                    );
-
-                    seedData.forEach((p) => {
-                        stmt.run(p.id, p.name, p.status, (e) => {
-                            if (e) console.error("Seed insert failed:", e.message);
-                        });
-                    });
-
-                    stmt.finalize(() => {
-                        console.log(`Successfully seeded ${seedData.length} participants.`);
-                    });
-                } else {
-                    console.log(`Database already has ${row.count} participants.`);
-                }
-            });
+            // 3) We no longer seed dummy participants. The authController handles dynamically loading 
+            // the assigned candidates from auth_credentials when an Interviewer explicitly logs in.
         });
     });
 
