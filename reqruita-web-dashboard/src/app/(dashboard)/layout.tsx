@@ -145,7 +145,7 @@ export default function DashboardLayout({
     {
       label: "Subscriptions",
       href: "/payment",
-      mainAdminOnly: true,
+      mainAdminOnly: true, // Only the 'Main Admin' (billing owner) can see this
       icon: (
         <svg
           className="w-5 h-5"
@@ -164,14 +164,33 @@ export default function DashboardLayout({
     },
   ];
 
+  /**
+   * DYNAMIC NAVIGATION FILTERING:
+   * This logic ensures that users only see the sidebar items they are authorized to use.
+   * 1. Hides 'Subscriptions' from normal admins.
+   * 2. Hides 'User & Roles' from interviewers.
+   * 3. Hides 'Job Forms' from interviewers.
+   */
   const filteredNavItems = navItems.filter((item: any) => {
+    // Check Main Admin requirement
     if (item.mainAdminOnly && !currentUser?.isMainAdmin) return false;
+    
+    // Check generic role restrictions
     if (item.roleRestricted && currentUser?.role !== item.roleRestricted) return false;
-    // Interviewer also hides Job Forms
+    
+    // Special case for interviewers: hide Job Forms
     if (currentUser?.role === "interviewer" && item.href === "/job-forms") return false;
+    
     return true;
   });
 
+  /**
+   * AUTHENTICATION INITIALIZATION:
+   * Runs when the dashboard first loads.
+   * 1. Checks if a token was passed via URL query (login from landing page).
+   * 2. Tries to retrieve user profile from memory or API.
+   * 3. Redirects to sign-in if no valid session is found.
+   */
   useEffect(() => {
     const initAuth = async () => {
       // Check for token in URL (passed from landing page)
@@ -182,19 +201,19 @@ export default function DashboardLayout({
         if (urlToken) {
           localStorage.setItem('reqruita_token', urlToken);
           const newUrl = window.location.pathname;
-          window.history.replaceState({}, '', newUrl);
+          window.history.replaceState({}, '', newUrl); // Clean the URL after saving token
         }
       }
 
       // Try to get stored user first
       let storedUser = getStoredUser();
 
-      // If we have a token but no user data, fetch it
+      // If we have a token but no user data in localStorage, fetch it from backend
       if (!storedUser && getToken()) {
         try {
           const { fetchMe, saveUser } = await import("@/lib/api");
           const user = await fetchMe();
-          saveUser(user);
+          saveUser(user); // Persistence
           storedUser = user;
         } catch (err) {
           console.error("Failed to fetch current user profile:", err);

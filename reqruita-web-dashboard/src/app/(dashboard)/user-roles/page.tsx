@@ -23,8 +23,12 @@ export default function UserRolesPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
-  // Current User State
+  // -- Permissions logic --
+  // currentUserRole: helps hide/show core UI elements (Admins see manage, Interviewers see read-only)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  
+  // isMainAdmin: True only for the person who created the company account.
+  // They are the ONLY ones who can edit or remove OTHER administrators.
   const [isMainAdmin, setIsMainAdmin] = useState<boolean>(false);
 
   // Status State
@@ -48,18 +52,25 @@ export default function UserRolesPage() {
         return;
       }
 
-      // decode token to get role
+      /**
+       * JWT DECODING:
+       * We decode the payload (2nd part of JWT) locally to check user's roles
+       * before we even make a network request. This allows for immediate UI 
+       * adaptation (e.g. hiding the 'Invite' button).
+       */
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserRole(payload.role);
         setIsMainAdmin(!!payload.isMainAdmin);
         
+        // Safety: If they aren't an admin, we don't fetch the user list
+        // (Server would block it anyway, but this saves a request).
         if (payload.role !== 'admin') {
           setLoading(false);
           return;
         }
       } catch (e) {
-        console.error("Error decoding token");
+        console.error("Error decoding token - possibly malformed");
       }
 
       const res = await fetch(`${AUTH_API_BASE}/api/dashboard/users`, {
@@ -297,6 +308,11 @@ export default function UserRolesPage() {
       <div className="bg-white rounded-2xl border p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold">Users</h2>
+          
+          {/** 
+            * ONLY Admins can see the 'Invite' button. 
+            * Normal 'Interviewers' see a list of colleagues but cannot invite new ones.
+            */}
           {isAdmin && (
             <button
               onClick={() => setIsModalOpen(true)}
@@ -388,6 +404,11 @@ export default function UserRolesPage() {
                             {user.status || "Active"}
                           </span>
                         </td>
+                        {/**
+                          * HIERARCHY LOGIC:
+                          * - A Main Admin can edit/remove anyone (except themselves).
+                          * - A normal Admin can edit/remove Interviewers, but CANNOT modify other Admins.
+                          */}
                         {isAdmin && (
                           <td className="py-4 flex gap-3">
                             {isMainAdmin && !user.isMainAdmin && (

@@ -208,10 +208,16 @@ export function getToken(): string | null {
   return localStorage.getItem("reqruita_token");
 }
 
+/**
+ * Clears session data.
+ * Also dispatches a custom event so other components (like Navigation)
+ * can instantly detect the logout and update their state.
+ */
 export function removeToken(): void {
   localStorage.removeItem("reqruita_token");
   localStorage.removeItem(USER_STORAGE_KEY);
   if (typeof window !== "undefined") {
+    // Notify the rest of the app that the user has changed (is now null)
     window.dispatchEvent(new CustomEvent(USER_UPDATED_EVENT, { detail: null }));
   }
 }
@@ -237,6 +243,13 @@ export function isAuthenticated(): boolean {
   return !!getToken();
 }
 
+/**
+ * CORE API WRAPPER: authedJsonRequest
+ * Automatically handles:
+ * 1. Attaching the 'Bearer <token>' header.
+ * 2. Setting 'Content-Type: application/json' for mutations.
+ * 3. Global Error Handling (auto-redirects to /signin on 401/403).
+ */
 async function authedJsonRequest<T>(
   path: string,
   init: RequestInit = {},
@@ -260,7 +273,10 @@ async function authedJsonRequest<T>(
   });
 
   const data = await res.json();
+  
+  // -- Error Logic --
   if (!res.ok) {
+    // If the server rejects the token, wipe local session and boot user to login
     if (res.status === 401 || res.status === 403) {
       removeToken();
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/signin')) {
