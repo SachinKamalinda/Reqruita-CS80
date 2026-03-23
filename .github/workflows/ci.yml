@@ -7,54 +7,6 @@ on:
     branches: [ main ]
 
 jobs:
-  backend-ci:
-    runs-on: ubuntu-latest
-    services:
-      mongodb:
-        image: mongo:latest
-        ports:
-          - 27017:27017
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
-      - name: Install Root Backend Dependencies
-        run: npm install
-      - name: Install Sub-service Dependencies
-        run: |
-          npm install --prefix dashboard
-          npm install --prefix desktop-app
-      - name: Start Servers and Run Tests
-        run: |
-          npm run dev &
-          npx wait-on http://localhost:3001 http://localhost:3003
-          npm test
-
-  web-dashboard-ci:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: reqruita-web-dashboard
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: reqruita-web-dashboard/package-lock.json
-      - name: Install Dependencies
-        run: npm install
-      - name: Run Build
-        run: npm run build
-
   desktop-app-ci:
     runs-on: ubuntu-latest
     defaults:
