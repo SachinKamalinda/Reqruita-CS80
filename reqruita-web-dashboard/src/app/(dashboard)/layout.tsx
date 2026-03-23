@@ -199,13 +199,15 @@ export default function DashboardLayout({
   const filteredNavItems = navItems.filter((item: any) => {
     // Check Main Admin requirement
     if (item.mainAdminOnly && !currentUser?.isMainAdmin) return false;
-    
+
     // Check generic role restrictions
-    if (item.roleRestricted && currentUser?.role !== item.roleRestricted) return false;
-    
+    if (item.roleRestricted && currentUser?.role !== item.roleRestricted)
+      return false;
+
     // Special case for interviewers: hide Job Forms
-    if (currentUser?.role === "interviewer" && item.href === "/job-forms") return false;
-    
+    if (currentUser?.role === "interviewer" && item.href === "/job-forms")
+      return false;
+
     return true;
   });
 
@@ -219,14 +221,14 @@ export default function DashboardLayout({
   useEffect(() => {
     const initAuth = async () => {
       // Check for token in URL (passed from landing page)
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const params = new URLSearchParams(window.location.search);
-        const urlToken = params.get('token');
+        const urlToken = params.get("token");
 
         if (urlToken) {
-          localStorage.setItem('reqruita_token', urlToken);
+          localStorage.setItem("reqruita_token", urlToken);
           const newUrl = window.location.pathname;
-          window.history.replaceState({}, '', newUrl); // Clean the URL after saving token
+          window.history.replaceState({}, "", newUrl); // Clean the URL after saving token
         }
       }
 
@@ -337,14 +339,16 @@ export default function DashboardLayout({
             <Link
               key={item.label}
               href={item.href}
-              className={`group w-full flex items-center gap-3 text-left py-3.5 px-4 rounded-xl transition-all duration-200 ${isActive(item.href)
-                ? "bg-white text-[#5D20B3] font-semibold shadow-lg transform scale-[1.02]"
-                : "text-white/90 hover:bg-white/15 hover:text-white hover:translate-x-1"
-                }`}
+              className={`group w-full flex items-center gap-3 text-left py-3.5 px-4 rounded-xl transition-all duration-200 ${
+                isActive(item.href)
+                  ? "bg-white text-[#5D20B3] font-semibold shadow-lg transform scale-[1.02]"
+                  : "text-white/90 hover:bg-white/15 hover:text-white hover:translate-x-1"
+              }`}
             >
               <span
-                className={`transition-transform duration-200 ${isActive(item.href) ? "" : "group-hover:scale-110"
-                  }`}
+                className={`transition-transform duration-200 ${
+                  isActive(item.href) ? "" : "group-hover:scale-110"
+                }`}
               >
                 {item.icon}
               </span>
@@ -356,9 +360,7 @@ export default function DashboardLayout({
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-20 bg-white/80 backdrop-blur-lg border-b border-gray-200/50 flex items-center justify-end px-8 shadow-sm">
-
           <div className="flex items-center gap-4 ml-8">
-
             <div className="relative" ref={profileMenuRef}>
               <button
                 className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 rounded-xl p-2 pr-3 transition-colors"
@@ -367,20 +369,30 @@ export default function DashboardLayout({
               >
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-full flex items-center justify-center font-bold text-white shadow-md">
                   {currentUser
-                    ? (currentUser.firstName || currentUser.fullName || currentUser.email || "U").charAt(0).toUpperCase()
+                    ? (
+                        currentUser.firstName ||
+                        currentUser.fullName ||
+                        currentUser.email ||
+                        "U"
+                      )
+                        .charAt(0)
+                        .toUpperCase()
                     : "U"}
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-gray-800">
-                    {currentUser ? (currentUser.fullName || currentUser.email) : "Admin User"}
+                    {currentUser
+                      ? currentUser.fullName || currentUser.email
+                      : "Admin User"}
                   </p>
                   <p className="text-xs text-gray-500 capitalize">
                     {currentUser?.role ?? "Administrator"}
                   </p>
                 </div>
                 <svg
-                  className={`w-4 h-4 text-gray-400 transition-transform ${isProfileMenuOpen ? "rotate-180" : ""
-                    }`}
+                  className={`w-4 h-4 text-gray-400 transition-transform ${
+                    isProfileMenuOpen ? "rotate-180" : ""
+                  }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -484,10 +496,11 @@ export default function DashboardLayout({
                 {notifications.map((notification) => (
                   <button
                     key={notification.id}
-                    className={`w-full text-left px-5 py-4 border-b border-gray-100 last:border-b-0 transition-colors ${selectedNotification?.id === notification.id
-                      ? "bg-purple-50"
-                      : "hover:bg-gray-50"
-                      }`}
+                    className={`w-full text-left px-5 py-4 border-b border-gray-100 last:border-b-0 transition-colors ${
+                      selectedNotification?.id === notification.id
+                        ? "bg-purple-50"
+                        : "hover:bg-gray-50"
+                    }`}
                     onClick={() => handleSelectNotification(notification)}
                   >
                     <div className="flex items-start justify-between gap-3">
