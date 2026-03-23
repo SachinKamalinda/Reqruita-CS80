@@ -1,0 +1,65 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Reqruita-CS80/backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Reqruita-CS80/backend/package-lock.json
+      - name: Install Dependencies
+        run: npm install
+      - name: Start Servers and Run Tests
+        run: |
+          npm run dev &
+          npx wait-on http://localhost:3001 http://localhost:3003
+          npm test
+
+  web-dashboard-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Reqruita-CS80/reqruita-web-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Reqruita-CS80/reqruita-web-dashboard/package-lock.json
+      - name: Install Dependencies
+        run: npm install
+      - name: Run Build
+        run: npm run build
+
+  desktop-app-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Reqruita-CS80/reqruita-desktop-app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Reqruita-CS80/reqruita-desktop-app/package-lock.json
+      - name: Install Dependencies
+        run: npm install
+      - name: Run Build
+        run: npm run build
